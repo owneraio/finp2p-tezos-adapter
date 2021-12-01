@@ -198,7 +198,8 @@ contract as the latter acts as an extra indirection layer.
 To operate correctly, the **Relay** contract needs to keep track and maintain
 the following information:
 
-- a set of administrator addresses (updatable)
+- a set of administrator addresses (updatable); only these administrators
+  are allowed to inject `transfer_asset` and `issue_asset` operations
 - a value `operation_ttl` in seconds that indicates how long an operation can be
   relayed depending on its timestamp (within the nonce); this value is updatable
   by an administrator and should match the retention policy of operations in the
@@ -477,8 +478,7 @@ However, for flexibility and future-proofing, the address of the Relay contract
 can be updated and the authorization logic can be updated as well.
 
 In particular, we want
-- a set of administrators (addresses) for this contract. Only these administrators
-  are allowed to inject `transfer_asset` and `issue_asset` operations.
+- a set of administrators (addresses) for this contract
 - a table `accredited` (big map) of addresses to bytes (the associated bytes
   value will be empty at the beginning but can contain arbitrary encoded
   information in the long run); this table is initialized with the Relay
