@@ -448,6 +448,18 @@ This would prevent to have the same information/code in two places, but it might
 not be desirable to have this coupling.
 
 
+### Update `operation_ttl`
+
+```ocaml
+let update_operation_ttl 
+  (new_operation_ttl, store : nat * storage) : (operation list * storage)
+= ...
+```
+This is callable only by an administrator. This does not need a multi-signature
+scheme at first glance.
+
+**TODO**: group other updatable configuration information for the Relay here.
+
 ## Authorization contract
 
 The authorization contract acts as an indirection point for the FA2 contracts to
