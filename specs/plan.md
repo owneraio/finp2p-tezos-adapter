@@ -287,7 +287,8 @@ This Tezos operation must be signed/injected by an administrator.
 
 ##### Signed Payload
 
-> See [API reference](https://finp2p-docs.ownera.io/reference/transfertoken).
+> See [API reference](https://finp2p-docs.ownera.io/reference/transfertoken) and
+> [DLT spec](https://finp2p-docs.ownera.io/reference/transfer-1).
 
 hashGroups = hash('BLAKE2B', [AHG, SHG]);
 
@@ -353,7 +354,6 @@ unchanged.
 
 #### Issue Asset
 
-
 ```ocaml
 type issue_asset_param = {
   nonce : bytes; (* 24 bytes *)
@@ -362,7 +362,7 @@ type issue_asset_param = {
   dst_account : public_key;
   amount : nat;
   shg : bytes; (* 32 bytes hash *)
-  signature : signature;
+  signature : signature option; (* Optional signature for issue *)
   fa2_token: (address * nat);
 }
 
@@ -373,9 +373,13 @@ let issue_asset
 
 This Tezos operation must be signed/injected by an administrator.
 
+Note that the signature is not necessarily present because FinP2P does not
+forward it to the DLT for now (but will at some point).
+
 ##### Payload
 
-> See [API reference](https://finp2p-docs.ownera.io/reference/issuetoken).
+> See [API reference](https://finp2p-docs.ownera.io/reference/issuetoken) and
+> [DLT spec](https://finp2p-docs.ownera.io/reference/issue-1).
 
 hashGroups = hash('BLAKE2B', [AHG, SHG]);
 
@@ -415,10 +419,10 @@ order | value | type | comment
 The entry point to issue a new asset (`issue_asset`) does the following:
 
 1. Do the same steps 1-4 of [transfer asset](#verifying-asset-signatures)
-5. check that the encoded message was signed by the public key `dst_account`
-   - **Question**: Who is the “sender” in this case? Is it `dst_account` or
-     someone else (like an admin) ? In the latter case, how can we know the
-     public key of the sender?
+5. **If the signature is present**, check that the encoded message was signed by
+   the public key `dst_account` (otherwise skip signature the check)
+   - **TODO**: Do we want a flag in the contract that says if the signature is
+     required?
 6. store the `asset_id` with `fa2_token` and check if does not already exist
 7. call the `mint` entry point of the FA2
    - **Question**: What token metadata? 
@@ -449,7 +453,8 @@ This Tezos operation must be signed/injected by an administrator.
 
 ##### Signed Payload
 
-> See [API reference](https://finp2p-docs.ownera.io/reference/redeemtoken).
+> See [API reference](https://finp2p-docs.ownera.io/reference/redeemtoken)  and
+> [DLT spec](https://finp2p-docs.ownera.io/reference/transfer-1).
 
 Signature = sign(sender private secp256k1 key, message)
 
