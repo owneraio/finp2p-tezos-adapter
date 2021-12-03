@@ -7,6 +7,8 @@ Tezos adapter and thus not all nodes can access the Tezos blockchain.
 This document describes the smart contracts architecture of the FinP2P adapter
 on the Tezos blockchain.
 
+<a name="architecture"></a>
+
 ![Contracts architecture](images/finp2p_tezos_contracts.png)
 
 ## Design choice for assets
@@ -243,8 +245,8 @@ the following information:
   id>:<resource type>:<resource>`) to pairs of the form `(<KT1>, <id>)` where
   `<KT1>` is the address of the FA2 contract for this asset on Tezos and `<id>`
   is a natural number for this asset within the FA2 contract. Note that the
-  FinP2P asset identifier can be opaque to the **Relay** contract (simply an
-  ASCII string or a byte sequence, as long as they are unique within FinP2P).
+  FinP2P asset identifier can be opaque to the **Relay** contract (simply a byte
+  sequence, as long as they are unique within FinP2P).
   
 <!--
 - (optional) a mapping of account addresses (`tz2`) to public keys (_i.e._,
@@ -298,14 +300,14 @@ AHG = hash('BLAKE2B', [fields by order]);
 | order | value | type | comment |
 |--|--|--|--|
 | 1 | nonce           | []byte  |  |
-| 2 | operation       | string  | "transfer" |
-| 3 | assetType       | string  | "finp2p" |
-| 4 | assetId         | string  | unique identifier of the asset |
-| 5 | srcAccountType  | string  | "finId" |
-| 6 | srcAccount      | string  | source account finId address  |
-| 7 | dstAccountType  | string  | "finId" |
-| 8 | dstAccount      | string  | destination account finId address  |
-| 9 | amount          | string  | hex representation of the transfer amount |
+| 2 | operation       | utf8 string  | "transfer" |
+| 3 | assetType       | utf8 string  | "finp2p" |
+| 4 | assetId         | utf8 string  | unique identifier of the asset |
+| 5 | srcAccountType  | utf8 string  | "finId" |
+| 6 | srcAccount      | utf8 string  | source account finId address  |
+| 7 | dstAccountType  | utf8 string  | "finId" |
+| 8 | dstAccount      | utf8 string  | destination account finId address  |
+| 9 | amount          | utf8 string  | hex representation of the transfer amount |
 
 ###### Settlement Hash Group (SHG) structure
 
@@ -313,13 +315,13 @@ SHG = hash('BLAKE2B', [fields by order]);
 
 | order | value | type | comment |
 |--|--|--|--|
-| 1 | assetType       | string  | "finp2p", "fiat", "cryptocurrency" |
-| 2 | assetId         | string  | unique identifier of the asset |
-| 3 | srcAccountType  | string  | "finId", "cryptoWallet", "escrow" |
-| 4 | srcAccount      | string  | source account of the asset  |
-| 5 | dstAccountType  | string  | "finId", "cryptoWallet", "escrow" |
-| 6 | dstAccount      | string  | destination account for the asset  |
-| 7 | amount          | string  | hex representation of the settlement amount |
+| 1 | assetType       | utf8 string  | "finp2p", "fiat", "cryptocurrency" |
+| 2 | assetId         | utf8 string  | unique identifier of the asset |
+| 3 | srcAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow" |
+| 4 | srcAccount      | utf8 string  | source account of the asset  |
+| 5 | dstAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow" |
+| 6 | dstAccount      | utf8 string  | destination account for the asset  |
+| 7 | amount          | utf8 string  | hex representation of the settlement amount |
 
 #### Verifying transfer signatures
 
@@ -330,18 +332,15 @@ The entry point to transfer an asset (`transfer_asset`) does the following:
    `timestamp` is in the past.
 2. encode the parameter (without the signature) in bytes to recover the original
    signed message in the FinP2P node.
-   - **Question**: Are the "string"s ascii or utf8? (answer seems to be utf8
-     based on documentation)
    - We need to convert the timestamp to seconds from epoch (easy) then to int64
      big endian bytes (cumbersome but possible, need to encode by hand)
    - encode public_key to bytes (easy, pack then trim prefix)
    - convert the amount to hex string (must be done by hand) and encode this hex
      string to utf8 bytes (cumbersome as well).
-3. Hash the produced bytes and ensure that it is not in our `live_operations`
-   table.
-   - **Question**: Should we exclude the SHG of the hash?
+3. Hash the produced bytes (this is in fact the `hashGroup`) and ensure that it
+   is not in our `live_operations` table.
 4. Register the hash -> timestamp in the `live_operations` table.
-   - **Question**: Should we store the timestamp or the expiry date (depends on
+   - **TODO**: Should we store the timestamp or the expiry date (depends on
      guarantees we want in case of `operation_ttl` update) ?
 5. check that the encoded message was signed by the public key `src_account`
    [^Tezos requires the signature to be done on a `hashGroup` whose top hash is [BLAKE2b](https://en.wikipedia.org/wiki/BLAKE_(hash_function))]
@@ -389,12 +388,12 @@ AHG = hash('BLAKE2B', [fields by order]);
 | order | value | type | comment |
 |--|--|--|--|
 | 1 | nonce | []byte | 
-| 2 | operation | string | "issue"
-| 3 | assetType | string | "finp2p"
-| 4 | assetId | string | unique identifier of the asset
-| 5 | dstAccountType | string | "finId"
-| 6 | dstAccount | string | destination account finId address hex representation
-| 7 | amount | string | hex (prefixed with 0x) representation of the issuance amount
+| 2 | operation | utf8 string | "issue"
+| 3 | assetType | utf8 string | "finp2p"
+| 4 | assetId | utf8 string | unique identifier of the asset
+| 5 | dstAccountType | utf8 string | "finId"
+| 6 | dstAccount | utf8 string | destination account finId address hex representation
+| 7 | amount | utf8 string | hex (prefixed with 0x) representation of the issuance amount
 
 ###### Settlement Hash Group (SHG) structure:
 
@@ -402,14 +401,14 @@ SHG = hash('BLAKE2B', [fields by order]);
 
 order | value | type | comment
 |--|--|--|--|
-| 1 | assetType | string | "finp2p", "fiat", "cryptocurrency"
-| 2 | assetId | string | unique identifier of the asset
-| 3 | srcAccountType | string | "finId", "cryptoWallet", "escrow"
-| 4 | srcAccount | string | source account of the asset
-| 5 | dstAccountType | string | "finId", "cryptoWallet", "escrow"
-| 6 | dstAccount | string | destination account for the asset
-| 7 | amount | string | hex representation of the settlement amount
-| 8 | expiry | string | hex representation of the escrow hold expiry value
+| 1 | assetType | utf8 string | "finp2p", "fiat", "cryptocurrency"
+| 2 | assetId | utf8 string | unique identifier of the asset
+| 3 | srcAccountType | utf8 string | "finId", "cryptoWallet", "escrow"
+| 4 | srcAccount | utf8 string | source account of the asset
+| 5 | dstAccountType | utf8 string | "finId", "cryptoWallet", "escrow"
+| 6 | dstAccount | utf8 string | destination account for the asset
+| 7 | amount | utf8 string | hex representation of the settlement amount
+| 8 | expiry | utf8 string | hex representation of the escrow hold expiry value
 
 #### Verifying asset issuance signature
 
@@ -417,7 +416,9 @@ The entry point to issue a new asset (`issue_asset`) does the following:
 
 1. Do the same steps 1-4 of [transfer asset](#verifying-asset-signatures)
 5. check that the encoded message was signed by the public key `dst_account`
-   - **Question**: can anyone issue assets? (_i.e._ is this check ok?)
+   - **Question**: Who is the “sender” in this case? Is it `dst_account` or
+     someone else (like an admin) ? In the latter case, how can we know the
+     public key of the sender?
 6. store the `asset_id` with `fa2_token` and check if does not already exist
 7. call the `mint` entry point of the FA2
    - **Question**: What token metadata? 
@@ -455,9 +456,9 @@ Signature = sign(sender private secp256k1 key, message)
 |order|value|type|comment|
 |---|---|---|---|
 |1|nonce|[]byte|	
-|2|	"redeem"|	string|	name of the method|
-|3|	assetId	|string	|
-|4|	quantity|	string|	hex representation of the quantity
+|2|	"redeem"|	utf8 string|	name of the method|
+|3|	assetId	|utf8 string	|
+|4|	quantity|	utf8 string|	hex representation of the quantity
 
 #### Verifying asset redeem signature
 
@@ -558,6 +559,10 @@ implementation (note that the update, and the migration of the data
 contained in the FA2, including the ledger, etc. should be done beforehand,
 either manually or by the FinP2P Tezos adapter).
 
+This entry point should also allow an administrator to add a new asset for an
+external FA2 token that is already deployed on chain (see [scenario External
+FA2s](external-fa2s)).
+
 ## Authorization contract
 
 The authorization contract acts as an indirection point for the FA2 contracts to
@@ -639,3 +644,36 @@ let update_authorization_logic
 This is callable only by an administrator. We will use a configurable
 multi-signature scheme if desired for this.
 
+
+## Scenarios
+
+### FinP2P Asset transfers outside FinP2P
+
+If we have a “finP2P FA2 contract” and an outside user A tries to transfer his
+tokens to B (B can be in finP2P or not), then the **Authorization** contract will
+receive a request to authorize a transfer of A to B where the sender is A (as
+opposed to the Relay contract).
+
+By default, if A is not in the `accredited` table, the transaction will be
+blocked, but if an admin adds A to `accredited`, then it will be allowed.
+
+Note: If we want a more complicated scheme in a future evolution of the platform
+we can update the autorization logic and say now that A is accredited to
+transfer only to [B] in the `accredited` table.
+
+### External FA2s
+
+Consider the scenario of an FA2 contract that is already deployed
+on Tezos, and someone wants to offer his assets through the finP2P
+network.
+
+In this case, this user will need to add the **Relay** contract as an operator
+to its account on the FA2. Because the operator has all the rights, the user
+will want to move only the assets to offer on finP2P to an address that
+corresponds to his finId and add an operator for this account only.
+
+The asset will need to also be added to the FinP2P network and an administrator
+should register the corresponding **asset id** in the **Relay** contract (with
+the `update_fa2_contract` entry point).
+
+See the red external FA2 contract [in the diagram above](#architecture).
