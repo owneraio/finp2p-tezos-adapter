@@ -60,9 +60,9 @@ The contract will have the following entry points:
 - `update_operators`
 - `balance_of`
 - `mint`
+- `burn`
 
-**Question**: Do we want more? (e.g. burn, see [Asset Token
-redeem](#asset-token-redeem))
+**Question**: Do we want more?
 
 #### Authorization policy
 
@@ -151,9 +151,42 @@ entry point `authorize` with the parameter:
 } 
 ```
 
-
 The mint will create new tokens for the account `dst_account_pkh` (_i.e._ his
 balance in this token will be incremented by `amount`).
+
+#### `burn`
+
+The burn entry point is not part of the standard but we propose that it takes a
+list of assets to be burned (so as to be more efficient if the relay changes and
+allows for multiple burns at the same time).
+
+```ocaml
+type burn_param = {
+  from_ : address;
+  token_id : nat;
+  amount : nat;
+}
+
+let burn
+  (param, store : burn_param * storage) : (operation list * storage) = ...
+```
+
+Burning tokens will produce a call to the **Authorization** contract at the
+entry point `authorize` with the parameter:
+
+```ocaml
+{ 
+  sender = "KT1relay";
+  fa2_address = "KT1fa2X";
+  parameters = Burn [
+    {from_ = src_account_pkh ; token_id; amount};
+    ...
+  ] 
+} 
+```
+
+The burn will remove tokens from the account `src_account_pkh` (_i.e._ his
+balance in this token will be decremented by `amount`).
 
 ### `update_operators`
 
@@ -222,6 +255,7 @@ the following information:
 
 - `transfer_asset`
 - `issue_asset`
+- `redeem_asset`
 - `cleanup`
 - `update_administrator`
 - `update_operation_ttl`
@@ -379,27 +413,63 @@ order | value | type | comment
 
 #### Verifying asset issuance signature
 
-The entry point to issue a new asset (`transfer`) does the following:
+The entry point to issue a new asset (`issue_asset`) does the following:
 
 1. Do the same steps 1-4 of [transfer asset](#verifying-asset-signatures)
 5. check that the encoded message was signed by the public key `dst_account`
    - **Question**: can anyone issue assets? (_i.e._ is this check ok?)
 6. store the `asset_id` with `fa2_token` and check if does not already exist
 7. call the `mint` entry point of the FA2
-   - **Question**: What token metadata?
+   - **Question**: What token metadata? 
      - decimals (mandatory)
      - name (= asset_id?)
      - symbol
      - URI to external metadata
 
 
-### Asset Token redeem
+### Redeem Asset
 
-See https://finp2p-docs.ownera.io/reference/redeemtoken
+```ocaml
+type redeem_asset_param = {
+  nonce : bytes; (* 24 bytes *)
+  nonce_timestamp : timestamp;
+  asset_id : bytes;
+  quantity : nat;
+  signature : signature;
+  src_account : public_key;
+}
 
-**Questions**:
-- Do we need this?
-- Is this analogous to a burn operation on the DLT?
+let redeem_asset
+  (param, store : issue_asset_param * storage) : (operation list * storage)
+= ...
+```
+
+This Tezos operation must be signed/injected by an administrator.
+
+##### Signed Payload
+
+> See [API reference](https://finp2p-docs.ownera.io/reference/redeemtoken).
+
+Signature = sign(sender private secp256k1 key, message)
+
+|order|value|type|comment|
+|---|---|---|---|
+|1|nonce|[]byte|	
+|2|	"redeem"|	string|	name of the method|
+|3|	assetId	|string	|
+|4|	quantity|	string|	hex representation of the quantity
+
+#### Verifying asset redeem signature
+
+The entry point to redeem an existing asset (`redeem_asset`) does the following:
+
+1. Do the same steps 1-4 of [transfer asset](#verifying-asset-signatures)
+   excepted that the `src_account` is not part of the signed payload (but it
+   still need to be passed as a parameter to the Tezos transaction in order to
+   check the signature and to burn tokens from the correct signer)
+5. check that the encoded message was signed by the public key `src_account`
+7. call the `burn` entry point of the FA2
+
 
 ### Clean up
 
@@ -526,6 +596,7 @@ In particular, we want
 type authorize_fa2_param =
 | Transfer of fa2_transfer_param
 | Mint of fa2_transfer_mint
+| Burn of fa2_transfer_burn
 | ...
 
 type authorize_param = {
