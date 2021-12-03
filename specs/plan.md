@@ -224,6 +224,8 @@ the following information:
 - `issue_asset`
 - `cleanup`
 - `update_administrator`
+- `update_operation_ttl`
+- `update_fa2_token`
 
 
 #### Transfer Asset
@@ -440,6 +442,7 @@ let update_administrators
   (param, store : address set * storage) : (operation list * storage)
 = ...
 ```
+
 This is callable only by an administrator. We will use a configurable
 multi-signature scheme if desired for this.
 
@@ -456,10 +459,34 @@ let update_operation_ttl
   (new_operation_ttl, store : nat * storage) : (operation list * storage)
 = ...
 ```
+
 This is callable only by an administrator. This does not need a multi-signature
 scheme at first glance.
 
 **TODO**: group other updatable configuration information for the Relay here.
+
+### Update FA2 token for an asset
+
+```ocaml
+type update_fa2_token_param = {
+  asset_id : bytes;
+  fa2_token : (address * nat);
+}
+
+let update_fa2_token 
+  (param, store : update_fa2_token_param * storage) : (operation list * storage)
+= ...
+```
+
+This is callable only by an administrator. This does not need a multi-signature
+scheme at first glance. It should allow for an administrator to update the FA2
+contract address (and/or it's token id) for an asset that is already registered
+in the table.
+
+This is useful in case we want to update one or more FA2 contract to a new
+implementation (note that the update, and the migration of the data
+contained in the FA2, including the ledger, etc. should be done beforehand,
+either manually or by the FinP2P Tezos adapter).
 
 ## Authorization contract
 
