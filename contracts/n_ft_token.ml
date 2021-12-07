@@ -1,4 +1,3 @@
-open Mligo
 include Types
 
 let get_balance (p : balance_of_param) (ledger : ledger) : operation =

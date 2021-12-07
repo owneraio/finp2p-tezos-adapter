@@ -1,5 +1,4 @@
-open Mligo
-include Types
+include Fa2_types
 
 let set_admin (s : storage) (a : address) : storage =
   { s with pending_admin = Some a }

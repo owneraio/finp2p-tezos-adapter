@@ -7,7 +7,7 @@ all: copy
 
 copy: dist
 	@cp -f $(BUILD)/contracts/*.mligo $(DIST)/ligo
-	@cp -f $(BUILD)/contracts/n_ft_multiple.tz $(DIST)/michelson
+	@cp -f $(BUILD)/contracts/*.tz $(DIST)/michelson
 
 dist: build
 	@mkdir -p $(DIST)/ligo

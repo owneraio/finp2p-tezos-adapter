@@ -1,5 +1,5 @@
-open Mligo
-include Types
+include Errors
+include Fa2_types
 
 let get_balance (p : balance_of_param) (ledger : ledger) : operation =
   let to_balance (r : balance_of_request) =

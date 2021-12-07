@@ -1,7 +1,7 @@
-open Mligo
 include Admin
 
 let mint_tokens (s : storage) (p: mint_param): storage =
+  (* FIXME can mint any id > or existing *)
   if s.next_token_id = p.mi_token_id then
     let ledger, supply = List.fold (fun ((l, supply), (owner, amo) : (ledger * nat) * (address * nat)) ->
         Big_map.add (p.mi_token_id, owner) amo l, supply + amo
@@ -31,6 +31,7 @@ let burn_tokens (s : storage) (p : burn_param)  : storage =
   | Some (_, m) ->
     if Tezos.sender None = s.admin then remove_tokens s p.bu_token_id p.bu_owners
     else if not (Map.mem "burnable" m) then (failwith "NOT_BURNABLE" : storage)
+    (* FIXME no burnable metadata *)
     else match p.bu_owners with
       | [ owner, _ ] ->
         begin match Big_map.find_opt (p.bu_token_id, owner) s.ledger with

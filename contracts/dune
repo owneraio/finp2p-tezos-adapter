@@ -1,14 +1,36 @@
 (library
- (name n_ft_multiple)
+ (name base)
  (modules
    errors
-   types
+   fa2_params
+   auth_params
+   fa2_types
+   auth_types
+ )
+ (preprocess (pps mligo.ppx))
+ (flags (:standard -open Mligo)))
+
+(library
+ (name n_ft_multiple)
+ (modules
    assets
    admin
    manager
    n_ft_multiple
  )
- (preprocess (pps mligo.ppx)))
+ (libraries base)
+ (preprocess (pps mligo.ppx))
+ (flags (:standard -open Mligo -open Base)))
+
+ 
+(library
+ (name authorization)
+ (modules
+   authorization
+ )
+ (libraries base)
+ (preprocess (pps mligo.ppx))
+ (flags (:standard -open Mligo -open Base)))
 
 (library
  (name n_ft_multiple_test)
@@ -19,55 +41,83 @@
 (rule
  (deps
    errors.ml
-   types.ml
+   fa2_params.ml
+   fa2_types.ml
    assets.ml
    admin.ml
    manager.ml
    n_ft_multiple.ml
    n_ft_multiple_test.ml
+   auth_params.ml
+   auth_types.ml
+   authorization.ml
  )
  (targets
    errors.mligo
-   types.mligo
+   fa2_params.mligo
+   fa2_types.mligo
    assets.mligo
    admin.mligo
    manager.mligo
    n_ft_multiple.mligo
    n_ft_multiple_test.mligo
+   auth_params.mligo
+   auth_types.mligo
+   authorization.mligo
  )
  (action
    (progn
     (run to_mligo n_ft_multiple.ml)
+    (run to_mligo authorization.ml)
     (run to_mligo n_ft_multiple_test.ml))))
 
 (rule
  (alias runtest)
- (deps n_ft_multiple.mligo)
- (action (with-stdout-to n_ft_multiple.tz (run ligo compile contract n_ft_multiple.mligo))))
+ (deps n_ft_multiple.mligo authorization.mligo)
+ (action
+  (progn
+   (with-stdout-to n_ft_multiple.tz
+    (run ligo compile contract n_ft_multiple.mligo))
+   (with-stdout-to authorization.tz
+    (run ligo compile contract authorization.mligo)))))
 
 (rule
  (deps
    errors.ml
-   types.ml
+   fa2_params.ml
+   fa2_types.ml
    assets.ml
    admin.ml
    manager.ml
    n_ft_multiple.ml
+   auth_params.ml
+   auth_types.ml
+   authorization.mligo
  )
- (targets n_ft_multiple_interface.ml)
- (action (run mligo_interface -s -o n_ft_multiple_interface.ml n_ft_multiple.ml)))
+ (targets n_ft_multiple_interface.ml authorization_interface.ml)
+ (action
+  (progn
+   (run mligo_interface -s -o n_ft_multiple_interface.ml n_ft_multiple.ml)
+   (run mligo_interface -s -o authorization_interface.ml authorization.ml))))
 
 (rule
  (deps
    errors.ml
-   types.ml
+   fa2_params.ml
+   fa2_types.ml
    assets.ml
    admin.ml
    manager.ml
    n_ft_multiple.ml
+   auth_params.ml
+   auth_types.ml
+   authorization.ml
  )
- (targets n_ft_multiple_tzfunc.ml)
- (action (run mligo_interface -o n_ft_multiple_tzfunc.ml n_ft_multiple.ml)))
+ (targets n_ft_multiple_tzfunc.ml authorization_tzfunc.ml)
+ (action
+  (progn
+   (run mligo_interface -o n_ft_multiple_tzfunc.ml n_ft_multiple.ml)
+   (run mligo_interface -o authorization_tzfunc.ml authorization.ml))))
 
 (library
  (name n_ft_multiple_interface)
@@ -79,3 +129,14 @@
  (optional)
  (modules n_ft_multiple_tzfunc)
  (libraries n_ft_multiple mligo.tzfunc))
+
+(library
+ (name authorization_interface)
+ (modules authorization_interface)
+ (libraries authorization mligo.unix))
+
+(library
+ (name authorization_tzfunc)
+ (optional)
+ (modules authorization_tzfunc)
+ (libraries authorization mligo.tzfunc))
