@@ -19,8 +19,8 @@ build:
 clean:
 	@dune clean
 
-opam-switch:
-	@opam switch create . ocaml-base-compiler.4.12.1 -y
+_opam:
+	@opam switch create . --empty --no-install
 
-build-deps:
+build-deps: _opam
 	@opam install . --deps-only -y
