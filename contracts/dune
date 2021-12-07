@@ -1,0 +1,81 @@
+(library
+ (name n_ft_multiple)
+ (modules
+   errors
+   types
+   assets
+   admin
+   manager
+   n_ft_multiple
+ )
+ (preprocess (pps mligo.ppx)))
+
+(library
+ (name n_ft_multiple_test)
+ (modules n_ft_multiple_test)
+ (libraries n_ft_multiple)
+ (preprocess (pps mligo.ppx)))
+
+(rule
+ (deps
+   errors.ml
+   types.ml
+   assets.ml
+   admin.ml
+   manager.ml
+   n_ft_multiple.ml
+   n_ft_multiple_test.ml
+ )
+ (targets
+   errors.mligo
+   types.mligo
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   n_ft_multiple.mligo
+   n_ft_multiple_test.mligo
+ )
+ (action
+   (progn
+    (run to_mligo n_ft_multiple.ml)
+    (run to_mligo n_ft_multiple_test.ml))))
+
+(rule
+ (alias runtest)
+ (deps n_ft_multiple.mligo)
+ (action (with-stdout-to n_ft_multiple.tz (run ligo compile contract n_ft_multiple.mligo))))
+
+(rule
+ (deps
+   errors.ml
+   types.ml
+   assets.ml
+   admin.ml
+   manager.ml
+   n_ft_multiple.ml
+ )
+ (targets n_ft_multiple_interface.ml)
+ (action (run mligo_interface -s -o n_ft_multiple_interface.ml n_ft_multiple.ml)))
+
+(rule
+ (deps
+   errors.ml
+   types.ml
+   assets.ml
+   admin.ml
+   manager.ml
+   n_ft_multiple.ml
+ )
+ (targets n_ft_multiple_tzfunc.ml)
+ (action (run mligo_interface -o n_ft_multiple_tzfunc.ml n_ft_multiple.ml)))
+
+(library
+ (name n_ft_multiple_interface)
+ (modules n_ft_multiple_interface)
+ (libraries n_ft_multiple mligo.unix))
+
+(library
+ (name n_ft_multiple_tzfunc)
+ (optional)
+ (modules n_ft_multiple_tzfunc)
+ (libraries n_ft_multiple mligo.tzfunc))
