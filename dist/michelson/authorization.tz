@@ -1,0 +1,34 @@
+{ parameter
+    (or (pair %authorize
+           (address %sender)
+           (pair (list %sender_is_operator (list bool))
+                 (pair (address %fa2_address)
+                       (or %action
+                          (or %assets_action
+                             (or (pair %balance_of
+                                    (list %requests (pair (address %owner) (nat %token_id)))
+                                    (contract %callback
+                                       (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                 (list %transfer
+                                    (pair (address %from_)
+                                          (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                             (or (list %update_operators
+                                    (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                        (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))
+                                 (list %update_operators_for_all
+                                    (or (address %add_operator_for_all) (address %remove_operator_for_all)))))
+                          (or (or %manage_action
+                                 (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                 (pair %mint
+                                    (nat %token_id)
+                                    (pair (map %token_info string bytes) (list %owners (pair address nat)))))
+                              (unit %admin_action))))))
+        (or %update_accredited
+           (pair %add_accredited address bytes)
+           (address %remove_accredited))) ;
+  storage unit ;
+  code { UNPAIR ;
+         NIL operation ;
+         SWAP ;
+         IF_LEFT { DROP ; PAIR } { DROP ; PAIR } } }
+
