@@ -42,3 +42,15 @@ let fa2_token_already_exists = "FA2_TOKEN_ALREADY_EXISTS"
 
 (** Action was rejected by Finp2p authorization contract *)
 let unauthorized = "FINP2P_UNAUTHORIZED_ACTION"
+
+(** Operation is in the past or is expired *)
+let op_not_live = "FINP2P_PASSED_OR_EXPIRED_OPERATION"
+
+(** Asset id does not correspond to a known FA2 token *)
+let unknown_asset_id = "FINP2P_UNKNOWN_ASSET_ID"
+
+(** Contract does not have the expected FA2 interface *)
+let invalid_fa2_contract = "INVALID_FA2_CONTRACT"
+
+(** Issuing of a new already existing asset *)
+let asset_already_exists = "FINP2P_ASSET_ALREADY_EXISTS"
