@@ -51,7 +51,7 @@ type fa2 =
 
 type mint_param = {
   mi_token_id : nat;
-  mi_token_info : (string, bytes) map;
+  mi_token_info : (string, bytes) map option;
   mi_owners : (address * nat) list;
 }
 [@@comb] [@@param Mint_tokens]

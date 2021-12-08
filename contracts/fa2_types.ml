@@ -20,7 +20,6 @@ type storage = {
   ledger : ledger;
   operators : operators_storage;
   token_metadata : token_metadata_storage;
-  next_token_id : nat;
   metadata : (string, bytes) big_map;
 }
 [@@store]

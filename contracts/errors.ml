@@ -37,5 +37,8 @@ let fa2_receiver_hook_undefined = "FA2_RECEIVER_HOOK_UNDEFINED"
     by a sender contract *)
 let fa2_sender_hook_undefined = "FA2_SENDER_HOOK_UNDEFINED"
 
+(** A mint for a new contract reuses an existing token id *)
+let fa2_token_already_exists = "FA2_TOKEN_ALREADY_EXISTS"
+
 (** Action was rejected by Finp2p authorization contract *)
 let unauthorized = "FINP2P_UNAUTHORIZED_ACTION"

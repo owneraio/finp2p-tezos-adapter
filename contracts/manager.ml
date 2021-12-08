@@ -2,21 +2,40 @@ include Errors
 include Admin
 
 let mint (s : storage) (p : mint_param) : storage =
-  (* FIXME can mint any id > or existing *)
-  if s.next_token_id = p.mi_token_id then
-    let (ledger, supply) =
-      List.fold
-        (fun (((l, supply), (owner, amo)) : (ledger * nat) * (address * nat)) ->
-          (Big_map.add (p.mi_token_id, owner) amo l, supply + amo))
-        p.mi_owners
-        (s.ledger, 0n)
-    in
-    let token_metadata =
-      Big_map.add p.mi_token_id (supply, p.mi_token_info) s.token_metadata
-    in
-    let next_token_id = s.next_token_id + 1n in
-    {s with token_metadata; ledger; next_token_id}
-  else (failwith "INVALID_TOKEN_ID" : storage)
+  let maybe_metadata = Big_map.find_opt p.mi_token_id s.token_metadata in
+  let (supply, info) =
+    match p.mi_token_info with
+    | None -> (
+        (* Existing token *)
+        match maybe_metadata with
+        | None -> (failwith fa2_token_undefined : nat * (string, bytes) map)
+        | Some supply_info -> supply_info)
+    | Some info -> (
+        (* New token *)
+        match maybe_metadata with
+        | Some _ ->
+            (failwith fa2_token_already_exists : nat * (string, bytes) map)
+        | None -> (0n, info))
+  in
+  let (ledger, supply) =
+    List.fold_left
+      (fun (((ledger, supply), (owner, mint_amount)) :
+             (ledger * nat) * (address * nat)) ->
+        let new_balance =
+          match Big_map.find_opt (p.mi_token_id, owner) ledger with
+          | None -> mint_amount
+          | Some balance -> balance + mint_amount
+        in
+        let ledger = Big_map.add (p.mi_token_id, owner) new_balance ledger in
+        let supply = supply + mint_amount in
+        (ledger, supply))
+      (s.ledger, supply)
+      p.mi_owners
+  in
+  let token_metadata =
+    Big_map.add p.mi_token_id (supply, info) s.token_metadata
+  in
+  {s with token_metadata; ledger}
 
 let burn_tokens (s : storage) (id : nat) (owners : (address * nat) list) :
     storage =
