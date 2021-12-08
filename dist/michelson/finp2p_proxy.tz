@@ -39,30 +39,6 @@
              IF_NONE { FAILWITH } { SWAP ; DROP } } ;
          SWAP ;
          APPLY ;
-         SWAP ;
-         DUP ;
-         DUG 2 ;
-         LAMBDA
-           (pair string address)
-           (contract (pair nat (pair (option (map string bytes)) (list (pair address nat)))))
-           { UNPAIR ;
-             SWAP ;
-             CONTRACT %mint
-               (pair (nat %token_id)
-                     (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))) ;
-             IF_NONE { FAILWITH } { SWAP ; DROP } } ;
-         SWAP ;
-         APPLY ;
-         DIG 2 ;
-         LAMBDA
-           (pair string address)
-           (contract (pair nat (list (pair address nat))))
-           { UNPAIR ;
-             SWAP ;
-             CONTRACT %burn (pair (nat %token_id) (list %owners (pair address nat))) ;
-             IF_NONE { FAILWITH } { SWAP ; DROP } } ;
-         SWAP ;
-         APPLY ;
          LAMBDA
            (pair (pair address (big_map bytes (pair address nat)))
                  (pair (big_map bytes timestamp) nat))
@@ -110,20 +86,19 @@
          SWAP ;
          APPLY ;
          LAMBDA key address { HASH_KEY ; IMPLICIT_ACCOUNT ; ADDRESS } ;
-         DIG 9 ;
+         DIG 8 ;
          UNPAIR ;
          IF_LEFT
            { DIG 2 ;
              DIG 3 ;
+             DIG 7 ;
+             DIG 8 ;
              DIG 9 ;
-             DIG 10 ;
-             DROP 4 ;
+             DROP 5 ;
              IF_LEFT
                { DIG 3 ;
                  DIG 4 ;
-                 DIG 5 ;
-                 DIG 6 ;
-                 DROP 4 ;
+                 DROP 2 ;
                  SWAP ;
                  DUP ;
                  DUG 2 ;
@@ -169,9 +144,7 @@
                  IF_LEFT
                    { IF_LEFT
                        { DIG 2 ;
-                         DIG 3 ;
-                         DIG 4 ;
-                         DROP 3 ;
+                         DROP ;
                          SWAP ;
                          DUP ;
                          DUG 2 ;
@@ -183,39 +156,22 @@
                          PAIR ;
                          PAIR }
                        { UNPAIR ;
-                         DIG 5 ;
-                         DIG 5 ;
-                         DIG 5 ;
-                         DIG 4 ;
-                         DIG 4 ;
-                         PAIR 5 ;
+                         DIG 3 ;
+                         DUG 2 ;
+                         PAIR 3 ;
                          LAMBDA
                            (pair (pair bytes
                                        (pair (pair address nat)
-                                             (pair (lambda address (contract (pair nat (list (pair address nat)))))
-                                                   (pair (lambda
-                                                            address
-                                                            (contract (pair nat (pair (option (map string bytes)) (list (pair address nat))))))
-                                                         (lambda address (contract (list (pair address (list (pair address (pair nat nat)))))))))))
+                                             (lambda address (contract (list (pair address (list (pair address (pair nat nat)))))))))
                                  (pair (pair address (big_map bytes (pair address nat)))
                                        (pair (big_map bytes timestamp) nat)))
                            (pair (pair address (big_map bytes (pair address nat)))
                                  (pair (big_map bytes timestamp) nat))
                            { UNPAIR ;
-                             UNPAIR 5 ;
-                             DIG 5 ;
+                             UNPAIR 3 ;
+                             DIG 3 ;
                              DUP 3 ;
                              CAR ;
-                             DUP ;
-                             DIG 7 ;
-                             SWAP ;
-                             EXEC ;
-                             DROP ;
-                             DUP ;
-                             DIG 6 ;
-                             SWAP ;
-                             EXEC ;
-                             DROP ;
                              DIG 4 ;
                              SWAP ;
                              EXEC ;
@@ -242,19 +198,7 @@
                          APPLY ;
                          SWAP ;
                          EXEC } }
-                   { DIG 2 ;
-                     DIG 3 ;
-                     DIG 4 ;
-                     DROP 3 ;
-                     SWAP ;
-                     DUP ;
-                     DUG 2 ;
-                     CDR ;
-                     CAR ;
-                     PAIR ;
-                     SWAP ;
-                     CAR ;
-                     PAIR } ;
+                   { DIG 2 ; DROP ; SWAP ; DUP ; DUG 2 ; CDR ; CAR ; PAIR ; SWAP ; CAR ; PAIR } ;
                  NIL operation ;
                  PAIR } }
            { DIG 4 ;
@@ -267,12 +211,10 @@
              EXEC ;
              DROP ;
              IF_LEFT
-               { DIG 6 ;
+               { DIG 4 ;
                  DROP ;
                  IF_LEFT
-                   { DIG 4 ;
-                     DROP ;
-                     DUP ;
+                   { DUP ;
                      CDR ;
                      CAR ;
                      CAR ;
@@ -364,9 +306,10 @@
                      PAIR ;
                      SWAP ;
                      CAR ;
-                     DIG 3 ;
-                     SWAP ;
-                     EXEC ;
+                     CONTRACT %mint
+                       (pair (nat %token_id)
+                             (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))) ;
+                     IF_NONE { DIG 2 ; FAILWITH } { DIG 3 ; DROP } ;
                      PUSH mutez 0 ;
                      DIG 2 ;
                      TRANSFER_TOKENS ;
@@ -375,9 +318,7 @@
                      DIG 2 ;
                      CONS ;
                      PAIR }
-                   { DIG 5 ;
-                     DROP ;
-                     DUP ;
+                   { DUP ;
                      CAR ;
                      CDR ;
                      CAR ;
@@ -440,9 +381,8 @@
                      PAIR ;
                      SWAP ;
                      CAR ;
-                     DIG 3 ;
-                     SWAP ;
-                     EXEC ;
+                     CONTRACT %burn (pair (nat %token_id) (list %owners (pair address nat))) ;
+                     IF_NONE { DIG 2 ; FAILWITH } { DIG 3 ; DROP } ;
                      PUSH mutez 0 ;
                      DIG 2 ;
                      TRANSFER_TOKENS ;
@@ -451,9 +391,8 @@
                      DIG 2 ;
                      CONS ;
                      PAIR } }
-               { DIG 4 ;
-                 DIG 5 ;
-                 DROP 2 ;
+               { DIG 5 ;
+                 DROP ;
                  DUP ;
                  CAR ;
                  CDR ;

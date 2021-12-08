@@ -23,7 +23,6 @@ let get_burn_entrypoint (addr : address) : burn_param contract =
   | Some c -> c
 
 let check_fa2_contract (addr : address) : unit =
-  let _ = get_transfer_entrypoint addr in
-  let _ = get_mint_entrypoint addr in let _ = get_burn_entrypoint addr in ()
+  let _ = get_transfer_entrypoint addr in ()
 
 #endif

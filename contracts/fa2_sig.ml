@@ -25,14 +25,8 @@ let get_burn_entrypoint (addr : address) : (burn_param, _) contract =
   | None -> (failwith invalid_fa2_contract : (burn_param, _) contract)
   | Some c -> c
 
-(** Fails if the contract does not have the correct interface, i.e. the
-    entry-points that we use in the proxy:
-    - transfer
-    - mint
-    - burn
-*)
+(** Fails if the contract does not have at least the correct transfer
+    entry-point *)
 let check_fa2_contract (addr : address) : unit =
   let _ = get_transfer_entrypoint addr in
-  let _ = get_mint_entrypoint addr in
-  let _ = get_burn_entrypoint addr in
   ()
