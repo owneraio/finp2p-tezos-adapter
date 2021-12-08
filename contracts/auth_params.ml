@@ -14,12 +14,21 @@ type auth_param = {
 }
 [@@comb] [@@param Authorize]
 
-type update_accredited_param =
+type auth_storage = {
+  auth_admin : address;
+  auth_accredited : (address, bytes) big_map;
+}
+[@@param Store]
+
+type auth_admin_param =
   | Add_accredited of (address * bytes)
   | Remove_accredited of address
-[@@param Update_accredited]
+  | Update_admin of address
+  | Update_auth_logic of
+      (auth_param * auth_storage -> operation list * auth_storage)
+[@@param Admin]
 
 type auth_main_param =
   | Authorize of auth_param
-  | Update_accredited of update_accredited_param
+  | Auth_admin of auth_admin_param
 [@@entry Main]

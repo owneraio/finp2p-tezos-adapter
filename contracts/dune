@@ -74,60 +74,60 @@
     authorization.tz
     (run ligo compile contract authorization.mligo)))))
 
-(rule
- (deps
-  errors.ml
-  fa2_params.ml
-  fa2_types.ml
-  assets.ml
-  admin.ml
-  manager.ml
-  fa2.ml
-  auth_params.ml
-  auth_types.ml
-  authorization.mligo)
- (targets fa2_interface.ml authorization_interface.ml)
- (action
-  (progn
-   (run mligo_interface -s -o fa2_interface.ml fa2.ml)
-   (run mligo_interface -s -o authorization_interface.ml authorization.ml))))
+; (rule
+;  (deps
+;   errors.ml
+;   fa2_params.ml
+;   fa2_types.ml
+;   assets.ml
+;   admin.ml
+;   manager.ml
+;   fa2.ml
+;   auth_params.ml
+;   auth_types.ml
+;   authorization.mligo)
+;  (targets fa2_interface.ml authorization_interface.ml)
+;  (action
+;   (progn
+;    (run mligo_interface -s -o fa2_interface.ml fa2.ml)
+;    (run mligo_interface -s -o authorization_interface.ml authorization.ml))))
 
-(rule
- (deps
-  errors.ml
-  fa2_params.ml
-  fa2_types.ml
-  assets.ml
-  admin.ml
-  manager.ml
-  fa2.ml
-  auth_params.ml
-  auth_types.ml
-  authorization.ml)
- (targets fa2_tzfunc.ml authorization_tzfunc.ml)
- (action
-  (progn
-   (run mligo_interface -o fa2_tzfunc.ml fa2.ml)
-   (run mligo_interface -o authorization_tzfunc.ml authorization.ml))))
+; (rule
+;  (deps
+;   errors.ml
+;   fa2_params.ml
+;   fa2_types.ml
+;   assets.ml
+;   admin.ml
+;   manager.ml
+;   fa2.ml
+;   auth_params.ml
+;   auth_types.ml
+;   authorization.ml)
+;  (targets fa2_tzfunc.ml authorization_tzfunc.ml)
+;  (action
+;   (progn
+;    (run mligo_interface -o fa2_tzfunc.ml fa2.ml)
+;    (run mligo_interface -o authorization_tzfunc.ml authorization.ml))))
 
-(library
- (name fa2_interface)
- (modules fa2_interface)
- (libraries fa2 mligo.unix))
+; (library
+;  (name fa2_interface)
+;  (modules fa2_interface)
+;  (libraries fa2 mligo.unix))
 
-(library
- (name fa2_tzfunc)
- (optional)
- (modules fa2_tzfunc)
- (libraries fa2 mligo.tzfunc))
+; (library
+;  (name fa2_tzfunc)
+;  (optional)
+;  (modules fa2_tzfunc)
+;  (libraries fa2 mligo.tzfunc))
 
-(library
- (name authorization_interface)
- (modules authorization_interface)
- (libraries authorization mligo.unix))
+; (library
+;  (name authorization_interface)
+;  (modules authorization_interface)
+;  (libraries authorization mligo.unix))
 
-(library
- (name authorization_tzfunc)
- (optional)
- (modules authorization_tzfunc)
- (libraries authorization mligo.tzfunc))
+; (library
+;  (name authorization_tzfunc)
+;  (optional)
+;  (modules authorization_tzfunc)
+;  (libraries authorization mligo.tzfunc))
