@@ -31,4 +31,22 @@ let fa2_receiver_hook_undefined  =
 let fa2_sender_hook_undefined  =
   "FA2_SENDER_HOOK_UNDEFINED"
 
+let fa2_token_already_exists  =
+  "FA2_TOKEN_ALREADY_EXISTS"
+
+let unauthorized  =
+  "FINP2P_UNAUTHORIZED_ACTION"
+
+let op_not_live  =
+  "FINP2P_PASSED_OR_EXPIRED_OPERATION"
+
+let unknown_asset_id  =
+  "FINP2P_UNKNOWN_ASSET_ID"
+
+let invalid_fa2_contract  =
+  "INVALID_FA2_CONTRACT"
+
+let asset_already_exists  =
+  "FINP2P_ASSET_ALREADY_EXISTS"
+
 #endif

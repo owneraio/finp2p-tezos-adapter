@@ -42,7 +42,7 @@ type fa2 =
 
 type mint_param = [@layout:comb]  {
     token_id: nat ;
-    token_info: (string, bytes) map ;
+    token_info: (string, bytes) map option ;
     owners: (address * nat) list }
 
 type burn_param = [@layout:comb]  {

@@ -1,5 +1,32 @@
 { parameter
-    (or (pair %authorize
+    (or (or %auth_admin
+           (or (pair %add_accredited address bytes) (address %remove_accredited))
+           (or (address %update_admin)
+               (lambda %update_auth_logic
+                  (pair (pair (address %sender)
+                              (pair (list %sender_is_operator (list bool))
+                                    (pair (address %fa2_address)
+                                          (or %action
+                                             (or %assets_action
+                                                (or (pair %balance_of
+                                                       (list %requests (pair (address %owner) (nat %token_id)))
+                                                       (contract %callback
+                                                          (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                                    (list %transfer
+                                                       (pair (address %from_)
+                                                             (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                                                (list %update_operators
+                                                   (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                                       (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
+                                             (or (or %manage_action
+                                                    (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                                    (pair %mint
+                                                       (nat %token_id)
+                                                       (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                                 (unit %admin_action))))))
+                        (pair (big_map %ccredited address bytes) (address %dmin)))
+                  (pair (list operation) (pair (big_map %ccredited address bytes) (address %dmin))))))
+        (pair %authorize
            (address %sender)
            (pair (list %sender_is_operator (list bool))
                  (pair (address %fa2_address)
@@ -12,23 +39,110 @@
                                  (list %transfer
                                     (pair (address %from_)
                                           (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
-                             (or (list %update_operators
-                                    (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
-                                        (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))
-                                 (list %update_operators_for_all
-                                    (or (address %add_operator_for_all) (address %remove_operator_for_all)))))
+                             (list %update_operators
+                                (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                    (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
                           (or (or %manage_action
                                  (pair %burn (nat %token_id) (list %owners (pair address nat)))
                                  (pair %mint
                                     (nat %token_id)
-                                    (pair (map %token_info string bytes) (list %owners (pair address nat)))))
-                              (unit %admin_action))))))
-        (or %update_accredited
-           (pair %add_accredited address bytes)
-           (address %remove_accredited))) ;
-  storage unit ;
+                                    (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                              (unit %admin_action))))))) ;
+  storage
+    (pair (lambda %authorize
+             (pair (pair (address %sender)
+                         (pair (list %sender_is_operator (list bool))
+                               (pair (address %fa2_address)
+                                     (or %action
+                                        (or %assets_action
+                                           (or (pair %balance_of
+                                                  (list %requests (pair (address %owner) (nat %token_id)))
+                                                  (contract %callback
+                                                     (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                               (list %transfer
+                                                  (pair (address %from_)
+                                                        (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                                           (list %update_operators
+                                              (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                                  (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
+                                        (or (or %manage_action
+                                               (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                               (pair %mint
+                                                  (nat %token_id)
+                                                  (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                            (unit %admin_action))))))
+                   (pair (big_map %ccredited address bytes) (address %dmin)))
+             (pair (list operation) (pair (big_map %ccredited address bytes) (address %dmin))))
+          (pair %storage (big_map %ccredited address bytes) (address %dmin))) ;
   code { UNPAIR ;
-         NIL operation ;
-         SWAP ;
-         IF_LEFT { DROP ; PAIR } { DROP ; PAIR } } }
+         IF_LEFT
+           { SWAP ;
+             DUP ;
+             DUG 2 ;
+             CDR ;
+             CDR ;
+             SENDER ;
+             COMPARE ;
+             EQ ;
+             NOT ;
+             IF { PUSH string "FINP2P_UNAUTHORIZED_ACTION" ; FAILWITH } {} ;
+             IF_LEFT
+               { IF_LEFT
+                   { UNPAIR ;
+                     DUP 3 ;
+                     CDR ;
+                     CDR ;
+                     DUP 4 ;
+                     CDR ;
+                     CAR ;
+                     DIG 3 ;
+                     DIG 3 ;
+                     SWAP ;
+                     SOME ;
+                     SWAP ;
+                     UPDATE ;
+                     PAIR ;
+                     SWAP ;
+                     CAR ;
+                     PAIR }
+                   { SWAP ;
+                     DUP ;
+                     DUG 2 ;
+                     CDR ;
+                     CDR ;
+                     DUP 3 ;
+                     CDR ;
+                     CAR ;
+                     DIG 2 ;
+                     NONE bytes ;
+                     SWAP ;
+                     UPDATE ;
+                     PAIR ;
+                     SWAP ;
+                     CAR ;
+                     PAIR } }
+               { IF_LEFT
+                   { SWAP ; DUP ; DUG 2 ; CDR ; CAR ; PAIR ; SWAP ; CAR ; PAIR }
+                   { SWAP ; CDR ; SWAP ; PAIR } } ;
+             NIL operation ;
+             PAIR }
+           { SWAP ;
+             DUP ;
+             DUG 2 ;
+             CDR ;
+             SWAP ;
+             PAIR ;
+             SWAP ;
+             DUP ;
+             DUG 2 ;
+             CAR ;
+             SWAP ;
+             EXEC ;
+             UNPAIR ;
+             SWAP ;
+             DIG 2 ;
+             CAR ;
+             PAIR ;
+             SWAP ;
+             PAIR } } }
 

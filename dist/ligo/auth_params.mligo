@@ -13,12 +13,19 @@ type auth_param = [@layout:comb]  {
     fa2_address: address ;
     action: authorizable_action }
 
-type update_accredited_param =
+type auth_storage = {
+  dmin: address ;
+  ccredited: (address, bytes) big_map }
+
+type auth_admin_param =
   | Add_accredited of (address * bytes) 
   | Remove_accredited of address 
+  | Update_admin of address 
+  | Update_auth_logic of
+      ((auth_param * auth_storage) -> (operation list * auth_storage)) 
 
 type auth_main_param =
   | Authorize of auth_param 
-  | Update_accredited of update_accredited_param 
+  | Auth_admin of auth_admin_param 
 
 #endif
