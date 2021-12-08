@@ -19,7 +19,6 @@ type update_accredited_param =
   | Remove_accredited of address
 [@@param Update_accredited]
 
-
 type auth_main_param =
   | Authorize of auth_param
   | Update_accredited of update_accredited_param

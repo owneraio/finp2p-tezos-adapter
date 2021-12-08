@@ -1,4 +1,3 @@
 include Auth_params
 
-type storage = unit
- [@@store]
+type storage = unit [@@store]

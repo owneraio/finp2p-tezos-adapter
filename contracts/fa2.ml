@@ -41,17 +41,19 @@ let authorize (param : param) (s : storage) : operation =
     | Manager p -> Manage_action p
     | Admin _ -> Admin_action
   in
-  Tezos.transaction None
+  Tezos.transaction
+    None
     {
       sender = Tezos.sender None;
       sender_is_operator;
       fa2_address = Tezos.self_address None;
       action;
     }
-    0t auth_contract
+    0t
+    auth_contract
 
 let main ((param, s) : param * storage) : operation list * storage =
-  let ops, s =
+  let (ops, s) =
     match param with
     | Admin p -> admin (p, s)
     | Manager p -> manager (p, s)

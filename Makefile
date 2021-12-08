@@ -19,6 +19,9 @@ build:
 clean:
 	@dune clean
 
+fmt:
+	@dune build @fmt --auto-promote
+
 _opam:
 	@opam switch create . --empty --no-install
 
