@@ -1,6 +1,6 @@
 open Mligo
 open List
-include N_ft_multiple
+include Fa2
 
 let src = Test.nth_bootstrap_account 0
 let other = Test.nth_bootstrap_account 1
