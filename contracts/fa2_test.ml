@@ -33,7 +33,7 @@ let test_mint =
     mi_token_info = (Map.empty : (string, bytes) map);
     mi_owners
   } in
-  let () = Test.transfer_to_contract_exn contr (Manager (Mint_tokens mint_param) ) 0t in
+  let () = Test.transfer_to_contract_exn contr (Manager (Mint mint_param) ) 0t in
   let storage = Test.get_storage taddr in
   let () = assert (next_token_id storage = mi_token_id + quantity) in
   let () = assert (Big_map.find_opt (3n, src) storage.ledger = Some 1n) in

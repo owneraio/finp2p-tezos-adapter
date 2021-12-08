@@ -63,9 +63,8 @@ type burn_param = {
 } [@@comb] [@@param Burn_tokens]
 
 type manager =
-  (* FIXME change names *)
-  | Mint_tokens of mint_param
-  | Burn_tokens of burn_param
+  | Mint of mint_param
+  | Burn of burn_param
 [@@entry Tokens]
 
 (* Admin *)

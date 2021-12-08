@@ -28,7 +28,7 @@ let main (param, s : param * storage) : (operation list) * storage =
                     s.operators
               ) ok tx.tr_txs
         ) true txs
-    | Manager (Burn_tokens bu) ->
+    | Manager (Burn bu) ->
       List.fold_left (fun ((ok : bool), ((owner : address), (_amount : nat))) ->
                 if not ok then false else
                   Big_map.mem
