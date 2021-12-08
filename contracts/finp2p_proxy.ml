@@ -1,4 +1,5 @@
 include Errors
+include Fa2_sig
 include Finp2p_proxy_types
 
 let fail_not_admin (s : storage) =
@@ -23,6 +24,14 @@ let update_operation_ttl (operation_ttl : nat) (s : storage) =
   {s with operation_ttl}
 
 let update_admin (admin : address) (s : storage) = {s with admin}
+
+let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
+  (* Check that the contract has the correct interface *)
+  let () =
+    if not (is_fa2_contract fa2.address) then
+      (failwith "INVALID_FA2_CONTRACT" : unit)
+  in
+  {s with finp2p_assets = Big_map.add asset_id fa2 s.finp2p_assets}
 
 (** This entry point removes expired operations (passed in argument) from the
     [live_operations] table *)
@@ -60,6 +69,7 @@ let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
     match p with
     | Update_operation_ttl p -> update_operation_ttl p s
     | Update_admin p -> update_admin p s
+    | Update_fa2_token p -> update_fa2_token p s
   in
   (([] : operation list), s)
 

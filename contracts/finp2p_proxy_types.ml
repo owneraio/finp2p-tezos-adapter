@@ -47,9 +47,12 @@ type finp2p_proxy_asset_param =
   | Redeem_tokens of redeem_tokens_param
 [@@param Finp2p_asset]
 
+type update_fa2_token_param = asset_id * fa2_token [@@param Update_fa2_token]
+
 type finp2p_proxy_admin_param =
   | Update_operation_ttl of nat
   | Update_admin of address
+  | Update_fa2_token of update_fa2_token_param
 [@@param Finp2p_asset]
 
 type finp2p_proxy_param =
