@@ -26,7 +26,7 @@ type auth_admin_param =
   | Update_admin of address
   | Update_auth_logic of
       (auth_param * auth_storage -> operation list * auth_storage)
-[@@param Admin]
+[@@param Auth_admin]
 
 type auth_main_param =
   | Authorize of auth_param

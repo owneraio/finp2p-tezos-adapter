@@ -24,7 +24,7 @@ let mint (p : mint_param) (s : storage) : storage =
         let new_balance =
           match Big_map.find_opt (p.mi_token_id, owner) ledger with
           | None -> mint_amount
-          | Some balance -> balance + mint_amount
+          | Some old_balance -> old_balance + mint_amount
         in
         let ledger = Big_map.add (p.mi_token_id, owner) new_balance ledger in
         let supply = supply + mint_amount in
@@ -42,12 +42,12 @@ let burn (p : burn_param) (s : storage) : storage =
   let ledger =
     List.fold_left
       (fun ((ledger, (owner, burn_amount)) : ledger * (address * nat)) ->
-        let balance =
+        let old_balance =
           match Big_map.find_opt (id, owner) ledger with
           | None -> 0n
-          | Some balance -> balance
+          | Some old_balance -> old_balance
         in
-        match is_nat (balance - burn_amount) with
+        match is_nat (old_balance - burn_amount) with
         | None -> (failwith fa2_insufficient_balance : ledger)
         | Some new_balance ->
             if new_balance = 0n then Big_map.remove (id, owner) ledger

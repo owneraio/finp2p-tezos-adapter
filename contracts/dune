@@ -1,6 +1,6 @@
 (library
  (name base)
- (modules errors fa2_params auth_params fa2_types auth_types)
+ (modules errors fa2_params auth_params fa2_types auth_types finp2p_proxy_types)
  (preprocess
   (pps mligo.ppx))
  (flags
@@ -18,6 +18,15 @@
 (library
  (name authorization)
  (modules authorization)
+ (libraries base)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo -open Base)))
+
+(library
+ (name finp2p_proxy)
+ (modules finp2p_proxy)
  (libraries base)
  (preprocess
   (pps mligo.ppx))
@@ -43,7 +52,9 @@
   fa2_test.ml
   auth_params.ml
   auth_types.ml
-  authorization.ml)
+  authorization.ml
+  finp2p_proxy_types.ml
+  finp2p_proxy.ml)
  (targets
   errors.mligo
   fa2_params.mligo
@@ -55,24 +66,43 @@
   fa2_test.mligo
   auth_params.mligo
   auth_types.mligo
-  authorization.mligo)
+  authorization.mligo
+  finp2p_proxy_types.mligo
+  finp2p_proxy.mligo)
  (action
   (progn
    (run to_mligo fa2.ml)
    (run to_mligo authorization.ml)
+   (run to_mligo finp2p_proxy.ml)
    (run to_mligo fa2_test.ml))))
 
 (rule
  (alias runtest)
- (deps fa2.mligo authorization.mligo)
- (action
-  (progn
-   (with-stdout-to
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+   fa2_test.mligo
+   auth_params.mligo
+   auth_types.mligo
+   authorization.mligo
+   finp2p_proxy_types.mligo
+   finp2p_proxy.mligo)
+(action
+ (progn
+  (with-stdout-to
     fa2.tz
-    (run ligo compile contract fa2.mligo))
-   (with-stdout-to
+   (run ligo compile contract fa2.mligo))
+  (with-stdout-to
     authorization.tz
-    (run ligo compile contract authorization.mligo)))))
+   (run ligo compile contract authorization.mligo))
+  (with-stdout-to
+    finp2p_proxy.tz
+   (run ligo compile contract finp2p_proxy.mligo)))))
 
 ; (rule
 ;  (deps
