@@ -1,10 +1,16 @@
 include Fa2_params
 
+type authorizable_action =
+  | Assets_action of fa2
+  | Manage_action of manager
+  | Admin_action
+[@@comb] [@@param Authorize]
+
 type auth_param = {
   sender : address;
-  sender_is_operator : bool;
+  sender_is_operator : bool list list;
   fa2_address : address;
-  parameters : param;
+  action : authorizable_action;
 }
 [@@comb] [@@param Authorize]
 

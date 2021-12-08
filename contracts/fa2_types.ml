@@ -8,7 +8,7 @@ type operators_for_all_storage = ((address * address), unit) big_map [@@param St
 type token_metadata_storage = (nat, nat * (string, bytes) map) big_map [@@param Store]
 
 type storage = {
-  admin : address; (* FIXME remove/rename to auth_address *)
+  auth_contract : address;
   pending_admin : address option;
   paused : bool;
   ledger : ledger;

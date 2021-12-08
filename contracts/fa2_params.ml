@@ -70,8 +70,7 @@ type manager =
 (* Admin *)
 
 type admin =
-  | Set_admin of address
-  | Confirm_admin
+  | Update_auth_contract of address
   | Pause of bool
 [@@entry Admin]
 

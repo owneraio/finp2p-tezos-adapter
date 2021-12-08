@@ -6,7 +6,7 @@ let src = Test.nth_bootstrap_account 0
 let other = Test.nth_bootstrap_account 1
 
 let initial_storage : storage = {
-  admin = src;
+  auth_contract = src; (* TODO deploy auth *)
   pending_admin = (None : address option);
   paused = true;
   ledger = (Big_map.empty : ((nat * address), nat) big_map);
