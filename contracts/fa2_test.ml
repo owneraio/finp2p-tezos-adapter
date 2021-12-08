@@ -14,7 +14,6 @@ let initial_storage : storage =
     paused = true;
     ledger = (Big_map.empty : (nat * address, nat) big_map);
     operators = (Big_map.empty : operators_storage);
-    operators_for_all = (Big_map.empty : operators_for_all_storage);
     next_token_id = 0n;
     token_metadata = (Big_map.empty : (nat, nat * (string, bytes) map) big_map);
     metadata = (Big_map.empty : (string, bytes) big_map);

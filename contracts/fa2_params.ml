@@ -45,7 +45,6 @@ type fa2 =
   | Transfer of transfer list
   | Balance_of of balance_of_param
   | Update_operators of operator_update list
-  | Update_operators_for_all of operator_update_for_all list
 [@@entry Assets]
 
 (* Manager *)

@@ -89,22 +89,10 @@ let update_operators (storage : operators_storage) (ops : operator_update list)
 let default_operator_validator (owner : address) (operator : address)
     (token_id : nat) (s : storage) : unit =
   if owner = operator then () (* transfer by the owner *)
-  else if Big_map.mem (owner, operator) s.operators_for_all then ()
-    (* the company wallet is permitted *)
   else if Big_map.mem (owner, (operator, token_id)) s.operators then ()
     (* the operator is permitted for the token_id *)
   else (failwith fa2_not_operator : unit)
 (* the operator is not permitted for the token_id *)
-
-let update_operators_for_all (s : operators_for_all_storage)
-    (l : operator_update_for_all list) : operators_for_all_storage =
-  List.fold
-    (fun ((s, a) : operators_for_all_storage * operator_update_for_all) ->
-      match a with
-      | Add_operator_for_all op -> Big_map.add (op, Tezos.sender None) () s
-      | Remove_operator_for_all op -> Big_map.remove (op, Tezos.sender None) s)
-    l
-    s
 
 let fa2 ((param, storage) : fa2 * storage) : operation list * storage =
   match param with
@@ -117,10 +105,4 @@ let fa2 ((param, storage) : fa2 * storage) : operation list * storage =
   | Update_operators ops ->
       let operators = update_operators storage.operators ops in
       let storage = {storage with operators} in
-      (([] : operation list), storage)
-  | Update_operators_for_all ops ->
-      let operators_for_all =
-        update_operators_for_all storage.operators_for_all ops
-      in
-      let storage = {storage with operators_for_all} in
       (([] : operation list), storage)
