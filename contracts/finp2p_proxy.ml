@@ -4,6 +4,26 @@ include Finp2p_proxy_types
 let fail_not_admin (s : storage) =
   if not (Tezos.sender None = s.admin) then (failwith unauthorized : unit)
 
+let transfer_tokens (_p : transfer_tokens_param) (s : storage) :
+    operation list * storage =
+  (* TODO *)
+  (([] : operation list), s)
+
+let issue_tokens (_p : issue_tokens_param) (s : storage) :
+    operation list * storage =
+  (* TODO *)
+  (([] : operation list), s)
+
+let redeem_tokens (_p : redeem_tokens_param) (s : storage) :
+    operation list * storage =
+  (* TODO *)
+  (([] : operation list), s)
+
+let update_operation_ttl (operation_ttl : nat) (s : storage) =
+  {s with operation_ttl}
+
+let update_admin (admin : address) (s : storage) = {s with admin}
+
 (** This entry point removes expired operations (passed in argument) from the
     [live_operations] table *)
 let cleanup (ops : operation_hash list) (s : storage) : storage =
@@ -27,11 +47,31 @@ let cleanup (ops : operation_hash list) (s : storage) : storage =
   in
   {s with live_operations}
 
+let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
+    operation list * storage =
+  match p with
+  | Transfer_tokens p -> transfer_tokens p s
+  | Issue_tokens p -> issue_tokens p s
+  | Redeem_tokens p -> redeem_tokens p s
+
+let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
+    operation list * storage =
+  let s =
+    match p with
+    | Update_operation_ttl p -> update_operation_ttl p s
+    | Update_admin p -> update_admin p s
+  in
+  (([] : operation list), s)
+
 let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
     =
   match param with
-  | Finp2p_asset _p -> (([] : operation list), s)
-  | Finp2p_admin _p -> (([] : operation list), s)
+  | Finp2p_asset _p ->
+      let () = fail_not_admin s in
+      (([] : operation list), s)
+  | Finp2p_admin _p ->
+      let () = fail_not_admin s in
+      (([] : operation list), s)
   | Cleanup ops ->
       let s = cleanup ops s in
       (([] : operation list), s)
