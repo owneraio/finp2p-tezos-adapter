@@ -35,7 +35,7 @@
 
 (library
  (name finp2p_proxy)
- (modules finp2p_proxy)
+ (modules finp2p_conv finp2p_lib finp2p_proxy)
  (libraries base fa2_sig)
  (preprocess
   (pps mligo.ppx))
@@ -50,21 +50,17 @@
   (pps mligo.ppx)))
 
 (rule
- (deps
-  errors.ml
-  fa2_params.ml
-  fa2_types.ml
-  fa2_sig.ml
-  assets.ml
-  admin.ml
-  manager.ml
-  fa2.ml
-  fa2_test.ml
-  auth_params.ml
-  auth_types.ml
-  authorization.ml
-  finp2p_proxy_types.ml
-  finp2p_proxy.ml)
+ (mode promote)
+ (deps scripts/gen_finp2p_conv.ml)
+ (target finp2p_conv.ml)
+ (action
+  (with-stdout-to
+   %{target}
+  (run ./scripts/gen_finp2p_conv.ml))))
+
+(rule
+ (alias ligo)
+ (deps (glob_files *.ml))
  (targets
   errors.mligo
   fa2_params.mligo
@@ -79,6 +75,8 @@
   auth_types.mligo
   authorization.mligo
   finp2p_proxy_types.mligo
+  finp2p_conv.mligo
+  finp2p_lib.mligo
   finp2p_proxy.mligo)
  (action
   (progn
@@ -88,7 +86,7 @@
    (run to_mligo fa2_test.ml))))
 
 (rule
- (alias runtest)
+ (alias michelson)
  (deps
    errors.mligo
    fa2_params.mligo
@@ -103,6 +101,8 @@
    auth_types.mligo
    authorization.mligo
    finp2p_proxy_types.mligo
+   finp2p_conv.mligo
+   finp2p_lib.mligo
    finp2p_proxy.mligo)
 (action
  (progn

@@ -1,6 +1,7 @@
 include Errors
 include Fa2_sig
 include Finp2p_proxy_types
+include Finp2p_lib
 
 let fail_not_admin (s : storage) =
   if not (Tezos.sender None = s.admin) then (failwith unauthorized : unit)
@@ -35,6 +36,7 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
     | Some fa2_token -> fa2_token
   in
   let tr_amount = match p.tt_amount with Amount a -> a in
+  let _x = nat_to_int64_big_endian tr_amount in
   let fa2_transfer =
     {
       tr_src = address_of_key p.tt_src_account;
