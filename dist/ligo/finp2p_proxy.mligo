@@ -4,6 +4,7 @@
 #include "errors.mligo"
 #include "fa2_sig.mligo"
 #include "finp2p_proxy_types.mligo"
+#include "finp2p_lib.mligo"
 let fail_not_admin (s : storage) =
   if not (Tezos.sender = s.admin) then (failwith unauthorized : unit)
 
@@ -20,7 +21,7 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation list 
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
-  let oph = OpHash (Bytes.pack p) in
+  let oph = check_transfer_tokens_signature p in
   let s =
     {
       s with
@@ -31,6 +32,7 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation list 
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token in
   let tr_amount = match p.amount with | Amount a -> a in
+  let _x = nat_to_int64_big_endian tr_amount in
   let fa2_transfer =
     {
       from_ = (address_of_key p.src_account);
@@ -49,7 +51,7 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : (operation list * stor
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
-  let oph = OpHash (Bytes.pack p) in
+  let oph = check_issue_tokens_signature p in
   let s =
     {
       s with
@@ -83,7 +85,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation list * st
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
-  let oph = OpHash (Bytes.pack p) in
+  let oph = check_redeem_tokens_signature p in
   let s =
     {
       s with

@@ -44,7 +44,7 @@ type redeem_tokens_param =
     asset_id: asset_id ;
     src_account: key ;
     amount: token_amount ;
-    signature: signature option }
+    signature: signature }
 
 type finp2p_proxy_asset_param =
   | Transfer_tokens of transfer_tokens_param 

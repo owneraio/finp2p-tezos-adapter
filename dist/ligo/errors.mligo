@@ -49,4 +49,7 @@ let invalid_fa2_contract  =
 let asset_already_exists  =
   "FINP2P_ASSET_ALREADY_EXISTS"
 
+let invalid_signature  =
+  "FINP2P_INVALID_SIGNATURE"
+
 #endif
