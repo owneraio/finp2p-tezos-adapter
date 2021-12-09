@@ -37,7 +37,7 @@ type redeem_tokens_param = {
   rt_asset_id : asset_id;
   rt_src_account : key;
   rt_amount : token_amount;
-  rt_signature : signature option;
+  rt_signature : signature;
 }
 [@@param Redeem_tokens]
 

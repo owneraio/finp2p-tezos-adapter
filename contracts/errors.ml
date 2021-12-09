@@ -54,3 +54,6 @@ let invalid_fa2_contract = "INVALID_FA2_CONTRACT"
 
 (** Issuing of a new already existing asset *)
 let asset_already_exists = "FINP2P_ASSET_ALREADY_EXISTS"
+
+(** Invalid signature for asset operation *)
+let invalid_signature = "FINP2P_INVALID_SIGNATURE"

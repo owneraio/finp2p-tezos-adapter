@@ -21,9 +21,7 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
     if not (is_operation_live p.tt_nonce.timestamp s) then
       (failwith op_not_live : unit)
   in
-  (* TODO: hash operation *)
-  let oph = OpHash (Bytes.pack p (* XXX: placeholder *)) in
-  (* TODO: check_signature *)
+  let oph = check_transfer_tokens_signature p in
   let s =
     {
       s with
@@ -60,9 +58,7 @@ let issue_tokens (p : issue_tokens_param) (s : storage) :
     if not (is_operation_live p.it_nonce.timestamp s) then
       (failwith op_not_live : unit)
   in
-  (* TODO: hash operation *)
-  let oph = OpHash (Bytes.pack p (* XXX: placeholder *)) in
-  (* TODO: check_signature *)
+  let oph = check_issue_tokens_signature p in
   let s =
     {
       s with
@@ -103,9 +99,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) :
     if not (is_operation_live p.rt_nonce.timestamp s) then
       (failwith op_not_live : unit)
   in
-  (* TODO: hash operation *)
-  let oph = OpHash (Bytes.pack p (* XXX: placeholder *)) in
-  (* TODO: check_signature *)
+  let oph = check_redeem_tokens_signature p in
   let s =
     {
       s with
