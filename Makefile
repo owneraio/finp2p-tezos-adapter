@@ -1,16 +1,17 @@
-all: build
 
 DIST=dist
 BUILD=_build/default
 
-all: copy
+all: contracts lib
 
-copy: dist
+contracts: build copy
+
+copy: dist-dir
 	@cp -f $(BUILD)/contracts/*.mligo $(DIST)/ligo
 	@cp -f $(BUILD)/contracts/*.tz $(DIST)/michelson
 	@cp -f $(BUILD)/contracts/*.json $(DIST)/michelson
 
-dist: build
+dist-dir:
 	@mkdir -p $(DIST)/ligo
 	@mkdir -p $(DIST)/michelson
 
@@ -19,6 +20,7 @@ build:
 
 clean:
 	@dune clean
+	@rm -rf dist/js
 
 fmt:
 	@dune build @fmt --auto-promote
@@ -28,3 +30,10 @@ _opam:
 
 build-deps: _opam
 	@opam install . --deps-only -y
+
+ts-deps:
+	@sudo npm i -g typescript
+	@npm --prefix tezos-lib install
+
+lib:
+	@tsc -p tezos-lib/tsconfig.json

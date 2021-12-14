@@ -32,9 +32,29 @@ $ make build-deps
 Compile the OCaml Smart Contracts to Ligo and then to Michelson:
 
 ```bash
-$ make
+$ make contracts
 ```
 
 All the Ligo smart contracts will be copied (overwritten) in the
 [dist/ligo](dist/ligo) directory and the Michelson contracts in
 [dist/michelson](dist/michelson).
+
+
+## Typescript Tezos Library
+
+### Installation and compilation
+
+Install the dependencies with
+
+```bash
+$ make ts-deps
+```
+
+Compile the typescript library with
+
+```bash
+$ make lib
+```
+
+The JavaScript code will be produced in the [dist/js](dist/js) directory.
+

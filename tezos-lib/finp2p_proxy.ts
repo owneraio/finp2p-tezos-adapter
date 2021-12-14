@@ -1,0 +1,332 @@
+import {
+  TezosToolkit,
+  BigMapAbstraction,
+  OpKind,
+  createTransferOperation,
+  TransferParams,
+  RPCOperation,
+  createRevealOperation
+} from "@taquito/taquito"
+import { MichelsonV1Expression } from "@taquito/rpc"
+import { encodeOpHash } from '@taquito/utils';
+import { assert } from 'console';
+
+/** Interfaces/types for smart contract's entrypoints parameters and storage */
+
+type address = string
+type nat = bigint
+type key = string
+type bytes = Uint8Array
+type token_amount = bigint
+type asset_id = bytes
+type operation_hash = Uint8Array
+type nonce = Uint8Array
+type timestamp = Date
+type signature = string
+
+export interface fa2_token {
+  address: address;
+  id: nat;
+}
+
+export interface finp2p_nonce {
+  nonce: nonce;
+  timestamp: timestamp;
+}
+
+export interface transfer_tokens_param {
+  nonce: finp2p_nonce;
+  asset_id: asset_id;
+  src_account: key;
+  dst_account: key;
+  amount: token_amount;
+  shg: bytes;
+  signature: signature;
+}
+
+export interface BatchParam {
+  kind: 'transfer_tokens' | 'other';
+  param: transfer_tokens_param | string;
+}
+
+export interface storage {
+  operation_ttl: nat; /* in seconds */
+  live_operations: BigMapAbstraction;
+  finp2p_assets: BigMapAbstraction;
+  admin: address;
+}
+
+/** Auxiliary functions to encode entrypoints' parameters into Michelson */
+
+namespace Michelson {
+
+  function bytes_to_hex(b: Uint8Array): string {
+    return Buffer.from(b.buffer).toString("hex");
+  }
+
+  export function fa2_token(token: fa2_token): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        { /* address */ string: token.address },
+        { /* id */ int: token.id.toString() }
+      ]
+    }
+  }
+
+  export function finp2p_nonce(n: finp2p_nonce): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        { /* nonce */ bytes: bytes_to_hex(n.nonce) },
+        { /* timestamp */ string: n.timestamp.toISOString() }
+      ]
+    }
+  }
+
+  export function transfer_tokens_param(tt: transfer_tokens_param): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        /* nonce */ finp2p_nonce(tt.nonce),
+        { /* asset_id */ bytes: bytes_to_hex(tt.asset_id) },
+        { /* src_account */ string: tt.src_account },
+        { /* dst_account */ string: tt.dst_account },
+        { /* amount */ int: tt.amount.toString() },
+        { /* shg */ bytes: bytes_to_hex(tt.shg) },
+        { /* signature */ string: tt.signature }
+      ]
+    }
+  }
+
+}
+
+
+/** Some wrapper functions on top of Taquito to make calls, transfer xtz and reveal public keys.
+ * With these functions, we have a better control on the operations hashs being injected.
+*/
+
+export interface operation_result {
+  hash: string | null;
+  error: any;
+}
+
+function toStrRec(input: any): any {
+  Object.keys(input).forEach(k => {
+    let elt = input[k]
+    if (elt === undefined || elt === null) {
+      input[k] = undefined
+    } else if (typeof elt === 'object') {
+      input[k] = toStrRec(elt);
+    } else {
+      input[k] = elt.toString();
+    }
+  });
+  return input;
+}
+
+/** This function allows to reveal an address's public key on the blockchain.
+ * The address is supposed to have some XTZ on it for the revelation to work.
+ * The functions throws "WalletAlreadyRevealed" if the public key is already
+ * revealed.
+ * @param tk : Tezos toolkit
+ * @returns injection result
+ */
+export async function revealWallet(tk: TezosToolkit): Promise<operation_result> {
+  var opHash = null;
+  try {
+    let estimate = await tk.estimate.reveal();
+    if (estimate == undefined) {
+      throw "WalletAlreadyRevealed";
+    }
+    let publicKey = await tk.signer.publicKey();
+    let source = await tk.signer.publicKeyHash();
+    let revealParams = {
+      fee: estimate.suggestedFeeMutez,
+      gasLimit: estimate.gasLimit,
+      storageLimit: estimate.storageLimit
+    };
+    let rpcRevealOperation = await createRevealOperation(revealParams, source, publicKey);
+    let header = await tk.rpc.getBlockHeader();
+    let contract = await tk.rpc.getContract(source);
+    let counter = parseInt(contract.counter || '0', 10)
+    let op = toStrRec({
+      branch: header.hash,
+      contents: [{
+        ...rpcRevealOperation,
+        source,
+        counter: counter + 1
+      }]
+    });
+    let forgedOp = await tk.rpc.forgeOperations(op)
+    let signOp = await tk.signer.sign(forgedOp, new Uint8Array([3]));
+    opHash = encodeOpHash(signOp.sbytes);
+    const injectedOpHash = await tk.rpc.injectOperation(signOp.sbytes)
+    assert(injectedOpHash == opHash);
+    return { hash: opHash, error: null }
+  } catch (error) {
+    return { hash: opHash, error: error }
+  }
+}
+
+/**
+ * Generic auxiliary function for transfers and contracts calls
+ * @param tk : Tezos toolkit
+ * @param transferParams : the transaction's parameters
+ * @returns injection result
+ */
+async function make_transactions(tk: TezosToolkit, transfersParams: Array<TransferParams>): Promise<operation_result> {
+  var opHash = null;
+  try {
+    let source = await tk.signer.publicKeyHash();
+    let contract = await tk.rpc.getContract(source);
+    let counter = parseInt(contract.counter || '0', 10)
+    let contents: Array<RPCOperation> = []
+    await Promise.all(
+      transfersParams.map(async function (transferParams) {
+        let estimate = await tk.estimate.transfer(transferParams);
+        const rpcTransferOperation = await createTransferOperation({
+          ...transferParams,
+          fee: estimate.suggestedFeeMutez,
+          gasLimit: estimate.gasLimit,
+          storageLimit: estimate.storageLimit
+        });
+        counter++;
+        let v = {
+          ...rpcTransferOperation,
+          source,
+          counter: counter,
+        };
+        contents.push(v)
+      }));
+    let header = await tk.rpc.getBlockHeader();
+    let op = toStrRec({
+      branch: header.hash,
+      contents: contents
+    })
+    let forgedOp = await tk.rpc.forgeOperations(op)
+    let signOp = await tk.signer.sign(forgedOp, new Uint8Array([3]));
+    opHash = encodeOpHash(signOp.sbytes);
+    let injectedoOpHash = await tk.rpc.injectOperation(signOp.sbytes)
+    assert(injectedoOpHash == opHash);
+    return { hash: opHash, error: null }
+  } catch (error) {
+    return { hash: opHash, error: error }
+  }
+}
+
+/**
+ * Instantiation of function `make_call` to transfer the given amount of
+ * xtz from an account to the others.
+ * @param tk : Tezos toolkit
+ * @param destinations : the transfers' destinations
+ * @param amount: the amount to transfer in Tez (will be converted internally to muTez)
+ * @returns operation injection result
+ */
+export async function transfer_xtz(tk: TezosToolkit, destinations: string[], amount: number): Promise<operation_result> {
+  try {
+    var dests: TransferParams[] = [];
+    destinations.forEach(function (dest) {
+      let e = { amount: amount, to: dest };
+      dests.push(e)
+    });
+    return await make_transactions(tk, dests);
+  } catch (error) {
+    return { hash: null, error: error };
+  }
+}
+
+export async function send(
+  tk: TezosToolkit,
+  kt1: string,
+  entrypoint: string,
+  value: MichelsonV1Expression): Promise<operation_result> {
+  try {
+    return await make_transactions(tk, [{
+      amount: 0,
+      to: kt1,
+      parameter: { entrypoint, value }
+    }]);
+  } catch (error) {
+    return { hash: null, error: error };
+  }
+}
+// await op.confirmation(confirmations);
+
+/**
+ * Call the entry-point `transfer_tokens` of the FinP2P proxy
+ * @param tk : Tezos toolkit
+ * @param kt1 : address of the contract
+ * @param tt: the parameters of the transfer
+ * @returns operation injection result
+ */
+export async function transfer_tokens(
+  tk: TezosToolkit,
+  kt1: string,
+  tt: transfer_tokens_param)
+  : Promise<operation_result> {
+  return send(tk, kt1, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+}
+
+/**
+ * Make a batch call to the FinP2P proxy
+ * @param tk : Tezos toolkit
+ * @param kt1 : address of the contract
+ * @param p: the list of entry-points and parameters with which to call the contract
+ * @returns operation injection result
+ */
+export async function batch(
+  tk: TezosToolkit,
+  kt1: string,
+  p: BatchParam[])
+  : Promise<operation_result> {
+  const l = p.map(function (bp) {
+    switch (bp.kind) {
+      case 'transfer_tokens':
+        let v_tt = <transfer_tokens_param>bp.param
+        return { entrypoint: bp.kind, value: Michelson.transfer_tokens_param(v_tt) }
+      case 'other':
+        throw 'FIXME: This is just a placeholder'
+      default:
+        throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
+    }
+  })
+  const params = l.map(function (parameter) {
+    return {
+      //kind: <OpKind.TRANSACTION>OpKind.TRANSACTION,
+      amount: 0,
+      to: kt1,
+      parameter
+    }
+  })
+  try {
+    return await make_transactions(tk, params);
+  } catch (error) {
+    return { hash: null, error: error };
+  }
+}
+
+/**
+ * Retrieve the FinP2P proxy contract current storage
+ * @param tk : Tezos toolkit
+ * @param kt1 : address of the proxy contract
+ * @returns a promise with the current storage
+ */
+export async function storage(
+  tk: TezosToolkit,
+  kt1: string)
+  : Promise<storage> {
+  const contract = await tk.contract.at(kt1)
+  let storage = await contract.storage() as storage // TODO: convert?
+  return storage
+}
+
+export async function admin(
+  tk: TezosToolkit,
+  kt1: string,
+  stor?: storage
+)
+  : Promise<string> {
+  let st = (stor == undefined) ? await storage(tk, kt1) : stor!
+  return st.admin
+}
