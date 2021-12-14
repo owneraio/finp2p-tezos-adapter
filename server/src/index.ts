@@ -5,7 +5,6 @@ const app = express();
 const port = 3000;
 
 // Configure Express to parse incoming JSON data
-app.use(express.json());
 app.use(express.json({ limit: '50mb' }));
 
 // Configure routes
