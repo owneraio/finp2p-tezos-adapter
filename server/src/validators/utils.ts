@@ -6,5 +6,5 @@ export const messages = {
 
 export const isStrPositiveInt = (value: string) => {
   const v = Number(value);
-  return !!Number(v) && Number.isInteger(v) && v > 0;
+  return !!v && Number.isInteger(v) && v > 0;
 };
