@@ -16,7 +16,7 @@ let address_of_key (k : key) : address =
   Tezos.address (Tezos.implicit_account None (Crypto.hash_key k))
 
 let transfer_tokens (p : transfer_tokens_param) (s : storage) :
-    operation list * storage =
+    operation * storage =
   let () =
     if not (is_operation_live p.tt_nonce.timestamp s) then
       (failwith op_not_live : unit)
@@ -50,10 +50,9 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
   in
   let transfer_ep = get_transfer_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction None [fa2_transfer] 0t transfer_ep in
-  ([relay_op], s)
+  (relay_op, s)
 
-let issue_tokens (p : issue_tokens_param) (s : storage) :
-    operation list * storage =
+let issue_tokens (p : issue_tokens_param) (s : storage) : operation * storage =
   let () =
     if not (is_operation_live p.it_nonce.timestamp s) then
       (failwith op_not_live : unit)
@@ -91,10 +90,10 @@ let issue_tokens (p : issue_tokens_param) (s : storage) :
   in
   let mint_ep = get_mint_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction None fa2_mint 0t mint_ep in
-  ([relay_op], s)
+  (relay_op, s)
 
-let redeem_tokens (p : redeem_tokens_param) (s : storage) :
-    operation list * storage =
+let redeem_tokens (p : redeem_tokens_param) (s : storage) : operation * storage
+    =
   let () =
     if not (is_operation_live p.rt_nonce.timestamp s) then
       (failwith op_not_live : unit)
@@ -120,7 +119,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) :
   in
   let burn_ep = get_burn_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction None fa2_burn 0t burn_ep in
-  ([relay_op], s)
+  (relay_op, s)
 
 let update_operation_ttl (operation_ttl : nat) (s : storage) =
   {s with operation_ttl}
@@ -156,11 +155,21 @@ let cleanup (ops : operation_hash list) (s : storage) : storage =
   {s with live_operations}
 
 let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
-    operation list * storage =
+    operation * storage =
   match p with
   | Transfer_tokens p -> transfer_tokens p s
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
+
+let finp2p_batch_asset (l : finp2p_proxy_asset_param list) (s : storage) :
+    operation list * storage =
+  List.fold_left
+    (fun ( ((acc : operation list), (s : storage)),
+           (p : finp2p_proxy_asset_param) ) ->
+      let (op, s) = finp2p_asset p s in
+      (op :: acc, s))
+    (([] : operation list), s)
+    l
 
 let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
     operation list * storage =
@@ -177,7 +186,11 @@ let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
   match param with
   | Finp2p_asset p ->
       let () = fail_not_admin s in
-      finp2p_asset p s
+      let (op, s) = finp2p_asset p s in
+      ([op], s)
+  | Finp2p_batch_asset p ->
+      let () = fail_not_admin s in
+      finp2p_batch_asset p s
   | Finp2p_admin p ->
       let () = fail_not_admin s in
       finp2p_admin p s

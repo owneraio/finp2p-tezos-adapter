@@ -57,6 +57,7 @@ type finp2p_proxy_admin_param =
 
 type finp2p_proxy_param =
   | Finp2p_asset of finp2p_proxy_asset_param
+  | Finp2p_batch_asset of finp2p_proxy_asset_param list
   | Finp2p_admin of finp2p_proxy_admin_param
   | Cleanup of operation_hash list
 [@@param Main]
