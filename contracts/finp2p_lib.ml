@@ -140,7 +140,7 @@ let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
       (timestamp_to_int64_big_endian tt_nonce.timestamp)
   in
   let operation = string_to_bytes "transfer" in
-  let assetType = string_to_bytes "pinp2p" in
+  let assetType = string_to_bytes "finp2p" in
   let assetId = match tt_asset_id with Asset_id id -> id in
   let accountType = string_to_bytes "finId" in
   let srcAccountType = accountType in
@@ -185,7 +185,7 @@ let encode_issue_tokens_payload (p : issue_tokens_param) =
       (timestamp_to_int64_big_endian it_nonce.timestamp)
   in
   let operation = string_to_bytes "issue" in
-  let assetType = string_to_bytes "pinp2p" in
+  let assetType = string_to_bytes "finp2p" in
   let assetId = match it_asset_id with Asset_id id -> id in
   let dstAccountType = string_to_bytes "finId" in
   let dstAccount = public_key_to_bytes it_dst_account in
