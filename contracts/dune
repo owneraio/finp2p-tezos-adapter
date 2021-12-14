@@ -35,7 +35,7 @@
 
 (library
  (name finp2p_proxy)
- (modules finp2p_conv finp2p_lib finp2p_proxy)
+ (modules finp2p_lib finp2p_proxy)
  (libraries base fa2_sig)
  (preprocess
   (pps mligo.ppx))
@@ -75,7 +75,7 @@
   auth_types.mligo
   authorization.mligo
   finp2p_proxy_types.mligo
-  finp2p_conv.mligo
+  ; finp2p_conv.mligo
   finp2p_lib.mligo
   finp2p_proxy.mligo)
  (action
@@ -101,7 +101,7 @@
    auth_types.mligo
    authorization.mligo
    finp2p_proxy_types.mligo
-   finp2p_conv.mligo
+   ; finp2p_conv.mligo
    finp2p_lib.mligo
    finp2p_proxy.mligo)
 (action
