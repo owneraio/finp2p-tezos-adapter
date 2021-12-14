@@ -1,7 +1,7 @@
 #if !FINP2P_PROXY_TYPES
 #define FINP2P_PROXY_TYPES
 
-type fa2_token = {
+type fa2_token = [@layout:comb]  {
   address: address ;
   id: nat }
 
@@ -11,15 +11,14 @@ type operation_hash =
 type asset_id =
   | Asset_id of bytes 
 
-type finp2p_nonce = {
+type finp2p_nonce = [@layout:comb]  {
   nonce: bytes ;
   timestamp: timestamp }
 
 type token_amount =
   | Amount of nat 
 
-type transfer_tokens_param =
-  {
+type transfer_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
     asset_id: asset_id ;
     src_account: key ;
@@ -28,8 +27,7 @@ type transfer_tokens_param =
     shg: bytes ;
     signature: signature }
 
-type issue_tokens_param =
-  {
+type issue_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
     asset_id: asset_id ;
     dst_account: key ;
@@ -38,8 +36,7 @@ type issue_tokens_param =
     signature: signature option ;
     new_token_info: (fa2_token * (string, bytes) map) option }
 
-type redeem_tokens_param =
-  {
+type redeem_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
     asset_id: asset_id ;
     src_account: key ;
@@ -60,14 +57,15 @@ type finp2p_proxy_admin_param =
 
 type finp2p_proxy_param =
   | Finp2p_asset of finp2p_proxy_asset_param 
+  | Finp2p_batch_asset of finp2p_proxy_asset_param list 
   | Finp2p_admin of finp2p_proxy_admin_param 
   | Cleanup of operation_hash list 
 
 type storage =
   {
-    admin: address ;
     operation_ttl: nat ;
     live_operations: (operation_hash, timestamp) big_map ;
-    finp2p_assets: (asset_id, fa2_token) big_map }
+    finp2p_assets: (asset_id, fa2_token) big_map ;
+    admin: address }
 
 #endif

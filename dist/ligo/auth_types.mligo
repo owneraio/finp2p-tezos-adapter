@@ -7,4 +7,5 @@ type storage =
     storage: auth_storage ;
     authorize: (auth_param * auth_storage) -> (operation list * auth_storage) }
 
+
 #endif

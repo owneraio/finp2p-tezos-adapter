@@ -17,7 +17,7 @@ let is_operation_live (op_timestamp : timestamp) (s : storage) : bool =
 let address_of_key (k : key) : address =
   Tezos.address (Tezos.implicit_account (Crypto.hash_key k))
 
-let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation list * storage) =
+let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation * storage) =
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
@@ -45,9 +45,9 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation list 
     } in
   let transfer_ep = get_transfer_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction [fa2_transfer] 0tez transfer_ep in
-  ([relay_op], s)
+  (relay_op, s)
 
-let issue_tokens (p : issue_tokens_param) (s : storage) : (operation list * storage) =
+let issue_tokens (p : issue_tokens_param) (s : storage) : (operation * storage) =
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
@@ -79,9 +79,9 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : (operation list * stor
       owners = [((address_of_key p.dst_account), issued_amount)]
     } in
   let mint_ep = get_mint_entrypoint fa2_token.address in
-  let relay_op = Tezos.transaction fa2_mint 0tez mint_ep in ([relay_op], s)
+  let relay_op = Tezos.transaction fa2_mint 0tez mint_ep in (relay_op, s)
 
-let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation list * storage) =
+let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation * storage) =
   let () =
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
@@ -102,7 +102,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation list * st
       owners = [((address_of_key p.src_account), redeemed_amount)]
     } in
   let burn_ep = get_burn_entrypoint fa2_token.address in
-  let relay_op = Tezos.transaction fa2_burn 0tez burn_ep in ([relay_op], s)
+  let relay_op = Tezos.transaction fa2_burn 0tez burn_ep in (relay_op, s)
 
 let update_operation_ttl (operation_ttl : nat) (s : storage) =
   { s with operation_ttl = operation_ttl  }
@@ -129,11 +129,19 @@ let cleanup (ops : operation_hash list) (s : storage) : storage =
             else live_operations) s.live_operations ops in
   { s with live_operations = live_operations  }
 
-let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) : (operation list * storage) =
+let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) : (operation * storage) =
   match p with
   | Transfer_tokens p -> transfer_tokens p s
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
+
+let finp2p_batch_asset (l : finp2p_proxy_asset_param list) (s : storage) : (operation list * storage) =
+  List.fold_left
+    (fun
+      (((acc : operation list), (s : storage)),
+       (p : finp2p_proxy_asset_param))
+      -> let (op, s) = finp2p_asset p s in ((op :: acc), s))
+    (([] : operation list), s) l
 
 let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) : (operation list * storage) =
   let s =
@@ -145,7 +153,9 @@ let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) : (operation list 
 
 let main ((param, s) : (finp2p_proxy_param * storage)) : (operation list * storage) =
   match param with
-  | Finp2p_asset p -> let () = fail_not_admin s in finp2p_asset p s
+  | Finp2p_asset p ->
+    let () = fail_not_admin s in let (op, s) = finp2p_asset p s in ([op], s)
+  | Finp2p_batch_asset p -> let () = fail_not_admin s in finp2p_batch_asset p s
   | Finp2p_admin p -> let () = fail_not_admin s in finp2p_admin p s
   | Cleanup ops -> let s = cleanup ops s in (([] : operation list), s)
 

@@ -13,9 +13,9 @@ type auth_param = [@layout:comb]  {
     fa2_address: address ;
     action: authorizable_action }
 
-type auth_storage = {
-  dmin: address ;
-  ccredited: (address, bytes) big_map }
+type auth_storage = [@layout:comb]  {
+  admin: address ;
+  accredited: (address, bytes) big_map }
 
 type auth_admin_param =
   | Add_accredited of (address * bytes) 

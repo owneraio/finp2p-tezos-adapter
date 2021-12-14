@@ -7,25 +7,25 @@ let auth_authorize ((param, s) : (auth_param * auth_storage)) : (operation list 
   let () =
     match param.action with
     | Admin_action ->
-      if not (param.sender = s.dmin) then (failwith unauthorized : unit)
+      if not (param.sender = s.admin) then (failwith unauthorized : unit)
     | _ ->
-      if not (Big_map.mem param.sender s.ccredited)
+      if not (Big_map.mem param.sender s.accredited)
       then (failwith unauthorized : unit) in
   (([] : operation list), s)
 
 let fail_not_admin (s : storage) =
-  if not (Tezos.sender = s.storage.dmin) then (failwith unauthorized : unit)
+  if not (Tezos.sender = s.storage.admin) then (failwith unauthorized : unit)
 
 let add_accredited (addr : address) (data : bytes) (s : storage) : storage =
-  let auth_accredited = Big_map.add addr data s.storage.ccredited in
-  { s with storage = { s.storage with ccredited = auth_accredited  } }
+  let accredited = Big_map.add addr data s.storage.accredited in
+  { s with storage = { s.storage with accredited = accredited  } }
 
 let remove_accredited (addr : address) (s : storage) : storage =
-  let auth_accredited = Big_map.remove addr s.storage.ccredited in
-  { s with storage = { s.storage with ccredited = auth_accredited  } }
+  let accredited = Big_map.remove addr s.storage.accredited in
+  { s with storage = { s.storage with accredited = accredited  } }
 
-let update_admin (auth_admin : address) (s : storage) : storage =
-  { s with storage = { s.storage with dmin = auth_admin  } }
+let update_admin (admin : address) (s : storage) : storage =
+  { s with storage = { s.storage with admin = admin  } }
 
 let update_auth_logic (auth_authorize :
                          (auth_param * auth_storage) -> (operation list * auth_storage)) (s : storage) : storage =
