@@ -18,7 +18,7 @@ type auth_storage = {
   auth_admin : address;
   auth_accredited : (address, bytes) big_map;
 }
-[@@param Store]
+[@@comb] [@@store]
 
 type auth_admin_param =
   | Add_accredited of (address * bytes)

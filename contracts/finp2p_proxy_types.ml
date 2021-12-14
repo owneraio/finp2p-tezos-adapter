@@ -1,10 +1,10 @@
-type fa2_token = {address : address; id : nat}
+type fa2_token = {address : address; id : nat} [@@comb]
 
 type operation_hash = OpHash of bytes (* 32 *)
 
 type asset_id = Asset_id of bytes
 
-type finp2p_nonce = {nonce : bytes; (* 24 *) timestamp : timestamp}
+type finp2p_nonce = {nonce : bytes; (* 24 *) timestamp : timestamp} [@@comb]
 
 type token_amount = Amount of nat
 
@@ -18,7 +18,7 @@ type transfer_tokens_param = {
   (* 32 *)
   tt_signature : signature;
 }
-[@@param Transfer_tokens]
+[@@comb] [@@param Transfer_tokens]
 
 type issue_tokens_param = {
   it_nonce : finp2p_nonce;
@@ -30,7 +30,7 @@ type issue_tokens_param = {
   it_signature : signature option;
   it_new_token_info : (fa2_token * (string, bytes) map) option;
 }
-[@@param Issue_tokens]
+[@@comb] [@@param Issue_tokens]
 
 type redeem_tokens_param = {
   rt_nonce : finp2p_nonce;
@@ -39,7 +39,7 @@ type redeem_tokens_param = {
   rt_amount : token_amount;
   rt_signature : signature;
 }
-[@@param Redeem_tokens]
+[@@comb] [@@param Redeem_tokens]
 
 type finp2p_proxy_asset_param =
   | Transfer_tokens of transfer_tokens_param
@@ -62,10 +62,10 @@ type finp2p_proxy_param =
 [@@param Main]
 
 type storage = {
-  admin : address;
   operation_ttl : nat;
   (* in seconds *)
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
+  admin : address;
 }
-[@@store]
+[@@comb] [@@store]

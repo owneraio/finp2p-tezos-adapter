@@ -643,8 +643,8 @@ Michelson encoding of ASCII strings:
 +---------------+------+-----------------+
 | Tag Micheline |    1 | 05              |
 | Tag string    |    1 | 01              |
-| Size string   |    4 | 00000006        |
-| Public Key    |   33 | 46696e503250    |
+| Size string   |    4 | 00000006 (=S)   |
+| String        | S= 6 | 46696e503250    |
 +---------------+------+-----------------+
 
 Example:
