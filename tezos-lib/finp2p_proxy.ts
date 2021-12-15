@@ -201,14 +201,23 @@ function toStrRec(input: any): any {
   return input;
 }
 
-/** This function allows to reveal an address's public key on the blockchain.
+export class FinP2PTezos {
+
+  tezosToolkit : TezosToolkit;
+
+  constructor (tk : TezosToolkit) {
+    this.tezosToolkit = tk;
+  }
+
+/** 
+ * @description This function allows to reveal an address's public key on the blockchain.
  * The address is supposed to have some XTZ on it for the revelation to work.
  * The functions throws "WalletAlreadyRevealed" if the public key is already
  * revealed.
- * @param tk : Tezos toolkit
  * @returns injection result
  */
-export async function revealWallet(tk: TezosToolkit): Promise<operation_result> {
+async revealWallet(): Promise<operation_result> {
+  let tk = this.tezosToolkit
   var opHash = null;
   try {
     let estimate = await tk.estimate.reveal();
@@ -246,12 +255,12 @@ export async function revealWallet(tk: TezosToolkit): Promise<operation_result> 
 }
 
 /**
- * Generic auxiliary function for transfers and contracts calls
- * @param tk : Tezos toolkit
+ * @description Generic auxiliary function for transfers and contracts calls
  * @param transferParams : the transaction's parameters
  * @returns injection result
  */
-async function make_transactions(tk: TezosToolkit, transfersParams: Array<TransferParams>): Promise<operation_result> {
+async make_transactions(transfersParams: Array<TransferParams>): Promise<operation_result> {
+  let tk = this.tezosToolkit
   var opHash = null;
   try {
     let source = await tk.signer.publicKeyHash();
@@ -292,33 +301,32 @@ async function make_transactions(tk: TezosToolkit, transfersParams: Array<Transf
 }
 
 /**
- * Instantiation of function `make_call` to transfer the given amount of
+ * @description Instantiation of function `make_call` to transfer the given amount of
  * xtz from an account to the others.
- * @param tk : Tezos toolkit
  * @param destinations : the transfers' destinations
  * @param amount: the amount to transfer in Tez (will be converted internally to muTez)
  * @returns operation injection result
  */
-export async function transfer_xtz(tk: TezosToolkit, destinations: string[], amount: number): Promise<operation_result> {
+async transfer_xtz(destinations: string[], amount: number): Promise<operation_result> {
+  let tk = this.tezosToolkit
   try {
     var dests: TransferParams[] = [];
     destinations.forEach(function (dest) {
       let e = { amount: amount, to: dest };
       dests.push(e)
     });
-    return await make_transactions(tk, dests);
+    return await this.make_transactions(dests);
   } catch (error) {
     return { hash: null, error: error };
   }
 }
 
-export async function send(
-  tk: TezosToolkit,
+async send(
   kt1: string,
   entrypoint: string,
   value: MichelsonV1Expression): Promise<operation_result> {
   try {
-    return await make_transactions(tk, [{
+    return await this.make_transactions([{
       amount: 0,
       to: kt1,
       parameter: { entrypoint, value }
@@ -330,59 +338,53 @@ export async function send(
 // await op.confirmation(confirmations);
 
 /**
- * Call the entry-point `transfer_tokens` of the FinP2P proxy
- * @param tk : Tezos toolkit
+ * @description Call the entry-point `transfer_tokens` of the FinP2P proxy
  * @param kt1 : address of the contract
  * @param tt: the parameters of the transfer
  * @returns operation injection result
  */
- export async function transfer_tokens(
-  tk: TezosToolkit,
+async transfer_tokens(
   kt1: string,
   tt: transfer_tokens_param)
   : Promise<operation_result> {
-  return send(tk, kt1, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+  return this.send(kt1, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
 }
 
 /**
- * Call the entry-point `issue_tokens` of the FinP2P proxy
- * @param tk : Tezos toolkit
+ * @description Call the entry-point `issue_tokens` of the FinP2P proxy
+ * @param this.tezosToolkit : Tezos toolkit
  * @param kt1 : address of the contract
  * @param it: the parameters of the issuance
  * @returns operation injection result
  */
- export async function issue_tokens(
-  tk: TezosToolkit,
+async issue_tokens(
   kt1: string,
   it: issue_tokens_param)
   : Promise<operation_result> {
-  return send(tk, kt1, 'issue_tokens', Michelson.issue_tokens_param(it))
+  return this.send(kt1, 'issue_tokens', Michelson.issue_tokens_param(it))
 }
 
 /**
- * Call the entry-point `redeem_tokens` of the FinP2P proxy
+ * @description Call the entry-point `redeem_tokens` of the FinP2P proxy
  * @param tk : Tezos toolkit
  * @param kt1 : address of the contract
  * @param rt: the parameters of the redeem
  * @returns operation injection result
  */
- export async function redeem_tokens(
-  tk: TezosToolkit,
+async redeem_tokens(
   kt1: string,
   rt: redeem_tokens_param)
   : Promise<operation_result> {
-  return send(tk, kt1, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
+  return this.send(kt1, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
 }
 
 /**
  * Make a batch call to the FinP2P proxy
- * @param tk : Tezos toolkit
  * @param kt1 : address of the contract
  * @param p: the list of entry-points and parameters with which to call the contract
  * @returns operation injection result
  */
-export async function batch(
-  tk: TezosToolkit,
+async batch(
   kt1: string,
   p: BatchParam[])
   : Promise<operation_result> {
@@ -410,7 +412,7 @@ export async function batch(
     }
   })
   try {
-    return await make_transactions(tk, params);
+    return await this.make_transactions(params);
   } catch (error) {
     return { hash: null, error: error };
   }
@@ -422,21 +424,20 @@ export async function batch(
  * @param kt1 : address of the proxy contract
  * @returns a promise with the current storage
  */
-export async function storage(
-  tk: TezosToolkit,
+async storage(
   kt1: string)
   : Promise<storage> {
-  const contract = await tk.contract.at(kt1)
+  const contract = await this.tezosToolkit.contract.at(kt1)
   let storage = await contract.storage() as storage // TODO: convert?
   return storage
 }
 
-export async function admin(
-  tk: TezosToolkit,
+async admin(
   kt1: string,
   stor?: storage
 )
   : Promise<string> {
-  let st = (stor == undefined) ? await storage(tk, kt1) : stor!
+  let st = (stor == undefined) ? await this.storage(kt1) : stor!
   return st.admin
+}
 }
