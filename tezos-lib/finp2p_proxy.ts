@@ -44,9 +44,27 @@ export interface transfer_tokens_param {
   signature: signature;
 }
 
+export interface issue_tokens_param {
+  nonce: finp2p_nonce;
+  asset_id: asset_id;
+  dst_account: key;
+  amount: token_amount;
+  shg: bytes;
+  signature?: signature;
+  new_token_info? : [fa2_token, Map<string, bytes>];
+}
+
+export interface redeem_tokens_param {
+  nonce: finp2p_nonce;
+  asset_id: asset_id;
+  src_account: key;
+  amount: token_amount;
+  signature: signature;
+}
+
 export interface BatchParam {
-  kind: 'transfer_tokens' | 'other';
-  param: transfer_tokens_param | string;
+  kind: 'transfer_tokens' | 'issue_tokens' | 'redeem_tokens';
+  param: transfer_tokens_param | issue_tokens_param | redeem_tokens_param;
 }
 
 export interface storage {
@@ -95,6 +113,64 @@ namespace Michelson {
         { /* amount */ int: tt.amount.toString() },
         { /* shg */ bytes: bytes_to_hex(tt.shg) },
         { /* signature */ string: tt.signature }
+      ]
+    }
+  }
+
+  function mk_opt<T> (v :T | undefined , conv: ((_ : T) => MichelsonV1Expression)) : MichelsonV1Expression {
+     return (v === undefined) ? { prim: 'None' } : conv(v)!;
+  }
+
+  function mk_map<K,V> (
+    m : Map<K,V>, 
+    mk_key: ((_ : K) => MichelsonV1Expression),
+    mk_value: ((_ : V) => MichelsonV1Expression)) : MichelsonV1Expression {
+      let arr = [...m.entries()]
+      let res = arr.map(([k, v]) => { return { prim: 'Elt', args: [mk_key(k), mk_value(v)] } })
+      return res
+  }
+
+  export function issue_tokens_param(it: issue_tokens_param): MichelsonV1Expression {
+    let mich_signature =
+      mk_opt(it.signature,
+        ((s) => { return { string: s } }))
+    let mich_new_token_info =
+      mk_opt(it.new_token_info, 
+        (([fa2t, info]) => {
+          let mich_info = [...info.entries()].map(([k, b]) => {
+            return { prim: 'Elt', args: [{ string: k }, { bytes: bytes_to_hex(b) }] }
+          });
+          return {
+            prim: 'Pair',
+            args: [
+              fa2_token(fa2t),
+              mich_info
+            ]
+          }
+        }))
+    return {
+      prim: 'Pair',
+      args: [
+        /* nonce */ finp2p_nonce(it.nonce),
+        { /* asset_id */ bytes: bytes_to_hex(it.asset_id) },
+        { /* dst_account */ string: it.dst_account },
+        { /* amount */ int: it.amount.toString() },
+        { /* shg */ bytes: bytes_to_hex(it.shg) },
+        /* signature */ mich_signature,
+        /* new_token_info */ mich_new_token_info
+      ]
+    }
+  }
+
+  export function redeem_tokens_param(rt: redeem_tokens_param): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        /* nonce */ finp2p_nonce(rt.nonce),
+        { /* asset_id */ bytes: bytes_to_hex(rt.asset_id) },
+        { /* src_account */ string: rt.src_account },
+        { /* amount */ int: rt.amount.toString() },
+        { /* signature */ string: rt.signature }
       ]
     }
   }
@@ -260,12 +336,42 @@ export async function send(
  * @param tt: the parameters of the transfer
  * @returns operation injection result
  */
-export async function transfer_tokens(
+ export async function transfer_tokens(
   tk: TezosToolkit,
   kt1: string,
   tt: transfer_tokens_param)
   : Promise<operation_result> {
   return send(tk, kt1, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+}
+
+/**
+ * Call the entry-point `issue_tokens` of the FinP2P proxy
+ * @param tk : Tezos toolkit
+ * @param kt1 : address of the contract
+ * @param it: the parameters of the issuance
+ * @returns operation injection result
+ */
+ export async function issue_tokens(
+  tk: TezosToolkit,
+  kt1: string,
+  it: issue_tokens_param)
+  : Promise<operation_result> {
+  return send(tk, kt1, 'issue_tokens', Michelson.issue_tokens_param(it))
+}
+
+/**
+ * Call the entry-point `redeem_tokens` of the FinP2P proxy
+ * @param tk : Tezos toolkit
+ * @param kt1 : address of the contract
+ * @param rt: the parameters of the redeem
+ * @returns operation injection result
+ */
+ export async function redeem_tokens(
+  tk: TezosToolkit,
+  kt1: string,
+  rt: redeem_tokens_param)
+  : Promise<operation_result> {
+  return send(tk, kt1, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
 }
 
 /**
@@ -285,8 +391,12 @@ export async function batch(
       case 'transfer_tokens':
         let v_tt = <transfer_tokens_param>bp.param
         return { entrypoint: bp.kind, value: Michelson.transfer_tokens_param(v_tt) }
-      case 'other':
-        throw 'FIXME: This is just a placeholder'
+      case 'issue_tokens':
+        let v_it = <issue_tokens_param>bp.param
+        return { entrypoint: bp.kind, value: Michelson.issue_tokens_param(v_it) }
+      case 'redeem_tokens':
+        let v_rt = <redeem_tokens_param>bp.param
+        return { entrypoint: bp.kind, value: Michelson.redeem_tokens_param(v_rt) }
       default:
         throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
     }
