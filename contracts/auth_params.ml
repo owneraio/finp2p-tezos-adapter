@@ -15,8 +15,8 @@ type auth_param = {
 [@@comb] [@@param Authorize]
 
 type auth_storage = {
-  auth_admin : address;
-  auth_accredited : (address, bytes) big_map;
+  admin : address; [@key "admin"]
+  accredited : (address, bytes) big_map; [@key "accredited"]
 }
 [@@comb] [@@store]
 
