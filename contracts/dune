@@ -104,6 +104,7 @@
    ; finp2p_conv.mligo
    finp2p_lib.mligo
    finp2p_proxy.mligo)
+(targets fa2.tz authorization.tz finp2p_proxy.tz)
 (action
  (progn
   (with-stdout-to
@@ -115,6 +116,41 @@
   (with-stdout-to
     finp2p_proxy.tz
    (run ligo compile contract finp2p_proxy.mligo)))))
+
+(rule
+ (alias michelson-json)
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   fa2_sig.ml
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+   fa2_test.mligo
+   auth_params.mligo
+   auth_types.mligo
+   authorization.mligo
+   finp2p_proxy_types.mligo
+   ; finp2p_conv.mligo
+   finp2p_lib.mligo
+   finp2p_proxy.mligo)
+(targets fa2.json authorization.json auth_init.json finp2p_proxy.json)
+(action
+ (progn
+  (with-stdout-to
+    fa2.json
+   (run ligo compile contract fa2.mligo --michelson-format json))
+  (with-stdout-to
+    authorization.json
+   (run ligo compile contract authorization.mligo --michelson-format json))
+  (with-stdout-to
+    auth_init.json
+   (run ligo compile contract authorization.mligo -e auth_authorize --michelson-format json))
+  (with-stdout-to
+    finp2p_proxy.json
+   (run ligo compile contract finp2p_proxy.mligo --michelson-format json)))))
 
 ; (rule
 ;  (deps

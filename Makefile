@@ -8,6 +8,7 @@ all: copy
 copy: dist
 	@cp -f $(BUILD)/contracts/*.mligo $(DIST)/ligo
 	@cp -f $(BUILD)/contracts/*.tz $(DIST)/michelson
+	@cp -f $(BUILD)/contracts/*.json $(DIST)/michelson
 
 dist: build
 	@mkdir -p $(DIST)/ligo
