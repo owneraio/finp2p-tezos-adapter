@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@taquito/local-forging": "^11.0.2",
     "@taquito/signer": "^11.0.2",
     "@taquito/taquito": "^11.0.2",
     "hacl-wasm": "^1.1.0"
