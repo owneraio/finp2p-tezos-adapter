@@ -3,21 +3,19 @@ include Fa2_types
 
 let get_balance (p : balance_of_param) (ledger : ledger) : operation =
   let to_balance (r : balance_of_request) =
-    match Big_map.find_opt (r.ba_token_id, r.ba_owner) ledger with
+    match Big_map.find_opt (r.ba_owner, r.ba_token_id) ledger with
     | None -> (failwith fa2_token_undefined : balance_of_response)
     | Some ba_balance -> {ba_request = r; ba_balance}
   in
   let responses = List.map to_balance p.ba_requests in
   Tezos.transaction None responses 0u p.ba_callback
 
-let transfer (txs : transfer list)
-    (validate_op : address -> address -> nat -> storage -> unit) (s : storage) :
-    ledger =
+let transfer (txs : transfer list) (s : storage) : ledger =
   List.fold
     (fun ((l, tx) : ledger * transfer) ->
       List.fold
         (fun ((ll, dst) : ledger * transfer_destination) ->
-          match Big_map.find_opt (dst.tr_token_id, tx.tr_src) ll with
+          match Big_map.find_opt (tx.tr_src, dst.tr_token_id) ll with
           | None -> (failwith fa2_insufficient_balance : ledger)
           | Some am -> (
               if dst.tr_amount = 0n then ll
@@ -25,31 +23,24 @@ let transfer (txs : transfer list)
                 match is_nat (am - dst.tr_amount) with
                 | None -> (failwith fa2_insufficient_balance : ledger)
                 | Some diff -> (
-                    let () =
-                      validate_op
-                        tx.tr_src
-                        (Tezos.sender None)
-                        dst.tr_token_id
-                        s
-                    in
                     let ll =
                       if diff = 0n then
-                        Big_map.remove (dst.tr_token_id, tx.tr_src) ll
+                        Big_map.remove (tx.tr_src, dst.tr_token_id) ll
                       else
                         Big_map.update
-                          (dst.tr_token_id, tx.tr_src)
+                          (tx.tr_src, dst.tr_token_id)
                           (Some diff)
                           ll
                     in
-                    match Big_map.find_opt (dst.tr_token_id, dst.tr_dst) ll with
+                    match Big_map.find_opt (dst.tr_dst, dst.tr_token_id) ll with
                     | None ->
                         Big_map.add
-                          (dst.tr_token_id, dst.tr_dst)
+                          (dst.tr_dst, dst.tr_token_id)
                           dst.tr_amount
                           ll
                     | Some am ->
                         Big_map.update
-                          (dst.tr_token_id, dst.tr_dst)
+                          (dst.tr_dst, dst.tr_token_id)
                           (Some (am + dst.tr_amount))
                           ll)))
         tx.tr_txs
@@ -86,18 +77,10 @@ let update_operators (storage : operators_storage) (ops : operator_update list)
     ops
     storage
 
-let default_operator_validator (owner : address) (operator : address)
-    (token_id : nat) (s : storage) : unit =
-  if owner = operator then () (* transfer by the owner *)
-  else if Big_map.mem (owner, (operator, token_id)) s.operators then ()
-    (* the operator is permitted for the token_id *)
-  else (failwith fa2_not_operator : unit)
-(* the operator is not permitted for the token_id *)
-
 let fa2 ((param, storage) : fa2 * storage) : operation list * storage =
   match param with
   | Transfer txs ->
-      let ledger = transfer txs default_operator_validator storage in
+      let ledger = transfer txs storage in
       (([] : operation list), {storage with ledger})
   | Balance_of p ->
       let op = get_balance p storage.ledger in
