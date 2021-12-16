@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "strict": true,
+    "strict": false,
     "module": "commonjs",
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "outDir": "_dist",
+    "outDir": "../_dist/tests",
     "target": "es2020"
   },
   "include": [ "*.ts" ]

@@ -14,7 +14,7 @@ import {
 } from "@taquito/taquito"
 import { defaultRPCOptions, MichelsonV1Expression } from "@taquito/rpc";
 import { localForger, LocalForger } from '@taquito/local-forging';
-import { encodeOpHash } from '@taquito/utils';
+import { encodeOpHash, validateAddress, validateContractAddress } from '@taquito/utils';
 import { assert } from 'console';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
@@ -24,16 +24,16 @@ import * as auth_init from '../dist/michelson/auth_init.json';
 
 /** Interfaces/types for smart contract's entrypoints parameters and storage */
 
-type address = string
-type nat = bigint
-type key = string
-type bytes = Uint8Array
-type token_amount = bigint
-type asset_id = bytes
-type operation_hash = Uint8Array
-type nonce = Uint8Array
-type timestamp = Date
-type signature = string
+export type address = string
+export type nat = bigint
+export type key = string
+export type bytes = Uint8Array
+export type token_amount = bigint
+export type asset_id = bytes
+export type operation_hash = Uint8Array
+export type nonce = Uint8Array
+export type timestamp = Date
+export type signature = string
 
 export interface fa2_token {
   address: address;
@@ -62,7 +62,7 @@ export interface issue_tokens_param {
   amount: token_amount;
   shg: bytes;
   signature?: signature;
-  new_token_info?: [fa2_token, Map<string, bytes>];
+  new_token_info?: [fa2_token, MichelsonMap<string, bytes>];
 }
 
 export interface redeem_tokens_param {
@@ -76,17 +76,23 @@ export interface redeem_tokens_param {
 export interface BatchParam {
   kind: 'transfer_tokens' | 'issue_tokens' | 'redeem_tokens';
   param: transfer_tokens_param | issue_tokens_param | redeem_tokens_param;
+  kt1? : address;
+}
+
+export interface operation_ttl  {
+  ttl : bigint, /* in seconds */
+  allowed_in_the_future : bigint /* in seconds */
 }
 
 export interface storage {
-  operation_ttl: nat; /* in seconds */
+  operation_ttl: operation_ttl;
   live_operations: BigMapAbstraction;
   finp2p_assets: BigMapAbstraction;
   admin: address;
 }
 
 interface initial_storage {
-  operation_ttl: nat; /* in seconds */
+  operation_ttl: operation_ttl; /* in seconds */
   live_operations: MichelsonMap<bytes, timestamp>;
   finp2p_assets: MichelsonMap<asset_id, fa2_token>;
   admin: address;
@@ -94,10 +100,18 @@ interface initial_storage {
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
 
-namespace Michelson {
+export namespace Michelson {
 
   export function bytes_to_hex(b: Uint8Array): string {
     return Buffer.from(b.buffer).toString("hex");
+  }
+
+  export function maybe_bytes(k : key) : MichelsonV1Expression {
+    if (k.substring(0,2) == '0x') {
+      return { bytes : k.substring(2) }
+    } else {
+      return { string : k }
+    }
   }
 
   export function fa2_token(token: fa2_token): MichelsonV1Expression {
@@ -126,17 +140,17 @@ namespace Michelson {
       args: [
         /* nonce */ finp2p_nonce(tt.nonce),
         { /* asset_id */ bytes: bytes_to_hex(tt.asset_id) },
-        { /* src_account */ string: tt.src_account },
-        { /* dst_account */ string: tt.dst_account },
+        /* src_account */ maybe_bytes(tt.src_account),
+        /* dst_account */ maybe_bytes(tt.dst_account),
         { /* amount */ int: tt.amount.toString() },
         { /* shg */ bytes: bytes_to_hex(tt.shg) },
-        { /* signature */ string: tt.signature }
+        /* signature */ maybe_bytes(tt.signature)
       ]
     }
   }
 
   function mk_opt<T>(v: T | undefined, conv: ((_: T) => MichelsonV1Expression)): MichelsonV1Expression {
-    return (v === undefined) ? { prim: 'None' } : conv(v)!;
+    return (v === undefined) ? { prim: 'None' } : { prim: 'Some', args : [conv(v)] }
   }
 
   function mk_map<K, V>(
@@ -151,13 +165,21 @@ namespace Michelson {
   export function issue_tokens_param(it: issue_tokens_param): MichelsonV1Expression {
     let mich_signature =
       mk_opt(it.signature,
-        ((s) => { return { string: s } }))
+             ((s) => { return maybe_bytes(s) }))
     let mich_new_token_info =
       mk_opt(it.new_token_info,
         (([fa2t, info]) => {
-          let mich_info = [...info.entries()].map(([k, b]) => {
-            return { prim: 'Elt', args: [{ string: k }, { bytes: bytes_to_hex(b) }] }
-          });
+          let mich_info =
+            [...info.entries()]
+              .sort(([k1, _v1], [k2, _v2]) => {
+                return (new String(k1)).localeCompare(k2)
+              })
+              .map(([k, b]) => {
+                return { prim: 'Elt',
+                         args: [
+                           { string: k }, { bytes: bytes_to_hex(b) }
+                         ] }
+              });
           return {
             prim: 'Pair',
             args: [
@@ -171,7 +193,7 @@ namespace Michelson {
       args: [
         /* nonce */ finp2p_nonce(it.nonce),
         { /* asset_id */ bytes: bytes_to_hex(it.asset_id) },
-        { /* dst_account */ string: it.dst_account },
+        /* dst_account */ maybe_bytes(it.dst_account),
         { /* amount */ int: it.amount.toString() },
         { /* shg */ bytes: bytes_to_hex(it.shg) },
         /* signature */ mich_signature,
@@ -186,9 +208,19 @@ namespace Michelson {
       args: [
         /* nonce */ finp2p_nonce(rt.nonce),
         { /* asset_id */ bytes: bytes_to_hex(rt.asset_id) },
-        { /* src_account */ string: rt.src_account },
+        /* src_account */ maybe_bytes(rt.src_account),
         { /* amount */ int: rt.amount.toString() },
-        { /* signature */ string: rt.signature }
+        /* signature */ maybe_bytes(rt.signature)
+      ]
+    }
+  }
+
+  export function add_accredited_param(addr : address, data : bytes) : MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        { string: addr },
+        { bytes: bytes_to_hex(data) }
       ]
     }
   }
@@ -225,7 +257,8 @@ class InjectionError extends Error {
   }
 
 }
-function toStrRec(input: any): any {
+
+function toStrRec(input : any) {
   Object.keys(input).forEach(k => {
     let elt = input[k]
     if (elt === undefined || elt === null) {
@@ -257,36 +290,65 @@ export class FinP2PTezos {
     this.tezosToolkit = tk;
     // Forge operations locally (instead of using RPCs to the node)
     this.tezosToolkit.setForgerProvider(localForger);
+    this.check_config(config);
     this.config = config;
-    if (this.config.debug === undefined) { this.config.debug = false }
-    this.forger = new LocalForger()
+    if (this.config.debug === undefined) { this.config.debug = false };
+    this.forger = new LocalForger();
   }
 
-  async init (p : { operation_ttl : bigint, fa2_metadata : Map<string,bytes> }) {
+  check_config (c : config) {
+    if (c.finp2p_auth_address !== undefined &&
+        validateContractAddress(c.finp2p_auth_address) !== 3) {
+        throw new Error("Invalid Auth contract address")
+    }
+    if (c.finp2p_fa2_address !== undefined &&
+        validateContractAddress(c.finp2p_fa2_address) !== 3) {
+        throw new Error("Invalid FA2 contract address")
+    }
+    if (c.finp2p_proxy_address !== undefined &&
+        validateContractAddress(c.finp2p_proxy_address) !== 3) {
+        throw new Error("Invalid Proxy contract address")
+    }
+  }
+
+  async init (p : { operation_ttl : operation_ttl,
+                    fa2_metadata : Map<string,bytes> }) {
+    var accredit = false
     if (this.config.finp2p_auth_address === undefined) {
       let op = await this.deployFinp2pAuth()
-      op.confirmation()
+      await op.confirmation()
       this.config.finp2p_auth_address = op.contractAddress
+      console.log('Auth', op.contractAddress)
+      accredit = true
     }
     if (this.config.finp2p_fa2_address === undefined) {
       if (typeof this.config.finp2p_auth_address === 'string') {
-      let op = await this.deployFinp2pFA2(this.config.finp2p_auth_address, p.fa2_metadata)
-      op.confirmation()
-      this.config.finp2p_fa2_address = op.contractAddress
-    }}
+        let op = await this.deployFinp2pFA2(this.config.finp2p_auth_address, p.fa2_metadata)
+        await op.confirmation()
+        this.config.finp2p_fa2_address = op.contractAddress
+        console.log('FA2', op.contractAddress)
+      }}
     if (this.config.finp2p_proxy_address === undefined) {
       let op = await this.deployFinp2pProxy(p.operation_ttl)
-      op.confirmation()
+      await op.confirmation()
       this.config.finp2p_proxy_address = op.contractAddress
+      console.log('Proxy', op.contractAddress)
+      accredit = true
+    }
+    if (accredit && typeof this.config.finp2p_proxy_address === 'string') {
+      console.log('Adding Proxy to accredited contracts')
+      let op = await this.add_accredited(this.config.finp2p_proxy_address,
+                                         this.proxy_accreditation)
+      await this.wait_inclusion(op)
     }
   }
 
   private debug (message?: any, ...optionalParams: any[]) {
-    if (this.config.debug) { console.log(message, optionalParams) }
+    if (this.config.debug) { console.log(message, ...optionalParams) }
   }
 
   async deployFinp2pProxy(
-    operation_ttl: bigint,
+    operation_ttl : operation_ttl,
     admin = this.config.admin): Promise<OriginationOperation> {
     let initial_storage: initial_storage = {
       operation_ttl,
@@ -301,7 +363,7 @@ export class FinP2PTezos {
     });
   }
 
-  async deployFinp2pAuth(admin = this.config.admin): Promise<OriginationOperation> {      
+  async deployFinp2pAuth(admin = this.config.admin): Promise<OriginationOperation> {
     let initial_storage = {
       storage: { 
         admin,
@@ -319,17 +381,18 @@ export class FinP2PTezos {
   async deployFinp2pFA2(
     auth_contract = this.config.finp2p_auth_address,
     metadata : Map<string, bytes>
-    ): Promise<OriginationOperation> {      
-    let mich_metadata = [...metadata.entries()].map(([k, b]) => {
-      return { prim: 'Elt', args: [{ string: k }, { bytes: Michelson.bytes_to_hex(b) }] }
-    }) 
+  ): Promise<OriginationOperation> {
+    let mich_metadata = new MichelsonMap<string, bytes>()
+    metadata.forEach((b, k) => {
+      mich_metadata.set(k, b)
+    })
     let initial_storage = {
       auth_contract,
-      pending_admin: { prim : 'None' },
-      paused : {prim : 'False'},
-      ledger : [],
-      operators : [],
-      token_metadata : [],
+      paused : false,
+      ledger : new MichelsonMap<[nat, address], nat>(),
+      operators : new MichelsonMap<[address, [address, nat]], void>(),
+      token_metadata : new MichelsonMap<nat, [nat, Map<string, bytes>]>(),
+      total_supply : new MichelsonMap<nat, nat>(),
       metadata: mich_metadata
     }
     this.debug("Deploying new FinP2P FA2 asset smart contract")
@@ -357,6 +420,11 @@ export class FinP2PTezos {
     }
   }
 
+  async wait_inclusion({ hash } : operation_result) {
+    let op = await this.tezosToolkit.operation.createOperation(hash);
+    return await op.confirmation()
+  }
+
   /** 
    * @description This function allows to reveal an address's public key on the blockchain.
    * The address is supposed to have some XTZ on it for the revelation to work.
@@ -366,7 +434,6 @@ export class FinP2PTezos {
    */
   async revealWallet(): Promise<operation_result> {
     let tk = this.tezosToolkit
-    var opHash = null;
     let estimate = await tk.estimate.reveal();
     if (estimate == undefined) {
       throw "WalletAlreadyRevealed";
@@ -429,7 +496,6 @@ export class FinP2PTezos {
    * @returns operation injection result
    */
   async transfer_xtz(destinations: string[], amount: number): Promise<operation_result> {
-    let tk = this.tezosToolkit
     var dests: TransferParams[] = [];
     destinations.forEach(function (dest) {
       let e = { amount: amount, to: dest };
@@ -442,6 +508,7 @@ export class FinP2PTezos {
     kt1: string,
     entrypoint: string,
     value: MichelsonV1Expression): Promise<operation_result> {
+    this.debug("Calling", entrypoint, "with", value)
     return await this.make_transactions([{
       amount: 0,
       to: kt1,
@@ -450,104 +517,153 @@ export class FinP2PTezos {
   }
   // await op.confirmation(confirmations);
 
+  get_contract_address(kind : 'Proxy' | 'FA2' |'Auth',
+                       addr : address | undefined,
+                       kt1? : address
+                      ) : address {
+    if (kt1 !== undefined) {
+      return kt1
+    } else if (addr !== undefined) {
+      return addr
+    } else {
+      throw (new Error(`FinP2P ${kind} contract undefined`))
+    }
+  }
+
+  get_proxy_address(kt1? : address) : address {
+    return this.get_contract_address('Proxy', this.config.finp2p_proxy_address, kt1)
+  }
+
+  get_auth_address(kt1? : address) {
+    return this.get_contract_address('Auth', this.config.finp2p_auth_address, kt1)
+  }
+
+  get_fa2_address(kt1? : address) {
+    return this.get_contract_address('FA2', this.config.finp2p_fa2_address, kt1)
+  }
+
   /**
    * @description Call the entry-point `transfer_tokens` of the FinP2P proxy
-   * @param kt1 : address of the contract
    * @param tt: the parameters of the transfer
+   * @param kt1 : optional address of the contract
    * @returns operation injection result
    */
   async transfer_tokens(
-    kt1: string,
-    tt: transfer_tokens_param)
-    : Promise<operation_result> {
-    let contract = await this.tezosToolkit.contract.at(kt1)
-    return this.send(kt1, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+    tt : transfer_tokens_param,
+    kt1? : address)
+  : Promise<operation_result> {
+    let addr = this.get_proxy_address(kt1)
+    // let contract = await this.tezosToolkit.contract.at(kt1)
+    return this.send(addr, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
   }
 
   /**
    * @description Call the entry-point `issue_tokens` of the FinP2P proxy
-   * @param this.tezosToolkit : Tezos toolkit
-   * @param kt1 : address of the contract
    * @param it: the parameters of the issuance
+   * @param kt1 : optional address of the contract
    * @returns operation injection result
    */
   async issue_tokens(
-    kt1: string,
-    it: issue_tokens_param)
-    : Promise<operation_result> {
-    return this.send(kt1, 'issue_tokens', Michelson.issue_tokens_param(it))
+    it: issue_tokens_param,
+    kt1? : address)
+  : Promise<operation_result> {
+    let addr = this.get_proxy_address(kt1)
+    return this.send(addr, 'issue_tokens', Michelson.issue_tokens_param(it))
   }
 
   /**
    * @description Call the entry-point `redeem_tokens` of the FinP2P proxy
-   * @param tk : Tezos toolkit
-   * @param kt1 : address of the contract
    * @param rt: the parameters of the redeem
+   * @param kt1 : optional address of the contract
    * @returns operation injection result
    */
   async redeem_tokens(
-    kt1: string,
-    rt: redeem_tokens_param)
-    : Promise<operation_result> {
-    return this.send(kt1, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
-  }
-
-  /**
-   * Make a batch call to the FinP2P proxy
-   * @param kt1 : address of the contract
-   * @param p: the list of entry-points and parameters with which to call the contract
-   * @returns operation injection result
-   */
-  async batch(
-    kt1: string,
-    p: BatchParam[])
-    : Promise<operation_result> {
-    const l = p.map(function (bp) {
-      switch (bp.kind) {
-        case 'transfer_tokens':
-          let v_tt = <transfer_tokens_param>bp.param
-          return { entrypoint: bp.kind, value: Michelson.transfer_tokens_param(v_tt) }
-        case 'issue_tokens':
-          let v_it = <issue_tokens_param>bp.param
-          return { entrypoint: bp.kind, value: Michelson.issue_tokens_param(v_it) }
-        case 'redeem_tokens':
-          let v_rt = <redeem_tokens_param>bp.param
-          return { entrypoint: bp.kind, value: Michelson.redeem_tokens_param(v_rt) }
-        default:
-          throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
-      }
-    })
-    const params = l.map(function (parameter) {
-      return {
-        //kind: <OpKind.TRANSACTION>OpKind.TRANSACTION,
-        amount: 0,
-        to: kt1,
-        parameter
-      }
-    })
-    return await this.make_transactions(params);
+    rt: redeem_tokens_param,
+    kt1? : address)
+  : Promise<operation_result> {
+    let addr = this.get_proxy_address(kt1)
+    return this.send(addr, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
   }
 
   /**
    * Retrieve the FinP2P proxy contract current storage
-   * @param tk : Tezos toolkit
-   * @param kt1 : address of the proxy contract
+   * @param kt1 : optional address of the proxy contract
    * @returns a promise with the current storage
    */
   async storage(
-    kt1: string)
-    : Promise<storage> {
-    const contract = await this.tezosToolkit.contract.at(kt1)
-    let storage = await contract.storage() as storage // TODO: convert?
+    kt1?: address)
+  : Promise<storage> {
+    let addr = this.get_proxy_address(kt1)
+    const contract = await this.tezosToolkit.contract.at(addr)
+    let storage = await contract.storage() as storage
     return storage
   }
 
   async admin(
-    kt1: string,
-    stor?: storage
-  )
-    : Promise<string> {
+    stor?: storage,
+    kt1?: address)
+  : Promise<address> {
     let st = (stor == undefined) ? await this.storage(kt1) : stor!
     return st.admin
+  }
+
+
+  proxy_accreditation = new Uint8Array([0])
+  owner_accreditation = new Uint8Array([1])
+
+  async add_accredited(new_accredited : address,
+                       accreditatiaon : Uint8Array,
+                       kt1?:address)
+  : Promise<operation_result> {
+    let addr = this.get_auth_address(kt1)
+    return this.send(addr, 'add_accredited',
+                     Michelson.add_accredited_param(new_accredited,
+                                                    accreditatiaon))
+  }
+
+  /**
+   * Make a batch call to the FinP2P proxy
+   * @param p: the list of entry-points and parameters (anm optionally contract
+   * addresses) with which to call the contract
+   * @returns operation injection result
+   */
+  async batch(
+    p: BatchParam[])
+  : Promise<operation_result> {
+    let _this = this
+    const params = p.map(function (bp) {
+      switch (bp.kind) {
+        case 'transfer_tokens':
+          let v_tt = <transfer_tokens_param>bp.param
+          let kt1_tt  = _this.get_proxy_address(bp.kt1)
+          return {
+            amount : 0,
+            to : kt1_tt,
+            parameter : { entrypoint: bp.kind,
+                          value: Michelson.transfer_tokens_param(v_tt) }
+          }
+        case 'issue_tokens':
+          let v_it = <issue_tokens_param>bp.param
+          let kt1_it  = _this.get_proxy_address(bp.kt1)
+          return {
+            amount : 0,
+            to : kt1_it,
+            parameter : { entrypoint: bp.kind,
+                          value: Michelson.issue_tokens_param(v_it) }
+          }
+        case 'redeem_tokens':
+          let v_rt = <redeem_tokens_param>bp.param
+          let kt1_rt  = _this.get_proxy_address(bp.kt1)
+          return {
+            amount : 0,
+            to : kt1_rt,
+            parameter : { entrypoint: bp.kind,
+                          value: Michelson.redeem_tokens_param(v_rt) }
+          }
+        default:
+          throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
+      }
+    })
+    return await this.make_transactions(params);
   }
 }

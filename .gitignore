@@ -3,3 +3,4 @@
 /_build
 /dist/js
 /**/node_modules
+/tezos-lib/_dist

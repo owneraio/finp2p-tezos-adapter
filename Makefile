@@ -35,5 +35,14 @@ ts-deps:
 	@sudo npm i -g typescript
 	@npm --prefix tezos-lib install
 
+ts-dev-deps: ts-deps
+	@npm --prefix tezos-lib install --dev
+
 lib:
 	@tsc -p tezos-lib/tsconfig.json
+
+build-tests:
+	@tsc -p tezos-lib/tests/tsconfig.json
+
+test:
+	@cd tezos-lib && npm test
