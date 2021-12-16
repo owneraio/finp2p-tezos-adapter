@@ -33,11 +33,11 @@ transferred without restrictions.
 
 We propose that all transfers go through a central **Authorization** contract
 which allows, or not, the transfer to happen. In the first version (which we
-call V1), this contract will contain a reference to a single relay contract (see
+call V1), this contract will contain a reference to a single proxy contract (see
 below). For future-proofing, we plan to make part of this contract updatable.
 
 This means that, in V1, users cannot sign asset transfer operations (the Tezos
-operations) directly (they have to go through the relay contract).
+operations) directly (they have to go through the proxy contract).
 
 In V1, we also envision that we will only need one _mutli-asset_ contract to
 handle all assets that will be issued on the FinP2P network. If the requirements
@@ -71,7 +71,7 @@ The contract will have the following entry points:
 Actions that are concerned by this policy will produce a call to the
 **Authorization** contract with:
 - the action parameters (e.g. source, destination, amount, for a transfer)
-- the caller (in our case this will be the relay contract)
+- the caller (in our case this will be the proxy contract)
 - the FA2 address
 
 If this call fails, the whole action is reverted. Otherwise, the action is
@@ -111,7 +111,7 @@ entry point `authorize` with the parameter:
 
 ```ocaml
 { 
-  sender = "KT1relay";
+  sender = "KT1proxy";
   sender_is_operator = false;
   fa2_address = "KT1fa2X";
   parameters = Transfer [
@@ -125,7 +125,7 @@ entry point `authorize` with the parameter:
 #### `mint`
 
 The mint entry point is not part of the standard but we propose that it takes a
-list of assets to be minted (so as to be more efficient if the relay changes and
+list of assets to be minted (so as to be more efficient if the proxy changes and
 allows for multiple mints at the same time).
 
 ```ocaml
@@ -144,7 +144,7 @@ entry point `authorize` with the parameter:
 
 ```ocaml
 { 
-  sender = "KT1relay";
+  sender = "KT1proxy";
   fa2_address = "KT1fa2X";
   parameters = Mint [
     {to_ = dst_account_pkh ; token_id; amount};
@@ -159,7 +159,7 @@ balance in this token will be incremented by `amount`).
 #### `burn`
 
 The burn entry point is not part of the standard but we propose that it takes a
-list of assets to be burned (so as to be more efficient if the relay changes and
+list of assets to be burned (so as to be more efficient if the proxy changes and
 allows for multiple burns at the same time).
 
 ```ocaml
@@ -178,7 +178,7 @@ entry point `authorize` with the parameter:
 
 ```ocaml
 { 
-  sender = "KT1relay";
+  sender = "KT1proxy";
   fa2_address = "KT1fa2X";
   parameters = Burn [
     {from_ = src_account_pkh ; token_id; amount};
@@ -216,9 +216,9 @@ This entry point implements the usual semantics:
 > `balance_of_response` records.
 
 
-## Relay contract
+## Proxy contract
 
-The **Relay** contract for FinP2P assets is deployed once and for all to
+The **Proxy** contract for FinP2P assets is deployed once and for all to
 interact with the FinP2P FA2 contracts. The role of this contract is to check
 for payload signatures (and ensure safety properties) and forward/relay calls to
 the FA2 asset contracts.
@@ -230,11 +230,12 @@ contract as the latter acts as an extra indirection layer.
 
 ### Stored information
 
-To operate correctly, the **Relay** contract needs to keep track and maintain
+To operate correctly, the **Proxy** contract needs to keep track and maintain
 the following information:
 
 - a set of administrator addresses (updatable); only these administrators
-  are allowed to inject `transfer_asset` and `issue_asset` operations
+  are allowed to inject `transfer_asset`, `issue_asset`, and `burn_asset`
+  operations
 - a value `operation_ttl` in seconds that indicates how long an operation can be
   relayed depending on its timestamp (within the nonce); this value is updatable
   by an administrator and should match the retention policy of operations in the
@@ -245,7 +246,7 @@ the following information:
   id>:<resource type>:<resource>`) to pairs of the form `(<KT1>, <id>)` where
   `<KT1>` is the address of the FA2 contract for this asset on Tezos and `<id>`
   is a natural number for this asset within the FA2 contract. Note that the
-  FinP2P asset identifier can be opaque to the **Relay** contract (simply a byte
+  FinP2P asset identifier can be opaque to the **Proxy** contract (simply a byte
   sequence, as long as they are unique within FinP2P).
   
 <!--
@@ -539,7 +540,7 @@ let update_operation_ttl
 This is callable only by an administrator. This does not need a multi-signature
 scheme at first glance.
 
-**TODO**: group other updatable configuration information for the Relay here.
+**TODO**: group other updatable configuration information for the Proxy here.
 
 ### Update FA2 token for an asset
 
@@ -571,24 +572,24 @@ FA2s](external-fa2s)).
 ## Authorization contract
 
 The authorization contract acts as an indirection point for the FA2 contracts to
-access the Relay contract (the relay can be replaced). It will receive
+access the Proxy contract (the proxy can be replaced). It will receive
 authorization requests from the FA2 asset contracts (see [Authorization
 policy](#authorization-policy)).
 
 ### Stored information
 
-This contract needs at least to know the address of the Relay contract. In the
+This contract needs at least to know the address of the Proxy contract. In the
 most basic version, it simply checks if the `sender` field in the authorization
-requests corresponds to the Relay contract and rejects the others.
+requests corresponds to the Proxy contract and rejects the others.
 
-However, for flexibility and future-proofing, the address of the Relay contract
+However, for flexibility and future-proofing, the address of the Proxy contract
 can be updated and the authorization logic can be updated as well.
 
 In particular, we want
 - a set of administrators (addresses) for this contract
 - a table `accredited` (big map) of addresses to bytes (the associated bytes
   value will be empty at the beginning but can contain arbitrary encoded
-  information in the long run); this table is initialized with the Relay
+  information in the long run); this table is initialized with the Proxy
   contract address
 - a field to store a lambda which records the (updatable) code for the
   authorization logic.
@@ -657,7 +658,7 @@ multi-signature scheme if desired for this.
 If we have a “finP2P FA2 contract” and an outside user A tries to transfer his
 tokens to B (B can be in finP2P or not), then the **Authorization** contract will
 receive a request to authorize a transfer of A to B where the sender is A (as
-opposed to the Relay contract).
+opposed to the Proxy contract).
 
 By default, if A is not in the `accredited` table, the transaction will be
 blocked, but if an admin adds A to `accredited`, then it will be allowed.
@@ -672,13 +673,13 @@ Consider the scenario of an FA2 contract that is already deployed
 on Tezos, and someone wants to offer his assets through the finP2P
 network.
 
-In this case, this user will need to add the **Relay** contract as an operator
+In this case, this user will need to add the **Proxy** contract as an operator
 to its account on the FA2. Because the operator has all the rights, the user
 will want to move only the assets to offer on finP2P to an address that
 corresponds to his finId and add an operator for this account only.
 
 The asset will need to also be added to the FinP2P network and an administrator
-should register the corresponding **asset id** in the **Relay** contract (with
+should register the corresponding **asset id** in the **Proxy** contract (with
 the `update_fa2_contract` entry point).
 
 See the red external FA2 contract [in the diagram above](#architecture).

@@ -1,1 +1,6 @@
 .idea
+/_opam
+/attic
+/_build
+/dist/js
+/**/node_modules

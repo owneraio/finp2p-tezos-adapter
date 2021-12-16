@@ -1,0 +1,706 @@
+#if !FINP2P_LIB
+#define FINP2P_LIB
+
+#include "errors.mligo"
+#include "finp2p_proxy_types.mligo"
+[@inline]
+let max_int64 () : nat =
+  ([%Michelson ({| { DROP; PUSH nat 9223372036854775807 } |} : unit -> nat)])
+    ()
+
+let concat_bytes  : bytes list -> bytes =
+  [%Michelson ({| { CONCAT } |} : bytes list -> bytes)]
+
+let concat_string  : string list -> string =
+  [%Michelson ({| { CONCAT } |} : string list -> string)]
+
+let nth_nat_byte (number : nat) (n : nat) : nat =
+  (number lsr (n * 8n)) land 255n
+
+let bytes_conv_map  : (nat, bytes) map =
+  ([%Michelson
+    ({| {
+DROP;
+PUSH (map nat bytes) {
+Elt 0 0x00;
+Elt 1 0x01;
+Elt 2 0x02;
+Elt 3 0x03;
+Elt 4 0x04;
+Elt 5 0x05;
+Elt 6 0x06;
+Elt 7 0x07;
+Elt 8 0x08;
+Elt 9 0x09;
+Elt 10 0x0a;
+Elt 11 0x0b;
+Elt 12 0x0c;
+Elt 13 0x0d;
+Elt 14 0x0e;
+Elt 15 0x0f;
+Elt 16 0x10;
+Elt 17 0x11;
+Elt 18 0x12;
+Elt 19 0x13;
+Elt 20 0x14;
+Elt 21 0x15;
+Elt 22 0x16;
+Elt 23 0x17;
+Elt 24 0x18;
+Elt 25 0x19;
+Elt 26 0x1a;
+Elt 27 0x1b;
+Elt 28 0x1c;
+Elt 29 0x1d;
+Elt 30 0x1e;
+Elt 31 0x1f;
+Elt 32 0x20;
+Elt 33 0x21;
+Elt 34 0x22;
+Elt 35 0x23;
+Elt 36 0x24;
+Elt 37 0x25;
+Elt 38 0x26;
+Elt 39 0x27;
+Elt 40 0x28;
+Elt 41 0x29;
+Elt 42 0x2a;
+Elt 43 0x2b;
+Elt 44 0x2c;
+Elt 45 0x2d;
+Elt 46 0x2e;
+Elt 47 0x2f;
+Elt 48 0x30;
+Elt 49 0x31;
+Elt 50 0x32;
+Elt 51 0x33;
+Elt 52 0x34;
+Elt 53 0x35;
+Elt 54 0x36;
+Elt 55 0x37;
+Elt 56 0x38;
+Elt 57 0x39;
+Elt 58 0x3a;
+Elt 59 0x3b;
+Elt 60 0x3c;
+Elt 61 0x3d;
+Elt 62 0x3e;
+Elt 63 0x3f;
+Elt 64 0x40;
+Elt 65 0x41;
+Elt 66 0x42;
+Elt 67 0x43;
+Elt 68 0x44;
+Elt 69 0x45;
+Elt 70 0x46;
+Elt 71 0x47;
+Elt 72 0x48;
+Elt 73 0x49;
+Elt 74 0x4a;
+Elt 75 0x4b;
+Elt 76 0x4c;
+Elt 77 0x4d;
+Elt 78 0x4e;
+Elt 79 0x4f;
+Elt 80 0x50;
+Elt 81 0x51;
+Elt 82 0x52;
+Elt 83 0x53;
+Elt 84 0x54;
+Elt 85 0x55;
+Elt 86 0x56;
+Elt 87 0x57;
+Elt 88 0x58;
+Elt 89 0x59;
+Elt 90 0x5a;
+Elt 91 0x5b;
+Elt 92 0x5c;
+Elt 93 0x5d;
+Elt 94 0x5e;
+Elt 95 0x5f;
+Elt 96 0x60;
+Elt 97 0x61;
+Elt 98 0x62;
+Elt 99 0x63;
+Elt 100 0x64;
+Elt 101 0x65;
+Elt 102 0x66;
+Elt 103 0x67;
+Elt 104 0x68;
+Elt 105 0x69;
+Elt 106 0x6a;
+Elt 107 0x6b;
+Elt 108 0x6c;
+Elt 109 0x6d;
+Elt 110 0x6e;
+Elt 111 0x6f;
+Elt 112 0x70;
+Elt 113 0x71;
+Elt 114 0x72;
+Elt 115 0x73;
+Elt 116 0x74;
+Elt 117 0x75;
+Elt 118 0x76;
+Elt 119 0x77;
+Elt 120 0x78;
+Elt 121 0x79;
+Elt 122 0x7a;
+Elt 123 0x7b;
+Elt 124 0x7c;
+Elt 125 0x7d;
+Elt 126 0x7e;
+Elt 127 0x7f;
+Elt 128 0x80;
+Elt 129 0x81;
+Elt 130 0x82;
+Elt 131 0x83;
+Elt 132 0x84;
+Elt 133 0x85;
+Elt 134 0x86;
+Elt 135 0x87;
+Elt 136 0x88;
+Elt 137 0x89;
+Elt 138 0x8a;
+Elt 139 0x8b;
+Elt 140 0x8c;
+Elt 141 0x8d;
+Elt 142 0x8e;
+Elt 143 0x8f;
+Elt 144 0x90;
+Elt 145 0x91;
+Elt 146 0x92;
+Elt 147 0x93;
+Elt 148 0x94;
+Elt 149 0x95;
+Elt 150 0x96;
+Elt 151 0x97;
+Elt 152 0x98;
+Elt 153 0x99;
+Elt 154 0x9a;
+Elt 155 0x9b;
+Elt 156 0x9c;
+Elt 157 0x9d;
+Elt 158 0x9e;
+Elt 159 0x9f;
+Elt 160 0xa0;
+Elt 161 0xa1;
+Elt 162 0xa2;
+Elt 163 0xa3;
+Elt 164 0xa4;
+Elt 165 0xa5;
+Elt 166 0xa6;
+Elt 167 0xa7;
+Elt 168 0xa8;
+Elt 169 0xa9;
+Elt 170 0xaa;
+Elt 171 0xab;
+Elt 172 0xac;
+Elt 173 0xad;
+Elt 174 0xae;
+Elt 175 0xaf;
+Elt 176 0xb0;
+Elt 177 0xb1;
+Elt 178 0xb2;
+Elt 179 0xb3;
+Elt 180 0xb4;
+Elt 181 0xb5;
+Elt 182 0xb6;
+Elt 183 0xb7;
+Elt 184 0xb8;
+Elt 185 0xb9;
+Elt 186 0xba;
+Elt 187 0xbb;
+Elt 188 0xbc;
+Elt 189 0xbd;
+Elt 190 0xbe;
+Elt 191 0xbf;
+Elt 192 0xc0;
+Elt 193 0xc1;
+Elt 194 0xc2;
+Elt 195 0xc3;
+Elt 196 0xc4;
+Elt 197 0xc5;
+Elt 198 0xc6;
+Elt 199 0xc7;
+Elt 200 0xc8;
+Elt 201 0xc9;
+Elt 202 0xca;
+Elt 203 0xcb;
+Elt 204 0xcc;
+Elt 205 0xcd;
+Elt 206 0xce;
+Elt 207 0xcf;
+Elt 208 0xd0;
+Elt 209 0xd1;
+Elt 210 0xd2;
+Elt 211 0xd3;
+Elt 212 0xd4;
+Elt 213 0xd5;
+Elt 214 0xd6;
+Elt 215 0xd7;
+Elt 216 0xd8;
+Elt 217 0xd9;
+Elt 218 0xda;
+Elt 219 0xdb;
+Elt 220 0xdc;
+Elt 221 0xdd;
+Elt 222 0xde;
+Elt 223 0xdf;
+Elt 224 0xe0;
+Elt 225 0xe1;
+Elt 226 0xe2;
+Elt 227 0xe3;
+Elt 228 0xe4;
+Elt 229 0xe5;
+Elt 230 0xe6;
+Elt 231 0xe7;
+Elt 232 0xe8;
+Elt 233 0xe9;
+Elt 234 0xea;
+Elt 235 0xeb;
+Elt 236 0xec;
+Elt 237 0xed;
+Elt 238 0xee;
+Elt 239 0xef;
+Elt 240 0xf0;
+Elt 241 0xf1;
+Elt 242 0xf2;
+Elt 243 0xf3;
+Elt 244 0xf4;
+Elt 245 0xf5;
+Elt 246 0xf6;
+Elt 247 0xf7;
+Elt 248 0xf8;
+Elt 249 0xf9;
+Elt 250 0xfa;
+Elt 251 0xfb;
+Elt 252 0xfc;
+Elt 253 0xfd;
+Elt 254 0xfe;
+Elt 255 0xff;
+} } |} : 
+       unit -> (nat, bytes) map)]) ()
+
+let hex_conv_map  : (nat, string) map =
+  ([%Michelson
+    ({| {
+DROP;
+PUSH (map nat string) {
+Elt 0 "00";
+Elt 1 "01";
+Elt 2 "02";
+Elt 3 "03";
+Elt 4 "04";
+Elt 5 "05";
+Elt 6 "06";
+Elt 7 "07";
+Elt 8 "08";
+Elt 9 "09";
+Elt 10 "0a";
+Elt 11 "0b";
+Elt 12 "0c";
+Elt 13 "0d";
+Elt 14 "0e";
+Elt 15 "0f";
+Elt 16 "10";
+Elt 17 "11";
+Elt 18 "12";
+Elt 19 "13";
+Elt 20 "14";
+Elt 21 "15";
+Elt 22 "16";
+Elt 23 "17";
+Elt 24 "18";
+Elt 25 "19";
+Elt 26 "1a";
+Elt 27 "1b";
+Elt 28 "1c";
+Elt 29 "1d";
+Elt 30 "1e";
+Elt 31 "1f";
+Elt 32 "20";
+Elt 33 "21";
+Elt 34 "22";
+Elt 35 "23";
+Elt 36 "24";
+Elt 37 "25";
+Elt 38 "26";
+Elt 39 "27";
+Elt 40 "28";
+Elt 41 "29";
+Elt 42 "2a";
+Elt 43 "2b";
+Elt 44 "2c";
+Elt 45 "2d";
+Elt 46 "2e";
+Elt 47 "2f";
+Elt 48 "30";
+Elt 49 "31";
+Elt 50 "32";
+Elt 51 "33";
+Elt 52 "34";
+Elt 53 "35";
+Elt 54 "36";
+Elt 55 "37";
+Elt 56 "38";
+Elt 57 "39";
+Elt 58 "3a";
+Elt 59 "3b";
+Elt 60 "3c";
+Elt 61 "3d";
+Elt 62 "3e";
+Elt 63 "3f";
+Elt 64 "40";
+Elt 65 "41";
+Elt 66 "42";
+Elt 67 "43";
+Elt 68 "44";
+Elt 69 "45";
+Elt 70 "46";
+Elt 71 "47";
+Elt 72 "48";
+Elt 73 "49";
+Elt 74 "4a";
+Elt 75 "4b";
+Elt 76 "4c";
+Elt 77 "4d";
+Elt 78 "4e";
+Elt 79 "4f";
+Elt 80 "50";
+Elt 81 "51";
+Elt 82 "52";
+Elt 83 "53";
+Elt 84 "54";
+Elt 85 "55";
+Elt 86 "56";
+Elt 87 "57";
+Elt 88 "58";
+Elt 89 "59";
+Elt 90 "5a";
+Elt 91 "5b";
+Elt 92 "5c";
+Elt 93 "5d";
+Elt 94 "5e";
+Elt 95 "5f";
+Elt 96 "60";
+Elt 97 "61";
+Elt 98 "62";
+Elt 99 "63";
+Elt 100 "64";
+Elt 101 "65";
+Elt 102 "66";
+Elt 103 "67";
+Elt 104 "68";
+Elt 105 "69";
+Elt 106 "6a";
+Elt 107 "6b";
+Elt 108 "6c";
+Elt 109 "6d";
+Elt 110 "6e";
+Elt 111 "6f";
+Elt 112 "70";
+Elt 113 "71";
+Elt 114 "72";
+Elt 115 "73";
+Elt 116 "74";
+Elt 117 "75";
+Elt 118 "76";
+Elt 119 "77";
+Elt 120 "78";
+Elt 121 "79";
+Elt 122 "7a";
+Elt 123 "7b";
+Elt 124 "7c";
+Elt 125 "7d";
+Elt 126 "7e";
+Elt 127 "7f";
+Elt 128 "80";
+Elt 129 "81";
+Elt 130 "82";
+Elt 131 "83";
+Elt 132 "84";
+Elt 133 "85";
+Elt 134 "86";
+Elt 135 "87";
+Elt 136 "88";
+Elt 137 "89";
+Elt 138 "8a";
+Elt 139 "8b";
+Elt 140 "8c";
+Elt 141 "8d";
+Elt 142 "8e";
+Elt 143 "8f";
+Elt 144 "90";
+Elt 145 "91";
+Elt 146 "92";
+Elt 147 "93";
+Elt 148 "94";
+Elt 149 "95";
+Elt 150 "96";
+Elt 151 "97";
+Elt 152 "98";
+Elt 153 "99";
+Elt 154 "9a";
+Elt 155 "9b";
+Elt 156 "9c";
+Elt 157 "9d";
+Elt 158 "9e";
+Elt 159 "9f";
+Elt 160 "a0";
+Elt 161 "a1";
+Elt 162 "a2";
+Elt 163 "a3";
+Elt 164 "a4";
+Elt 165 "a5";
+Elt 166 "a6";
+Elt 167 "a7";
+Elt 168 "a8";
+Elt 169 "a9";
+Elt 170 "aa";
+Elt 171 "ab";
+Elt 172 "ac";
+Elt 173 "ad";
+Elt 174 "ae";
+Elt 175 "af";
+Elt 176 "b0";
+Elt 177 "b1";
+Elt 178 "b2";
+Elt 179 "b3";
+Elt 180 "b4";
+Elt 181 "b5";
+Elt 182 "b6";
+Elt 183 "b7";
+Elt 184 "b8";
+Elt 185 "b9";
+Elt 186 "ba";
+Elt 187 "bb";
+Elt 188 "bc";
+Elt 189 "bd";
+Elt 190 "be";
+Elt 191 "bf";
+Elt 192 "c0";
+Elt 193 "c1";
+Elt 194 "c2";
+Elt 195 "c3";
+Elt 196 "c4";
+Elt 197 "c5";
+Elt 198 "c6";
+Elt 199 "c7";
+Elt 200 "c8";
+Elt 201 "c9";
+Elt 202 "ca";
+Elt 203 "cb";
+Elt 204 "cc";
+Elt 205 "cd";
+Elt 206 "ce";
+Elt 207 "cf";
+Elt 208 "d0";
+Elt 209 "d1";
+Elt 210 "d2";
+Elt 211 "d3";
+Elt 212 "d4";
+Elt 213 "d5";
+Elt 214 "d6";
+Elt 215 "d7";
+Elt 216 "d8";
+Elt 217 "d9";
+Elt 218 "da";
+Elt 219 "db";
+Elt 220 "dc";
+Elt 221 "dd";
+Elt 222 "de";
+Elt 223 "df";
+Elt 224 "e0";
+Elt 225 "e1";
+Elt 226 "e2";
+Elt 227 "e3";
+Elt 228 "e4";
+Elt 229 "e5";
+Elt 230 "e6";
+Elt 231 "e7";
+Elt 232 "e8";
+Elt 233 "e9";
+Elt 234 "ea";
+Elt 235 "eb";
+Elt 236 "ec";
+Elt 237 "ed";
+Elt 238 "ee";
+Elt 239 "ef";
+Elt 240 "f0";
+Elt 241 "f1";
+Elt 242 "f2";
+Elt 243 "f3";
+Elt 244 "f4";
+Elt 245 "f5";
+Elt 246 "f6";
+Elt 247 "f7";
+Elt 248 "f8";
+Elt 249 "f9";
+Elt 250 "fa";
+Elt 251 "fb";
+Elt 252 "fc";
+Elt 253 "fd";
+Elt 254 "fe";
+Elt 255 "ff";
+} } |} : 
+       unit -> (nat, string) map)]) ()
+
+let uint8_to_byte (n : nat) =
+  match Map.find_opt n bytes_conv_map with
+  | None -> (failwith "" : bytes)
+  | Some b -> b
+
+let uint8_to_hex_byte (n : nat) =
+  match Map.find_opt n hex_conv_map with
+  | None -> (failwith "" : string)
+  | Some s -> s
+
+let nth_byte (number : nat) (n : nat) : bytes =
+  uint8_to_byte (nth_nat_byte number n)
+
+let nth_hex_byte (number : nat) (n : nat) : string =
+  uint8_to_hex_byte (nth_nat_byte number n)
+
+let nat_to_int64_big_endian (number : nat) : bytes =
+  if number > (max_int64 ())
+  then (failwith "BAD_INT64_NAT" : bytes)
+  else
+    concat_bytes
+      [nth_byte number 7n;
+       nth_byte number 6n;
+       nth_byte number 5n;
+       nth_byte number 4n;
+       nth_byte number 3n;
+       nth_byte number 2n;
+       nth_byte number 1n;
+       nth_byte number 0n]
+
+let nat_to_0x_hex_int64_big_endian (number : nat) : string =
+  if number > (max_int64 ())
+  then (failwith "BAD_INT64_NAT" : string)
+  else
+    concat_string
+      ["0x";
+       nth_hex_byte number 7n;
+       nth_hex_byte number 6n;
+       nth_hex_byte number 5n;
+       nth_hex_byte number 4n;
+       nth_hex_byte number 3n;
+       nth_hex_byte number 2n;
+       nth_hex_byte number 1n;
+       nth_hex_byte number 0n]
+
+let timestamp_to_int64_big_endian (timestamp : timestamp) : bytes =
+  let seconds_since_epoch =
+    match is_nat (timestamp - (0 : timestamp)) with
+    | None -> (failwith "" : nat)
+    | Some s -> s in
+  nat_to_int64_big_endian seconds_since_epoch
+
+let drop_n_first_bytes (b : bytes) (n : nat) : bytes =
+  let len = Bytes.length b in
+  let rem_len =
+    match is_nat (len - n) with
+    | None -> (failwith "INVALID_DROP_N" : nat)
+    | Some l -> l in
+  Bytes.sub n rem_len b
+
+let public_key_to_bytes (k : key) : bytes =
+  drop_n_first_bytes (Bytes.pack k) 6n
+
+let string_to_bytes (s : string) : bytes =
+  drop_n_first_bytes (Bytes.pack s) 6n
+
+let amount_to_bytes (a : token_amount) : bytes =
+  match a with | Amount a -> string_to_bytes (nat_to_0x_hex_int64_big_endian a)
+
+let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
+  let { nonce = tt_nonce; asset_id = tt_asset_id; src_account = tt_src_account;
+        dst_account = tt_dst_account; amount = tt_amount; shg = tt_shg;
+        signature = _ }
+    = p in
+  let nonce =
+    Bytes.concat tt_nonce.nonce
+      (timestamp_to_int64_big_endian tt_nonce.timestamp) in
+  let operation = string_to_bytes "transfer" in
+  let assetType = string_to_bytes "finp2p" in
+  let assetId = match tt_asset_id with | Asset_id id -> id in
+  let accountType = string_to_bytes "finId" in
+  let srcAccountType = accountType in
+  let srcAccount = public_key_to_bytes tt_src_account in
+  let dstAccountType = accountType in
+  let dstAccount = public_key_to_bytes tt_dst_account in
+  let amount_ = amount_to_bytes tt_amount in
+  let asset_bytes_group =
+    concat_bytes
+      [nonce;
+       operation;
+       assetType;
+       assetId;
+       accountType;
+       srcAccountType;
+       srcAccount;
+       dstAccountType;
+       dstAccount;
+       amount_] in
+  let ahg = Crypto.blake2b asset_bytes_group in Bytes.concat ahg tt_shg
+
+let encode_issue_tokens_payload (p : issue_tokens_param) =
+  let { nonce = it_nonce; asset_id = it_asset_id; dst_account = it_dst_account;
+        amount = it_amount; shg = it_shg; signature = _; new_token_info = _ }
+    = p in
+  let nonce =
+    Bytes.concat it_nonce.nonce
+      (timestamp_to_int64_big_endian it_nonce.timestamp) in
+  let operation = string_to_bytes "issue" in
+  let assetType = string_to_bytes "finp2p" in
+  let assetId = match it_asset_id with | Asset_id id -> id in
+  let dstAccountType = string_to_bytes "finId" in
+  let dstAccount = public_key_to_bytes it_dst_account in
+  let amount_ = amount_to_bytes it_amount in
+  let asset_bytes_group =
+    concat_bytes
+      [nonce;
+       operation;
+       assetType;
+       assetId;
+       dstAccountType;
+       dstAccount;
+       amount_] in
+  let ahg = Crypto.blake2b asset_bytes_group in Bytes.concat ahg it_shg
+
+let encode_redeem_tokens_payload (p : redeem_tokens_param) =
+  let { nonce = rt_nonce; asset_id = rt_asset_id; src_account = _;
+        amount = rt_amount; signature = _ }
+    = p in
+  let nonce =
+    Bytes.concat rt_nonce.nonce
+      (timestamp_to_int64_big_endian rt_nonce.timestamp) in
+  let operation = string_to_bytes "redeem" in
+  let assetId = match rt_asset_id with | Asset_id id -> id in
+  let quantity = amount_to_bytes rt_amount in
+  concat_bytes [nonce; operation; assetId; quantity]
+
+let check_transfer_tokens_signature (p : transfer_tokens_param) : operation_hash =
+  let payload = encode_tranfer_tokens_payload p in
+  if not (Crypto.check p.src_account p.signature payload)
+  then (failwith invalid_signature : operation_hash)
+  else OpHash (Crypto.blake2b payload)
+
+let check_issue_tokens_signature (p : issue_tokens_param) : operation_hash =
+  let payload = encode_issue_tokens_payload p in
+  let () =
+    match p.signature with
+    | None -> ()
+    | Some signature ->
+      if not (Crypto.check p.dst_account signature payload)
+      then (failwith invalid_signature : unit) in
+  OpHash (Crypto.blake2b payload)
+
+let check_redeem_tokens_signature (p : redeem_tokens_param) : operation_hash =
+  let payload = encode_redeem_tokens_payload p in
+  if not (Crypto.check p.src_account p.signature payload)
+  then (failwith invalid_signature : operation_hash)
+  else OpHash (Crypto.blake2b payload)
+
+#endif

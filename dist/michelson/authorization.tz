@@ -1,0 +1,146 @@
+{ parameter
+    (or (or %auth_admin
+           (or (pair %add_accredited address bytes) (address %remove_accredited))
+           (or (address %update_admin)
+               (lambda %update_auth_logic
+                  (pair (pair (address %sender)
+                              (pair (list %sender_is_operator (list bool))
+                                    (pair (address %fa2_address)
+                                          (or %action
+                                             (or %assets_action
+                                                (or (pair %balance_of
+                                                       (list %requests (pair (address %owner) (nat %token_id)))
+                                                       (contract %callback
+                                                          (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                                    (list %transfer
+                                                       (pair (address %from_)
+                                                             (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                                                (list %update_operators
+                                                   (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                                       (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
+                                             (or (or %manage_action
+                                                    (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                                    (pair %mint
+                                                       (nat %token_id)
+                                                       (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                                 (unit %admin_action))))))
+                        (pair (address %admin) (big_map %accredited address bytes)))
+                  (pair (list operation) (pair (address %admin) (big_map %accredited address bytes))))))
+        (pair %authorize
+           (address %sender)
+           (pair (list %sender_is_operator (list bool))
+                 (pair (address %fa2_address)
+                       (or %action
+                          (or %assets_action
+                             (or (pair %balance_of
+                                    (list %requests (pair (address %owner) (nat %token_id)))
+                                    (contract %callback
+                                       (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                 (list %transfer
+                                    (pair (address %from_)
+                                          (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                             (list %update_operators
+                                (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                    (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
+                          (or (or %manage_action
+                                 (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                 (pair %mint
+                                    (nat %token_id)
+                                    (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                              (unit %admin_action))))))) ;
+  storage
+    (pair (lambda %authorize
+             (pair (pair (address %sender)
+                         (pair (list %sender_is_operator (list bool))
+                               (pair (address %fa2_address)
+                                     (or %action
+                                        (or %assets_action
+                                           (or (pair %balance_of
+                                                  (list %requests (pair (address %owner) (nat %token_id)))
+                                                  (contract %callback
+                                                     (list (pair (pair %request (address %owner) (nat %token_id)) (nat %balance)))))
+                                               (list %transfer
+                                                  (pair (address %from_)
+                                                        (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))))
+                                           (list %update_operators
+                                              (or (pair %add_operator (address %owner) (pair (address %operator) (nat %token_id)))
+                                                  (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))
+                                        (or (or %manage_action
+                                               (pair %burn (nat %token_id) (list %owners (pair address nat)))
+                                               (pair %mint
+                                                  (nat %token_id)
+                                                  (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                            (unit %admin_action))))))
+                   (pair (address %admin) (big_map %accredited address bytes)))
+             (pair (list operation) (pair (address %admin) (big_map %accredited address bytes))))
+          (pair %storage (address %admin) (big_map %accredited address bytes))) ;
+  code { UNPAIR ;
+         IF_LEFT
+           { SWAP ;
+             DUP ;
+             DUG 2 ;
+             CDR ;
+             CAR ;
+             SENDER ;
+             COMPARE ;
+             EQ ;
+             NOT ;
+             IF { PUSH string "FINP2P_UNAUTHORIZED_ACTION" ; FAILWITH } {} ;
+             IF_LEFT
+               { IF_LEFT
+                   { UNPAIR ;
+                     DUP 3 ;
+                     CDR ;
+                     DUP 4 ;
+                     CDR ;
+                     CDR ;
+                     DIG 3 ;
+                     DIG 3 ;
+                     SWAP ;
+                     SOME ;
+                     SWAP ;
+                     UPDATE ;
+                     UPDATE 2 ;
+                     SWAP ;
+                     CAR ;
+                     PAIR }
+                   { SWAP ;
+                     DUP ;
+                     DUG 2 ;
+                     CDR ;
+                     DUP 3 ;
+                     CDR ;
+                     CDR ;
+                     DIG 2 ;
+                     NONE bytes ;
+                     SWAP ;
+                     UPDATE ;
+                     UPDATE 2 ;
+                     SWAP ;
+                     CAR ;
+                     PAIR } }
+               { IF_LEFT
+                   { SWAP ; DUP ; DUG 2 ; CDR ; SWAP ; UPDATE 1 ; SWAP ; CAR ; PAIR }
+                   { SWAP ; CDR ; SWAP ; PAIR } } ;
+             NIL operation ;
+             PAIR }
+           { SWAP ;
+             DUP ;
+             DUG 2 ;
+             CDR ;
+             SWAP ;
+             PAIR ;
+             SWAP ;
+             DUP ;
+             DUG 2 ;
+             CAR ;
+             SWAP ;
+             EXEC ;
+             UNPAIR ;
+             SWAP ;
+             DIG 2 ;
+             CAR ;
+             PAIR ;
+             SWAP ;
+             PAIR } } }
+

@@ -1,0 +1,211 @@
+(library
+ (name base)
+ (modules errors fa2_params auth_params fa2_types auth_types finp2p_proxy_types)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo)))
+
+(library
+ (name fa2)
+ (modules assets admin manager fa2)
+ (libraries base)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo -open Base)))
+
+(library
+ (name fa2_sig)
+ (modules fa2_sig)
+ (libraries base)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo -open Base)))
+
+(library
+ (name authorization)
+ (modules authorization)
+ (libraries base)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo -open Base)))
+
+(library
+ (name finp2p_proxy)
+ (modules finp2p_lib finp2p_proxy)
+ (libraries base fa2_sig)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo -open Base)))
+
+(library
+ (name fa2_test)
+ (modules fa2_test)
+ (libraries fa2)
+ (preprocess
+  (pps mligo.ppx)))
+
+(rule
+ (mode promote)
+ (deps scripts/gen_finp2p_conv.ml)
+ (target finp2p_conv.ml)
+ (action
+  (with-stdout-to
+   %{target}
+  (run ./scripts/gen_finp2p_conv.ml))))
+
+(rule
+ (alias ligo)
+ (deps (glob_files *.ml))
+ (targets
+  errors.mligo
+  fa2_params.mligo
+  fa2_types.mligo
+  fa2_sig.mligo
+  assets.mligo
+  admin.mligo
+  manager.mligo
+  fa2.mligo
+  fa2_test.mligo
+  auth_params.mligo
+  auth_types.mligo
+  authorization.mligo
+  finp2p_proxy_types.mligo
+  ; finp2p_conv.mligo
+  finp2p_lib.mligo
+  finp2p_proxy.mligo)
+ (action
+  (progn
+   (run to_mligo fa2.ml)
+   (run to_mligo authorization.ml)
+   (run to_mligo finp2p_proxy.ml)
+   (run to_mligo fa2_test.ml))))
+
+(rule
+ (alias michelson)
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   fa2_sig.ml
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+   fa2_test.mligo
+   auth_params.mligo
+   auth_types.mligo
+   authorization.mligo
+   finp2p_proxy_types.mligo
+   ; finp2p_conv.mligo
+   finp2p_lib.mligo
+   finp2p_proxy.mligo)
+(targets fa2.tz authorization.tz finp2p_proxy.tz)
+(action
+ (progn
+  (with-stdout-to
+    fa2.tz
+   (run ligo compile contract fa2.mligo))
+  (with-stdout-to
+    authorization.tz
+   (run ligo compile contract authorization.mligo))
+  (with-stdout-to
+    finp2p_proxy.tz
+   (run ligo compile contract finp2p_proxy.mligo)))))
+
+(rule
+ (alias michelson-json)
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   fa2_sig.ml
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+   fa2_test.mligo
+   auth_params.mligo
+   auth_types.mligo
+   authorization.mligo
+   finp2p_proxy_types.mligo
+   ; finp2p_conv.mligo
+   finp2p_lib.mligo
+   finp2p_proxy.mligo)
+(targets fa2.json authorization.json auth_init.json finp2p_proxy.json)
+(action
+ (progn
+  (with-stdout-to
+    fa2.json
+   (run ligo compile contract fa2.mligo --michelson-format json))
+  (with-stdout-to
+    authorization.json
+   (run ligo compile contract authorization.mligo --michelson-format json))
+  (with-stdout-to
+    auth_init.json
+   (run ligo compile contract authorization.mligo -e auth_authorize --michelson-format json))
+  (with-stdout-to
+    finp2p_proxy.json
+   (run ligo compile contract finp2p_proxy.mligo --michelson-format json)))))
+
+; (rule
+;  (deps
+;   errors.ml
+;   fa2_params.ml
+;   fa2_types.ml
+;   assets.ml
+;   admin.ml
+;   manager.ml
+;   fa2.ml
+;   auth_params.ml
+;   auth_types.ml
+;   authorization.mligo)
+;  (targets fa2_interface.ml authorization_interface.ml)
+;  (action
+;   (progn
+;    (run mligo_interface -s -o fa2_interface.ml fa2.ml)
+;    (run mligo_interface -s -o authorization_interface.ml authorization.ml))))
+
+; (rule
+;  (deps
+;   errors.ml
+;   fa2_params.ml
+;   fa2_types.ml
+;   assets.ml
+;   admin.ml
+;   manager.ml
+;   fa2.ml
+;   auth_params.ml
+;   auth_types.ml
+;   authorization.ml)
+;  (targets fa2_tzfunc.ml authorization_tzfunc.ml)
+;  (action
+;   (progn
+;    (run mligo_interface -o fa2_tzfunc.ml fa2.ml)
+;    (run mligo_interface -o authorization_tzfunc.ml authorization.ml))))
+
+; (library
+;  (name fa2_interface)
+;  (modules fa2_interface)
+;  (libraries fa2 mligo.unix))
+
+; (library
+;  (name fa2_tzfunc)
+;  (optional)
+;  (modules fa2_tzfunc)
+;  (libraries fa2 mligo.tzfunc))
+
+; (library
+;  (name authorization_interface)
+;  (modules authorization_interface)
+;  (libraries authorization mligo.unix))
+
+; (library
+;  (name authorization_tzfunc)
+;  (optional)
+;  (modules authorization_tzfunc)
+;  (libraries authorization mligo.tzfunc))
