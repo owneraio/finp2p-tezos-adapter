@@ -11,12 +11,11 @@ let other  =
 let initial_storage  : storage =
   {
     auth_contract = src;
-    pending_admin = (None : address option);
     paused = true;
-    ledger = (Big_map.empty : ((nat * address), nat) big_map);
+    ledger = (Big_map.empty : ledger);
     operators = (Big_map.empty : operators_storage);
-    token_metadata =
-      (Big_map.empty : (nat, (nat * (string, bytes) map)) big_map);
+    token_metadata = (Big_map.empty : token_metadata_storage);
+    total_supply = (Big_map.empty : total_supply_storage);
     metadata = (Big_map.empty : (string, bytes) big_map)
   }
 
@@ -34,9 +33,9 @@ let test_mint  =
   let () = Test.transfer_to_contract_exn contr (Manager (Mint mint_param)) 0tez in
   let storage = Test.get_storage taddr in
   let () =
-    assert ((Big_map.find_opt (12318n, src) storage.ledger) = (Some 10n)) in
+    assert ((Big_map.find_opt (src, 12318n) storage.ledger) = (Some 10n)) in
   let () =
-    assert ((Big_map.find_opt (10n, src) storage.ledger) = (None : nat option)) in
+    assert ((Big_map.find_opt (src, 10n) storage.ledger) = (None : nat option)) in
   storage
 
 #endif

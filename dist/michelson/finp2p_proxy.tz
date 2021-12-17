@@ -3,7 +3,7 @@
             (or %finp2p_admin
                (or (address %update_admin)
                    (pair %update_fa2_token bytes (pair (address %address) (nat %id))))
-               (nat %update_operation_ttl)))
+               (pair %update_operation_ttl (nat %ttl) (nat %allowed_in_the_future))))
         (or (or %finp2p_asset
                (or (pair %issue_tokens
                       (pair %nonce (bytes %nonce) (timestamp %timestamp))
@@ -41,9 +41,10 @@
                             (pair (key %src_account)
                                   (pair (key %dst_account) (pair (nat %amount) (pair (bytes %shg) (signature %signature))))))))))) ;
   storage
-    (pair (pair (address %admin)
-                (big_map %finp2p_assets bytes (pair (address %address) (nat %id))))
-          (pair (big_map %live_operations bytes timestamp) (nat %operation_ttl))) ;
+    (pair (pair %operation_ttl (nat %ttl) (nat %allowed_in_the_future))
+          (pair (big_map %live_operations bytes timestamp)
+                (pair (big_map %finp2p_assets bytes (pair (address %address) (nat %id)))
+                      (address %admin)))) ;
   code { PUSH string "FINP2P_PASSED_OR_EXPIRED_OPERATION" ;
          PUSH string "FINP2P_UNKNOWN_ASSET_ID" ;
          PUSH string "INVALID_FA2_CONTRACT" ;
@@ -63,10 +64,6 @@
          SWAP ;
          APPLY ;
          LAMBDA (list bytes) bytes { CONCAT } ;
-         LAMBDA
-           (pair nat nat)
-           nat
-           { UNPAIR ; PUSH nat 255 ; PUSH nat 8 ; DIG 3 ; MUL ; DIG 2 ; LSR ; AND } ;
          PUSH (map nat bytes)
               { Elt 0 0x00 ;
                 Elt 1 0x01 ;
@@ -325,293 +322,42 @@
                 Elt 254 0xfe ;
                 Elt 255 0xff } ;
          PUSH (map nat string)
-              { Elt 0 "00" ;
-                Elt 1 "01" ;
-                Elt 2 "02" ;
-                Elt 3 "03" ;
-                Elt 4 "04" ;
-                Elt 5 "05" ;
-                Elt 6 "06" ;
-                Elt 7 "07" ;
-                Elt 8 "08" ;
-                Elt 9 "09" ;
-                Elt 10 "0a" ;
-                Elt 11 "0b" ;
-                Elt 12 "0c" ;
-                Elt 13 "0d" ;
-                Elt 14 "0e" ;
-                Elt 15 "0f" ;
-                Elt 16 "10" ;
-                Elt 17 "11" ;
-                Elt 18 "12" ;
-                Elt 19 "13" ;
-                Elt 20 "14" ;
-                Elt 21 "15" ;
-                Elt 22 "16" ;
-                Elt 23 "17" ;
-                Elt 24 "18" ;
-                Elt 25 "19" ;
-                Elt 26 "1a" ;
-                Elt 27 "1b" ;
-                Elt 28 "1c" ;
-                Elt 29 "1d" ;
-                Elt 30 "1e" ;
-                Elt 31 "1f" ;
-                Elt 32 "20" ;
-                Elt 33 "21" ;
-                Elt 34 "22" ;
-                Elt 35 "23" ;
-                Elt 36 "24" ;
-                Elt 37 "25" ;
-                Elt 38 "26" ;
-                Elt 39 "27" ;
-                Elt 40 "28" ;
-                Elt 41 "29" ;
-                Elt 42 "2a" ;
-                Elt 43 "2b" ;
-                Elt 44 "2c" ;
-                Elt 45 "2d" ;
-                Elt 46 "2e" ;
-                Elt 47 "2f" ;
-                Elt 48 "30" ;
-                Elt 49 "31" ;
-                Elt 50 "32" ;
-                Elt 51 "33" ;
-                Elt 52 "34" ;
-                Elt 53 "35" ;
-                Elt 54 "36" ;
-                Elt 55 "37" ;
-                Elt 56 "38" ;
-                Elt 57 "39" ;
-                Elt 58 "3a" ;
-                Elt 59 "3b" ;
-                Elt 60 "3c" ;
-                Elt 61 "3d" ;
-                Elt 62 "3e" ;
-                Elt 63 "3f" ;
-                Elt 64 "40" ;
-                Elt 65 "41" ;
-                Elt 66 "42" ;
-                Elt 67 "43" ;
-                Elt 68 "44" ;
-                Elt 69 "45" ;
-                Elt 70 "46" ;
-                Elt 71 "47" ;
-                Elt 72 "48" ;
-                Elt 73 "49" ;
-                Elt 74 "4a" ;
-                Elt 75 "4b" ;
-                Elt 76 "4c" ;
-                Elt 77 "4d" ;
-                Elt 78 "4e" ;
-                Elt 79 "4f" ;
-                Elt 80 "50" ;
-                Elt 81 "51" ;
-                Elt 82 "52" ;
-                Elt 83 "53" ;
-                Elt 84 "54" ;
-                Elt 85 "55" ;
-                Elt 86 "56" ;
-                Elt 87 "57" ;
-                Elt 88 "58" ;
-                Elt 89 "59" ;
-                Elt 90 "5a" ;
-                Elt 91 "5b" ;
-                Elt 92 "5c" ;
-                Elt 93 "5d" ;
-                Elt 94 "5e" ;
-                Elt 95 "5f" ;
-                Elt 96 "60" ;
-                Elt 97 "61" ;
-                Elt 98 "62" ;
-                Elt 99 "63" ;
-                Elt 100 "64" ;
-                Elt 101 "65" ;
-                Elt 102 "66" ;
-                Elt 103 "67" ;
-                Elt 104 "68" ;
-                Elt 105 "69" ;
-                Elt 106 "6a" ;
-                Elt 107 "6b" ;
-                Elt 108 "6c" ;
-                Elt 109 "6d" ;
-                Elt 110 "6e" ;
-                Elt 111 "6f" ;
-                Elt 112 "70" ;
-                Elt 113 "71" ;
-                Elt 114 "72" ;
-                Elt 115 "73" ;
-                Elt 116 "74" ;
-                Elt 117 "75" ;
-                Elt 118 "76" ;
-                Elt 119 "77" ;
-                Elt 120 "78" ;
-                Elt 121 "79" ;
-                Elt 122 "7a" ;
-                Elt 123 "7b" ;
-                Elt 124 "7c" ;
-                Elt 125 "7d" ;
-                Elt 126 "7e" ;
-                Elt 127 "7f" ;
-                Elt 128 "80" ;
-                Elt 129 "81" ;
-                Elt 130 "82" ;
-                Elt 131 "83" ;
-                Elt 132 "84" ;
-                Elt 133 "85" ;
-                Elt 134 "86" ;
-                Elt 135 "87" ;
-                Elt 136 "88" ;
-                Elt 137 "89" ;
-                Elt 138 "8a" ;
-                Elt 139 "8b" ;
-                Elt 140 "8c" ;
-                Elt 141 "8d" ;
-                Elt 142 "8e" ;
-                Elt 143 "8f" ;
-                Elt 144 "90" ;
-                Elt 145 "91" ;
-                Elt 146 "92" ;
-                Elt 147 "93" ;
-                Elt 148 "94" ;
-                Elt 149 "95" ;
-                Elt 150 "96" ;
-                Elt 151 "97" ;
-                Elt 152 "98" ;
-                Elt 153 "99" ;
-                Elt 154 "9a" ;
-                Elt 155 "9b" ;
-                Elt 156 "9c" ;
-                Elt 157 "9d" ;
-                Elt 158 "9e" ;
-                Elt 159 "9f" ;
-                Elt 160 "a0" ;
-                Elt 161 "a1" ;
-                Elt 162 "a2" ;
-                Elt 163 "a3" ;
-                Elt 164 "a4" ;
-                Elt 165 "a5" ;
-                Elt 166 "a6" ;
-                Elt 167 "a7" ;
-                Elt 168 "a8" ;
-                Elt 169 "a9" ;
-                Elt 170 "aa" ;
-                Elt 171 "ab" ;
-                Elt 172 "ac" ;
-                Elt 173 "ad" ;
-                Elt 174 "ae" ;
-                Elt 175 "af" ;
-                Elt 176 "b0" ;
-                Elt 177 "b1" ;
-                Elt 178 "b2" ;
-                Elt 179 "b3" ;
-                Elt 180 "b4" ;
-                Elt 181 "b5" ;
-                Elt 182 "b6" ;
-                Elt 183 "b7" ;
-                Elt 184 "b8" ;
-                Elt 185 "b9" ;
-                Elt 186 "ba" ;
-                Elt 187 "bb" ;
-                Elt 188 "bc" ;
-                Elt 189 "bd" ;
-                Elt 190 "be" ;
-                Elt 191 "bf" ;
-                Elt 192 "c0" ;
-                Elt 193 "c1" ;
-                Elt 194 "c2" ;
-                Elt 195 "c3" ;
-                Elt 196 "c4" ;
-                Elt 197 "c5" ;
-                Elt 198 "c6" ;
-                Elt 199 "c7" ;
-                Elt 200 "c8" ;
-                Elt 201 "c9" ;
-                Elt 202 "ca" ;
-                Elt 203 "cb" ;
-                Elt 204 "cc" ;
-                Elt 205 "cd" ;
-                Elt 206 "ce" ;
-                Elt 207 "cf" ;
-                Elt 208 "d0" ;
-                Elt 209 "d1" ;
-                Elt 210 "d2" ;
-                Elt 211 "d3" ;
-                Elt 212 "d4" ;
-                Elt 213 "d5" ;
-                Elt 214 "d6" ;
-                Elt 215 "d7" ;
-                Elt 216 "d8" ;
-                Elt 217 "d9" ;
-                Elt 218 "da" ;
-                Elt 219 "db" ;
-                Elt 220 "dc" ;
-                Elt 221 "dd" ;
-                Elt 222 "de" ;
-                Elt 223 "df" ;
-                Elt 224 "e0" ;
-                Elt 225 "e1" ;
-                Elt 226 "e2" ;
-                Elt 227 "e3" ;
-                Elt 228 "e4" ;
-                Elt 229 "e5" ;
-                Elt 230 "e6" ;
-                Elt 231 "e7" ;
-                Elt 232 "e8" ;
-                Elt 233 "e9" ;
-                Elt 234 "ea" ;
-                Elt 235 "eb" ;
-                Elt 236 "ec" ;
-                Elt 237 "ed" ;
-                Elt 238 "ee" ;
-                Elt 239 "ef" ;
-                Elt 240 "f0" ;
-                Elt 241 "f1" ;
-                Elt 242 "f2" ;
-                Elt 243 "f3" ;
-                Elt 244 "f4" ;
-                Elt 245 "f5" ;
-                Elt 246 "f6" ;
-                Elt 247 "f7" ;
-                Elt 248 "f8" ;
-                Elt 249 "f9" ;
-                Elt 250 "fa" ;
-                Elt 251 "fb" ;
-                Elt 252 "fc" ;
-                Elt 253 "fd" ;
-                Elt 254 "fe" ;
-                Elt 255 "ff" } ;
-         DUP 3 ;
-         DIG 2 ;
-         PAIR ;
+              { Elt 0 "0" ;
+                Elt 1 "1" ;
+                Elt 2 "2" ;
+                Elt 3 "3" ;
+                Elt 4 "4" ;
+                Elt 5 "5" ;
+                Elt 6 "6" ;
+                Elt 7 "7" ;
+                Elt 8 "8" ;
+                Elt 9 "9" ;
+                Elt 10 "a" ;
+                Elt 11 "b" ;
+                Elt 12 "c" ;
+                Elt 13 "d" ;
+                Elt 14 "e" ;
+                Elt 15 "f" } ;
+         SWAP ;
          LAMBDA
-           (pair (pair (map nat bytes) (lambda (pair nat nat) nat)) (pair nat nat))
+           (pair (map nat bytes) (pair nat nat))
            bytes
            { UNPAIR ;
-             UNPAIR ;
-             DUG 2 ;
              SWAP ;
-             EXEC ;
-             GET ;
-             IF_NONE { PUSH string "" ; FAILWITH } {} } ;
-         SWAP ;
-         APPLY ;
-         DUG 2 ;
-         PAIR ;
-         LAMBDA
-           (pair (pair (map nat string) (lambda (pair nat nat) nat)) (pair nat nat))
-           string
-           { UNPAIR ;
              UNPAIR ;
-             DUG 2 ;
-             SWAP ;
-             EXEC ;
+             PUSH nat 255 ;
+             PUSH nat 8 ;
+             DIG 3 ;
+             MUL ;
+             DIG 2 ;
+             LSR ;
+             AND ;
              GET ;
              IF_NONE { PUSH string "" ; FAILWITH } {} } ;
          SWAP ;
          APPLY ;
          DUP 3 ;
-         DIG 2 ;
+         SWAP ;
          PAIR ;
          LAMBDA
            (pair (pair (lambda (pair nat nat) bytes) (lambda (list bytes) bytes)) nat)
@@ -743,7 +489,7 @@
          LAMBDA
            (pair (lambda (pair bytes nat) bytes) key)
            bytes
-           { UNPAIR ; SWAP ; PACK ; PUSH nat 6 ; SWAP ; PAIR ; EXEC } ;
+           { UNPAIR ; SWAP ; PACK ; PUSH nat 7 ; SWAP ; PAIR ; EXEC } ;
          SWAP ;
          APPLY ;
          SWAP ;
@@ -759,7 +505,7 @@
          DUG 2 ;
          PAIR ;
          LAMBDA
-           (pair (pair (lambda string bytes) (lambda (pair nat nat) string)) nat)
+           (pair (pair (lambda string bytes) (map nat string)) nat)
            bytes
            { UNPAIR ;
              UNPAIR ;
@@ -771,97 +517,66 @@
              COMPARE ;
              GT ;
              IF { DIG 2 ; DROP 2 ; PUSH string "BAD_INT64_NAT" ; FAILWITH }
-                { NIL string ;
+                { PUSH nat 0 ;
                   SWAP ;
                   DUP ;
                   DUG 2 ;
-                  PUSH nat 0 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 1 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 2 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 3 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 4 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 5 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  PUSH nat 6 ;
-                  SWAP ;
-                  PAIR ;
-                  DUP 5 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  SWAP ;
-                  PUSH nat 7 ;
-                  SWAP ;
-                  PAIR ;
-                  DIG 3 ;
-                  SWAP ;
-                  EXEC ;
-                  CONS ;
-                  PUSH string "0x" ;
-                  CONS ;
-                  CONCAT } ;
+                  COMPARE ;
+                  EQ ;
+                  IF { DIG 2 ; DROP 2 ; PUSH string "0x0" }
+                     { NIL string ;
+                       PUSH nat 15 ;
+                       DIG 2 ;
+                       PAIR ;
+                       PAIR ;
+                       LEFT string ;
+                       LOOP_LEFT
+                         { UNPAIR ;
+                           UNPAIR ;
+                           PUSH nat 15 ;
+                           PUSH nat 4 ;
+                           DUP 4 ;
+                           MUL ;
+                           DUP 3 ;
+                           LSR ;
+                           AND ;
+                           DUP 6 ;
+                           SWAP ;
+                           GET ;
+                           IF_NONE { PUSH string "" ; FAILWITH } {} ;
+                           PUSH string "0" ;
+                           SWAP ;
+                           DUP ;
+                           DUG 2 ;
+                           COMPARE ;
+                           EQ ;
+                           IF { DUP 4 ; IF_CONS { DROP 2 ; DIG 3 ; SWAP ; CONS } { DROP ; DIG 2 } }
+                              { DIG 3 ; SWAP ; CONS } ;
+                           PUSH nat 1 ;
+                           DIG 3 ;
+                           SUB ;
+                           ISNAT ;
+                           IF_NONE
+                             { SWAP ;
+                               DROP ;
+                               NIL string ;
+                               SWAP ;
+                               ITER { CONS } ;
+                               PUSH string "0x" ;
+                               CONS ;
+                               CONCAT ;
+                               RIGHT (pair (pair nat nat) (list string)) }
+                             { DIG 2 ; PAIR ; PAIR ; LEFT string } } ;
+                       DIG 2 ;
+                       DROP } } ;
              EXEC } ;
          SWAP ;
          APPLY ;
          LAMBDA
-           (pair (pair address (big_map bytes (pair address nat)))
-                 (pair (big_map bytes timestamp) nat))
+           (pair (pair nat nat)
+                 (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address)))
            unit
-           { CAR ;
-             CAR ;
+           { GET 6 ;
              SENDER ;
              COMPARE ;
              EQ ;
@@ -869,36 +584,41 @@
              IF { PUSH string "FINP2P_UNAUTHORIZED_ACTION" ; FAILWITH } { UNIT } } ;
          LAMBDA
            (pair timestamp
-                 (pair (pair address (big_map bytes (pair address nat)))
-                       (pair (big_map bytes timestamp) nat)))
+                 (pair (pair nat nat)
+                       (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address))))
            bool
-           { UNPAIR ; SWAP ; CDR ; CDR ; INT ; ADD ; NOW ; COMPARE ; GT } ;
+           { UNPAIR ; SWAP ; CAR ; CAR ; INT ; ADD ; NOW ; COMPARE ; GT } ;
          DUP ;
          LAMBDA
            (pair (lambda
                     (pair timestamp
-                          (pair (pair address (big_map bytes (pair address nat)))
-                                (pair (big_map bytes timestamp) nat)))
+                          (pair (pair nat nat)
+                                (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address))))
                     bool)
                  (pair timestamp
-                       (pair (pair address (big_map bytes (pair address nat)))
-                             (pair (big_map bytes timestamp) nat))))
+                       (pair (pair nat nat)
+                             (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address)))))
            bool
            { UNPAIR ;
              SWAP ;
              UNPAIR ;
              DUP ;
-             DIG 2 ;
+             DUP 3 ;
              SWAP ;
              PAIR ;
-             DIG 2 ;
+             DIG 3 ;
              SWAP ;
              EXEC ;
              NOT ;
+             DIG 2 ;
+             CAR ;
+             CDR ;
+             INT ;
              NOW ;
+             ADD ;
              DIG 2 ;
              COMPARE ;
-             GE ;
+             LE ;
              AND } ;
          SWAP ;
          APPLY ;
@@ -921,8 +641,8 @@
            (pair (pair (lambda key address)
                        (pair (lambda
                                 (pair timestamp
-                                      (pair (pair address (big_map bytes (pair address nat)))
-                                            (pair (big_map bytes timestamp) nat)))
+                                      (pair (pair nat nat)
+                                            (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address))))
                                 bool)
                              (pair (lambda nat bytes)
                                    (pair (lambda string bytes)
@@ -940,11 +660,11 @@
                                (pair (pair bytes timestamp) (pair bytes (pair key (pair nat signature)))))
                            (pair (pair bytes timestamp)
                                  (pair bytes (pair key (pair key (pair nat (pair bytes signature)))))))
-                       (pair (pair address (big_map bytes (pair address nat)))
-                             (pair (big_map bytes timestamp) nat))))
+                       (pair (pair nat nat)
+                             (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address)))))
            (pair operation
-                 (pair (pair address (big_map bytes (pair address nat)))
-                       (pair (big_map bytes timestamp) nat)))
+                 (pair (pair nat nat)
+                       (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address))))
            { UNPAIR ;
              UNPAIR 13 ;
              DIG 13 ;
@@ -1034,61 +754,52 @@
                          NOT ;
                          IF { DIG 4 ; FAILWITH } { DIG 4 ; DROP ; UNIT } } ;
                      DROP ;
-                     DUP 3 ;
-                     CDR ;
-                     CDR ;
-                     DUP 4 ;
-                     CDR ;
-                     CAR ;
-                     DUP 4 ;
-                     CAR ;
-                     CDR ;
-                     DIG 3 ;
-                     BLAKE2B ;
-                     SWAP ;
-                     SOME ;
-                     SWAP ;
-                     UPDATE ;
-                     PAIR ;
-                     DIG 2 ;
-                     CAR ;
-                     PAIR ;
                      SWAP ;
                      DUP ;
                      DUG 2 ;
                      GET 12 ;
                      IF_NONE
-                       { DUP ;
-                         CAR ;
-                         CDR ;
+                       { DUP 3 ;
+                         GET 5 ;
                          DUP 3 ;
                          GET 3 ;
                          GET ;
                          IF_NONE
-                           { DIG 4 ; FAILWITH }
-                           { DIG 5 ; DROP ; NONE (map string bytes) ; SWAP ; PAIR } }
-                       { DIG 5 ;
+                           { DIG 5 ; FAILWITH }
+                           { DIG 6 ;
+                             DROP ;
+                             DUP 4 ;
+                             GET 5 ;
+                             NONE (map string bytes) ;
+                             DIG 2 ;
+                             PAIR ;
+                             PAIR } }
+                       { DIG 6 ;
                          DROP ;
                          UNPAIR ;
-                         DUP 3 ;
-                         CAR ;
-                         CDR ;
                          DUP 5 ;
+                         GET 5 ;
+                         SWAP ;
+                         DUP ;
+                         DUG 2 ;
+                         SOME ;
+                         DUP 6 ;
                          GET 3 ;
-                         GET ;
+                         GET_AND_UPDATE ;
                          IF_NONE
-                           { SWAP ; SOME ; SWAP ; PAIR }
-                           { DROP 3 ; PUSH string "FINP2P_ASSET_ALREADY_EXISTS" ; FAILWITH } } ;
+                           { DIG 2 ; SOME ; DIG 2 ; PAIR ; PAIR }
+                           { DROP 4 ; PUSH string "FINP2P_ASSET_ALREADY_EXISTS" ; FAILWITH } } ;
+                     UNPAIR ;
                      UNPAIR ;
                      DUP ;
                      CDR ;
                      DIG 2 ;
                      NIL (pair address nat) ;
-                     DUP 6 ;
+                     DUP 7 ;
                      GET 7 ;
-                     DIG 6 ;
+                     DUP 8 ;
                      GET 5 ;
-                     DIG 7 ;
+                     DIG 10 ;
                      SWAP ;
                      EXEC ;
                      PAIR ;
@@ -1102,10 +813,26 @@
                      CONTRACT %mint
                        (pair (nat %token_id)
                              (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))) ;
-                     IF_NONE { DIG 2 ; FAILWITH } { DIG 3 ; DROP } ;
+                     IF_NONE { DIG 5 ; FAILWITH } { DIG 6 ; DROP } ;
                      PUSH mutez 0 ;
                      DIG 2 ;
                      TRANSFER_TOKENS ;
+                     DIG 4 ;
+                     DUP ;
+                     GET 3 ;
+                     DIG 5 ;
+                     CAR ;
+                     CDR ;
+                     DIG 5 ;
+                     BLAKE2B ;
+                     SWAP ;
+                     SOME ;
+                     SWAP ;
+                     UPDATE ;
+                     UPDATE 3 ;
+                     DIG 2 ;
+                     UPDATE 5 ;
+                     SWAP ;
                      PAIR }
                    { DIG 6 ;
                      DROP ;
@@ -1161,12 +888,9 @@
                      CHECK_SIGNATURE ;
                      NOT ;
                      IF { DROP ; DIG 3 ; FAILWITH } { DIG 4 ; DROP ; BLAKE2B } ;
-                     DUP 3 ;
-                     CDR ;
-                     CDR ;
-                     DUP 4 ;
-                     CDR ;
-                     CAR ;
+                     DIG 2 ;
+                     DUP ;
+                     GET 3 ;
                      DUP 4 ;
                      CAR ;
                      CDR ;
@@ -1175,13 +899,9 @@
                      SOME ;
                      SWAP ;
                      UPDATE ;
-                     PAIR ;
-                     DIG 2 ;
-                     CAR ;
-                     PAIR ;
+                     UPDATE 3 ;
                      DUP ;
-                     CAR ;
-                     CDR ;
+                     GET 5 ;
                      DUP 3 ;
                      GET 3 ;
                      GET ;
@@ -1267,10 +987,6 @@
                  SWAP ;
                  CONS ;
                  SWAP ;
-                 DUP ;
-                 DUG 2 ;
-                 CONS ;
-                 SWAP ;
                  CONS ;
                  DIG 4 ;
                  CONS ;
@@ -1293,12 +1009,9 @@
                  CHECK_SIGNATURE ;
                  NOT ;
                  IF { DROP ; DIG 5 ; FAILWITH } { DIG 6 ; DROP ; BLAKE2B } ;
-                 DUP 3 ;
-                 CDR ;
-                 CDR ;
-                 DUP 4 ;
-                 CDR ;
-                 CAR ;
+                 DIG 2 ;
+                 DUP ;
+                 GET 3 ;
                  DUP 4 ;
                  CAR ;
                  CDR ;
@@ -1307,13 +1020,9 @@
                  SOME ;
                  SWAP ;
                  UPDATE ;
-                 PAIR ;
-                 DIG 2 ;
-                 CAR ;
-                 PAIR ;
+                 UPDATE 3 ;
                  DUP ;
-                 CAR ;
-                 CDR ;
+                 GET 5 ;
                  DUP 3 ;
                  GET 3 ;
                  GET ;
@@ -1371,8 +1080,7 @@
                  SWAP ;
                  DUP ;
                  DUG 2 ;
-                 CDR ;
-                 CAR ;
+                 GET 3 ;
                  SWAP ;
                  ITER { SWAP ;
                         DUP ;
@@ -1389,16 +1097,7 @@
                             IF { SWAP ; NONE timestamp ; SWAP ; UPDATE } { SWAP ; DROP } } } ;
                  DIG 2 ;
                  DROP ;
-                 SWAP ;
-                 DUP ;
-                 DUG 2 ;
-                 CDR ;
-                 CDR ;
-                 SWAP ;
-                 PAIR ;
-                 SWAP ;
-                 CAR ;
-                 PAIR ;
+                 UPDATE 3 ;
                  NIL operation ;
                  PAIR }
                { DIG 2 ;
@@ -1412,18 +1111,7 @@
                  DROP ;
                  IF_LEFT
                    { IF_LEFT
-                       { DIG 2 ;
-                         DROP ;
-                         SWAP ;
-                         DUP ;
-                         DUG 2 ;
-                         CDR ;
-                         DIG 2 ;
-                         CAR ;
-                         CDR ;
-                         DIG 2 ;
-                         PAIR ;
-                         PAIR }
+                       { DIG 2 ; DROP ; UPDATE 6 }
                        { UNPAIR ;
                          DIG 3 ;
                          DUG 2 ;
@@ -1432,10 +1120,10 @@
                            (pair (pair bytes
                                        (pair (pair address nat)
                                              (lambda address (contract (list (pair address (list (pair address (pair nat nat)))))))))
-                                 (pair (pair address (big_map bytes (pair address nat)))
-                                       (pair (big_map bytes timestamp) nat)))
-                           (pair (pair address (big_map bytes (pair address nat)))
-                                 (pair (big_map bytes timestamp) nat))
+                                 (pair (pair nat nat)
+                                       (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address))))
+                           (pair (pair nat nat)
+                                 (pair (big_map bytes timestamp) (pair (big_map bytes (pair address nat)) address)))
                            { UNPAIR ;
                              UNPAIR 3 ;
                              DIG 3 ;
@@ -1446,28 +1134,19 @@
                              EXEC ;
                              DROP ;
                              DUP ;
-                             CDR ;
-                             SWAP ;
-                             DUP ;
-                             DUG 2 ;
-                             CAR ;
-                             CDR ;
-                             DIG 4 ;
-                             DIG 4 ;
+                             GET 5 ;
+                             DIG 3 ;
+                             DIG 3 ;
                              SWAP ;
                              SOME ;
                              SWAP ;
                              UPDATE ;
-                             DIG 2 ;
-                             CAR ;
-                             CAR ;
-                             PAIR ;
-                             PAIR } ;
+                             UPDATE 5 } ;
                          SWAP ;
                          APPLY ;
                          SWAP ;
                          EXEC } }
-                   { DIG 2 ; DROP ; SWAP ; DUP ; DUG 2 ; CDR ; CAR ; PAIR ; SWAP ; CAR ; PAIR } ;
+                   { DIG 2 ; DROP ; UPDATE 1 } ;
                  NIL operation ;
                  PAIR } }
            { DIG 3 ;

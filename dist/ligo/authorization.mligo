@@ -5,12 +5,32 @@
 #include "auth_types.mligo"
 let auth_authorize ((param, s) : (auth_param * auth_storage)) : (operation list * auth_storage) =
   let () =
+    let fa2_sender = param.sender in
     match param.action with
+    | Assets_action (Balance_of _) -> ()
     | Admin_action ->
       if not (param.sender = s.admin) then (failwith unauthorized : unit)
     | _ ->
-      if not (Big_map.mem param.sender s.accredited)
-      then (failwith unauthorized : unit) in
+      (match Big_map.find_opt param.sender s.accredited with
+       | None -> (failwith unauthorized : unit)
+       | Some data ->
+         if data = 0x00
+         then ()
+         else
+         if data = 0x01
+         then
+           (match param.action with
+            | Assets_action fa2 ->
+              (match fa2 with
+               | Transfer l ->
+                 List.iter
+                   (fun (t : transfer) ->
+                      if not (t.from_ = fa2_sender)
+                      then (failwith unauthorized : unit)) l
+               | Update_operators _ -> ()
+               | Balance_of _ -> ())
+            | _ -> (failwith unauthorized : unit))
+         else (failwith unauthorized : unit)) in
   (([] : operation list), s)
 
 let fail_not_admin (s : storage) =

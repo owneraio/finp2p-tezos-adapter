@@ -49,7 +49,8 @@
                                     (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
                               (unit %admin_action))))))) ;
   storage
-    (pair (lambda %authorize
+    (pair (pair %storage (address %admin) (big_map %accredited address bytes))
+          (lambda %authorize
              (pair (pair (address %sender)
                          (pair (list %sender_is_operator (list bool))
                                (pair (address %fa2_address)
@@ -72,14 +73,13 @@
                                                   (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
                                             (unit %admin_action))))))
                    (pair (address %admin) (big_map %accredited address bytes)))
-             (pair (list operation) (pair (address %admin) (big_map %accredited address bytes))))
-          (pair %storage (address %admin) (big_map %accredited address bytes))) ;
+             (pair (list operation) (pair (address %admin) (big_map %accredited address bytes))))) ;
   code { UNPAIR ;
          IF_LEFT
            { SWAP ;
              DUP ;
              DUG 2 ;
-             CDR ;
+             CAR ;
              CAR ;
              SENDER ;
              COMPARE ;
@@ -89,58 +89,54 @@
              IF_LEFT
                { IF_LEFT
                    { UNPAIR ;
-                     DUP 3 ;
+                     DIG 2 ;
+                     DUP ;
+                     DUP ;
+                     DUG 4 ;
+                     CAR ;
+                     DIG 4 ;
+                     CAR ;
                      CDR ;
-                     DUP 4 ;
-                     CDR ;
-                     CDR ;
-                     DIG 3 ;
-                     DIG 3 ;
+                     DIG 4 ;
+                     DIG 4 ;
                      SWAP ;
                      SOME ;
                      SWAP ;
                      UPDATE ;
                      UPDATE 2 ;
-                     SWAP ;
-                     CAR ;
-                     PAIR }
+                     UPDATE 1 }
                    { SWAP ;
                      DUP ;
-                     DUG 2 ;
+                     DUP ;
+                     DUG 3 ;
+                     CAR ;
+                     DIG 3 ;
+                     CAR ;
                      CDR ;
-                     DUP 3 ;
-                     CDR ;
-                     CDR ;
-                     DIG 2 ;
+                     DIG 3 ;
                      NONE bytes ;
                      SWAP ;
                      UPDATE ;
                      UPDATE 2 ;
-                     SWAP ;
-                     CAR ;
-                     PAIR } }
-               { IF_LEFT
-                   { SWAP ; DUP ; DUG 2 ; CDR ; SWAP ; UPDATE 1 ; SWAP ; CAR ; PAIR }
-                   { SWAP ; CDR ; SWAP ; PAIR } } ;
+                     UPDATE 1 } }
+               { IF_LEFT { SWAP ; DUP ; CAR ; DIG 2 ; UPDATE 1 ; UPDATE 1 } { UPDATE 2 } } ;
              NIL operation ;
              PAIR }
            { SWAP ;
              DUP ;
              DUG 2 ;
-             CDR ;
+             CAR ;
              SWAP ;
              PAIR ;
              SWAP ;
              DUP ;
              DUG 2 ;
-             CAR ;
+             CDR ;
              SWAP ;
              EXEC ;
              UNPAIR ;
-             SWAP ;
-             DIG 2 ;
-             CAR ;
-             PAIR ;
+             DUG 2 ;
+             UPDATE 1 ;
              SWAP ;
              PAIR } } }
 
