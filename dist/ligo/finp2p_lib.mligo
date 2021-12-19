@@ -14,9 +14,6 @@ let concat_bytes  : bytes list -> bytes =
 let concat_string  : string list -> string =
   [%Michelson ({| { CONCAT } |} : string list -> string)]
 
-let nth_nat_byte (number : nat) (n : nat) : nat =
-  (number lsr (n * 8n)) land 255n
-
 let bytes_conv_map  : (nat, bytes) map =
   ([%Michelson
     ({| {
@@ -281,285 +278,51 @@ Elt 255 0xff;
 } } |} : 
        unit -> (nat, bytes) map)]) ()
 
-let hex_conv_map  : (nat, string) map =
+let hexdigit_conv_map  : (nat, string) map =
   ([%Michelson
     ({| {
 DROP;
 PUSH (map nat string) {
-Elt 0 "00";
-Elt 1 "01";
-Elt 2 "02";
-Elt 3 "03";
-Elt 4 "04";
-Elt 5 "05";
-Elt 6 "06";
-Elt 7 "07";
-Elt 8 "08";
-Elt 9 "09";
-Elt 10 "0a";
-Elt 11 "0b";
-Elt 12 "0c";
-Elt 13 "0d";
-Elt 14 "0e";
-Elt 15 "0f";
-Elt 16 "10";
-Elt 17 "11";
-Elt 18 "12";
-Elt 19 "13";
-Elt 20 "14";
-Elt 21 "15";
-Elt 22 "16";
-Elt 23 "17";
-Elt 24 "18";
-Elt 25 "19";
-Elt 26 "1a";
-Elt 27 "1b";
-Elt 28 "1c";
-Elt 29 "1d";
-Elt 30 "1e";
-Elt 31 "1f";
-Elt 32 "20";
-Elt 33 "21";
-Elt 34 "22";
-Elt 35 "23";
-Elt 36 "24";
-Elt 37 "25";
-Elt 38 "26";
-Elt 39 "27";
-Elt 40 "28";
-Elt 41 "29";
-Elt 42 "2a";
-Elt 43 "2b";
-Elt 44 "2c";
-Elt 45 "2d";
-Elt 46 "2e";
-Elt 47 "2f";
-Elt 48 "30";
-Elt 49 "31";
-Elt 50 "32";
-Elt 51 "33";
-Elt 52 "34";
-Elt 53 "35";
-Elt 54 "36";
-Elt 55 "37";
-Elt 56 "38";
-Elt 57 "39";
-Elt 58 "3a";
-Elt 59 "3b";
-Elt 60 "3c";
-Elt 61 "3d";
-Elt 62 "3e";
-Elt 63 "3f";
-Elt 64 "40";
-Elt 65 "41";
-Elt 66 "42";
-Elt 67 "43";
-Elt 68 "44";
-Elt 69 "45";
-Elt 70 "46";
-Elt 71 "47";
-Elt 72 "48";
-Elt 73 "49";
-Elt 74 "4a";
-Elt 75 "4b";
-Elt 76 "4c";
-Elt 77 "4d";
-Elt 78 "4e";
-Elt 79 "4f";
-Elt 80 "50";
-Elt 81 "51";
-Elt 82 "52";
-Elt 83 "53";
-Elt 84 "54";
-Elt 85 "55";
-Elt 86 "56";
-Elt 87 "57";
-Elt 88 "58";
-Elt 89 "59";
-Elt 90 "5a";
-Elt 91 "5b";
-Elt 92 "5c";
-Elt 93 "5d";
-Elt 94 "5e";
-Elt 95 "5f";
-Elt 96 "60";
-Elt 97 "61";
-Elt 98 "62";
-Elt 99 "63";
-Elt 100 "64";
-Elt 101 "65";
-Elt 102 "66";
-Elt 103 "67";
-Elt 104 "68";
-Elt 105 "69";
-Elt 106 "6a";
-Elt 107 "6b";
-Elt 108 "6c";
-Elt 109 "6d";
-Elt 110 "6e";
-Elt 111 "6f";
-Elt 112 "70";
-Elt 113 "71";
-Elt 114 "72";
-Elt 115 "73";
-Elt 116 "74";
-Elt 117 "75";
-Elt 118 "76";
-Elt 119 "77";
-Elt 120 "78";
-Elt 121 "79";
-Elt 122 "7a";
-Elt 123 "7b";
-Elt 124 "7c";
-Elt 125 "7d";
-Elt 126 "7e";
-Elt 127 "7f";
-Elt 128 "80";
-Elt 129 "81";
-Elt 130 "82";
-Elt 131 "83";
-Elt 132 "84";
-Elt 133 "85";
-Elt 134 "86";
-Elt 135 "87";
-Elt 136 "88";
-Elt 137 "89";
-Elt 138 "8a";
-Elt 139 "8b";
-Elt 140 "8c";
-Elt 141 "8d";
-Elt 142 "8e";
-Elt 143 "8f";
-Elt 144 "90";
-Elt 145 "91";
-Elt 146 "92";
-Elt 147 "93";
-Elt 148 "94";
-Elt 149 "95";
-Elt 150 "96";
-Elt 151 "97";
-Elt 152 "98";
-Elt 153 "99";
-Elt 154 "9a";
-Elt 155 "9b";
-Elt 156 "9c";
-Elt 157 "9d";
-Elt 158 "9e";
-Elt 159 "9f";
-Elt 160 "a0";
-Elt 161 "a1";
-Elt 162 "a2";
-Elt 163 "a3";
-Elt 164 "a4";
-Elt 165 "a5";
-Elt 166 "a6";
-Elt 167 "a7";
-Elt 168 "a8";
-Elt 169 "a9";
-Elt 170 "aa";
-Elt 171 "ab";
-Elt 172 "ac";
-Elt 173 "ad";
-Elt 174 "ae";
-Elt 175 "af";
-Elt 176 "b0";
-Elt 177 "b1";
-Elt 178 "b2";
-Elt 179 "b3";
-Elt 180 "b4";
-Elt 181 "b5";
-Elt 182 "b6";
-Elt 183 "b7";
-Elt 184 "b8";
-Elt 185 "b9";
-Elt 186 "ba";
-Elt 187 "bb";
-Elt 188 "bc";
-Elt 189 "bd";
-Elt 190 "be";
-Elt 191 "bf";
-Elt 192 "c0";
-Elt 193 "c1";
-Elt 194 "c2";
-Elt 195 "c3";
-Elt 196 "c4";
-Elt 197 "c5";
-Elt 198 "c6";
-Elt 199 "c7";
-Elt 200 "c8";
-Elt 201 "c9";
-Elt 202 "ca";
-Elt 203 "cb";
-Elt 204 "cc";
-Elt 205 "cd";
-Elt 206 "ce";
-Elt 207 "cf";
-Elt 208 "d0";
-Elt 209 "d1";
-Elt 210 "d2";
-Elt 211 "d3";
-Elt 212 "d4";
-Elt 213 "d5";
-Elt 214 "d6";
-Elt 215 "d7";
-Elt 216 "d8";
-Elt 217 "d9";
-Elt 218 "da";
-Elt 219 "db";
-Elt 220 "dc";
-Elt 221 "dd";
-Elt 222 "de";
-Elt 223 "df";
-Elt 224 "e0";
-Elt 225 "e1";
-Elt 226 "e2";
-Elt 227 "e3";
-Elt 228 "e4";
-Elt 229 "e5";
-Elt 230 "e6";
-Elt 231 "e7";
-Elt 232 "e8";
-Elt 233 "e9";
-Elt 234 "ea";
-Elt 235 "eb";
-Elt 236 "ec";
-Elt 237 "ed";
-Elt 238 "ee";
-Elt 239 "ef";
-Elt 240 "f0";
-Elt 241 "f1";
-Elt 242 "f2";
-Elt 243 "f3";
-Elt 244 "f4";
-Elt 245 "f5";
-Elt 246 "f6";
-Elt 247 "f7";
-Elt 248 "f8";
-Elt 249 "f9";
-Elt 250 "fa";
-Elt 251 "fb";
-Elt 252 "fc";
-Elt 253 "fd";
-Elt 254 "fe";
-Elt 255 "ff";
+Elt 0 "0";
+Elt 1 "1";
+Elt 2 "2";
+Elt 3 "3";
+Elt 4 "4";
+Elt 5 "5";
+Elt 6 "6";
+Elt 7 "7";
+Elt 8 "8";
+Elt 9 "9";
+Elt 10 "a";
+Elt 11 "b";
+Elt 12 "c";
+Elt 13 "d";
+Elt 14 "e";
+Elt 15 "f";
 } } |} : 
        unit -> (nat, string) map)]) ()
+
+let nth_nat_byte (number : nat) (n : nat) : nat =
+  (number lsr (n * 8n)) land 255n
+
+let nth_nat_hex_digit (number : nat) (n : nat) : nat =
+  (number lsr (n * 4n)) land 15n
 
 let uint8_to_byte (n : nat) =
   match Map.find_opt n bytes_conv_map with
   | None -> (failwith "" : bytes)
   | Some b -> b
 
-let uint8_to_hex_byte (n : nat) =
-  match Map.find_opt n hex_conv_map with
+let uint4_to_hex_digit (n : nat) =
+  match Map.find_opt n hexdigit_conv_map with
   | None -> (failwith "" : string)
   | Some s -> s
 
 let nth_byte (number : nat) (n : nat) : bytes =
   uint8_to_byte (nth_nat_byte number n)
 
-let nth_hex_byte (number : nat) (n : nat) : string =
-  uint8_to_hex_byte (nth_nat_byte number n)
+let nth_hex_digit (number : nat) (n : nat) : string =
+  uint4_to_hex_digit (nth_nat_hex_digit number n)
 
 let nat_to_int64_big_endian (number : nat) : bytes =
   if number > (max_int64 ())
@@ -575,20 +338,27 @@ let nat_to_int64_big_endian (number : nat) : bytes =
        nth_byte number 1n;
        nth_byte number 0n]
 
+let rec nat_to_0x_hex_int64_big_endian_rec ((number : nat), (n : nat), (acc : string list)) : string =
+  let hex_digit = nth_hex_digit number n in
+  let acc =
+    if hex_digit = "0"
+    then match acc with | [] -> acc | _ -> hex_digit :: acc
+    else hex_digit :: acc in
+  match is_nat (n - 1n) with
+  | None ->
+    let digits =
+      List.fold_left (fun ((acc : string list), (h : string)) -> h :: acc)
+        ([] : string list) acc in
+    concat_string ("0x" :: digits)
+  | Some n -> nat_to_0x_hex_int64_big_endian_rec (number, n, acc)
+
 let nat_to_0x_hex_int64_big_endian (number : nat) : string =
   if number > (max_int64 ())
   then (failwith "BAD_INT64_NAT" : string)
   else
-    concat_string
-      ["0x";
-       nth_hex_byte number 7n;
-       nth_hex_byte number 6n;
-       nth_hex_byte number 5n;
-       nth_hex_byte number 4n;
-       nth_hex_byte number 3n;
-       nth_hex_byte number 2n;
-       nth_hex_byte number 1n;
-       nth_hex_byte number 0n]
+  if number = 0n
+  then "0x0"
+  else nat_to_0x_hex_int64_big_endian_rec (number, 15n, ([] : string list))
 
 let timestamp_to_int64_big_endian (timestamp : timestamp) : bytes =
   let seconds_since_epoch =
@@ -606,7 +376,7 @@ let drop_n_first_bytes (b : bytes) (n : nat) : bytes =
   Bytes.sub n rem_len b
 
 let public_key_to_bytes (k : key) : bytes =
-  drop_n_first_bytes (Bytes.pack k) 6n
+  drop_n_first_bytes (Bytes.pack k) 7n
 
 let string_to_bytes (s : string) : bytes =
   drop_n_first_bytes (Bytes.pack s) 6n
@@ -637,7 +407,6 @@ let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
        operation;
        assetType;
        assetId;
-       accountType;
        srcAccountType;
        srcAccount;
        dstAccountType;

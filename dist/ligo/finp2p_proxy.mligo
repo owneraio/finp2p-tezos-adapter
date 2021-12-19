@@ -9,10 +9,11 @@ let fail_not_admin (s : storage) =
   if not (Tezos.sender = s.admin) then (failwith unauthorized : unit)
 
 let is_operation_expired (op_timestamp : timestamp) (s : storage) : bool =
-  Tezos.now > (op_timestamp + (int s.operation_ttl))
+  Tezos.now > (op_timestamp + (int s.operation_ttl.ttl))
 
 let is_operation_live (op_timestamp : timestamp) (s : storage) : bool =
-  (op_timestamp >= Tezos.now) && (not (is_operation_expired op_timestamp s))
+  (op_timestamp <= (Tezos.now + (int s.operation_ttl.allowed_in_the_future)))
+  && (not (is_operation_expired op_timestamp s))
 
 let address_of_key (k : key) : address =
   Tezos.address (Tezos.implicit_account (Crypto.hash_key k))
@@ -52,25 +53,26 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : (operation * storage) 
     if not (is_operation_live p.nonce.timestamp s)
     then (failwith op_not_live : unit) in
   let oph = check_issue_tokens_signature p in
-  let s =
-    {
-      s with
-      live_operations = (Big_map.add oph p.nonce.timestamp s.live_operations)
-    } in
-  let (fa2_token, mi_token_info) =
+  let live_operations = Big_map.add oph p.nonce.timestamp s.live_operations in
+  let (fa2_token, mi_token_info, finp2p_assets) =
     match p.new_token_info with
     | None ->
       (match Big_map.find_opt p.asset_id s.finp2p_assets with
        | None ->
          (failwith unknown_asset_id : (fa2_token * (string, bytes) map
-                                         option))
-       | Some fa2_token -> (fa2_token, (None : (string, bytes) map option)))
+                                         option * (asset_id, fa2_token)
+                                         big_map))
+       | Some fa2_token ->
+         (fa2_token, (None : (string, bytes) map option), s.finp2p_assets))
     | Some (fa2_token, token_info) ->
-      (match Big_map.find_opt p.asset_id s.finp2p_assets with
+      let (old_asset, finp2p_assets) =
+        Big_map.get_and_update p.asset_id (Some fa2_token) s.finp2p_assets in
+      (match old_asset with
        | Some _ ->
          (failwith asset_already_exists : (fa2_token * (string, bytes) map
-                                             option))
-       | None -> (fa2_token, (Some token_info))) in
+                                             option * (asset_id, fa2_token)
+                                             big_map))
+       | None -> (fa2_token, (Some token_info), finp2p_assets)) in
   let issued_amount = match p.amount with | Amount a -> a in
   let fa2_mint =
     {
@@ -79,7 +81,11 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : (operation * storage) 
       owners = [((address_of_key p.dst_account), issued_amount)]
     } in
   let mint_ep = get_mint_entrypoint fa2_token.address in
-  let relay_op = Tezos.transaction fa2_mint 0tez mint_ep in (relay_op, s)
+  let relay_op = Tezos.transaction fa2_mint 0tez mint_ep in
+  let s =
+    { s with live_operations = live_operations ; finp2p_assets = finp2p_assets 
+    } in
+  (relay_op, s)
 
 let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation * storage) =
   let () =
@@ -104,7 +110,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation * storage
   let burn_ep = get_burn_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction fa2_burn 0tez burn_ep in (relay_op, s)
 
-let update_operation_ttl (operation_ttl : nat) (s : storage) =
+let update_operation_ttl (operation_ttl : operation_ttl) (s : storage) =
   { s with operation_ttl = operation_ttl  }
 
 let update_admin (admin : address) (s : storage) =

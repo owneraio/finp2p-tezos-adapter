@@ -2,10 +2,11 @@
 #define AUTH_TYPES
 
 #include "auth_params.mligo"
-type storage =
-  {
+type storage = [@layout:comb]  {
     storage: auth_storage ;
     authorize: (auth_param * auth_storage) -> (operation list * auth_storage) }
+
+
 
 
 #endif
