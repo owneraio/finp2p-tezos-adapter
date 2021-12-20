@@ -2,8 +2,8 @@ import { TezosToolkit } from '@taquito/taquito';
 import { InMemorySigner } from '@taquito/signer';
 import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
-import crypto from 'crypto';
 import { logger } from '../helpers/logger';
+import { account, contracts, nodeAddr } from '../helpers/config';
 
 let service:TokenService;
 let utf8 = new TextEncoder();
@@ -48,36 +48,23 @@ export interface Receipt {
   //TODO: add transactionDetails
 }
 
-//TODO: move this to configuration
-// This is the account that we will use to sign transactions on Tezos Note that
-// this account must also be an admin of the `finp2p_proxy` contract
-let account = {
-  pkh : 'tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz',
-  pk : 'edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq',
-  sk : 'edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS',
-};
-
-//TODO: what is this?
-let shg = crypto.randomBytes(32);
-
-var tokenId =  Math.floor((new Date()).getTime() / 1000);
+let tokenId =  Math.floor((new Date()).getTime() / 1000);
 
 export class TokenService {
   tezosClient: FINP2PProxy.FinP2PTezos;
 
   private constructor() {
-    let Tezos = new TezosToolkit('https://rpc.hangzhounet.teztnets.xyz');
+    let Tezos = new TezosToolkit(nodeAddr);
     // Tell Taquito to use our private key for signing transactions
     Tezos.setSignerProvider(new InMemorySigner(account.sk));
     // Initialize FinP2P library
     let config: FINP2PProxy.config = {
       admin : account.pkh,
-      finp2p_auth_address : 'KT1N2ASxaShJETXs5yarM7rozTq4SwWMKTYY',
-      finp2p_fa2_address : 'KT19fMJ34XeivLXDfkSm5cSTfuX9TtjPzQEJ',
-      finp2p_proxy_address : 'KT1MvSFwHpSguMi8Ra1q8sey7cx2b7EfWSim',
+      finp2p_auth_address : contracts.finp2p_auth_address,
+      finp2p_fa2_address : contracts.finp2p_fa2_address,
+      finp2p_proxy_address : contracts.finp2p_proxy_address,
       debug: false,
     };
-
     this.tezosClient = new FINP2PProxy.FinP2PTezos(Tezos, config);
   }
 
@@ -98,7 +85,7 @@ export class TokenService {
       nonce: { nonce: utf8.encode(''), timestamp: new Date() },
       dst_account: '0x01' /* secp256k1 */ + '0359bb16f5e103deb5c35f08aacfe59e6ad2694ab8623a5f754b778fdb2276d166',
       amount: BigInt(0),
-      shg,
+      shg: new Uint8Array(),
       new_token_info: newTokenParams,
     });
     await this.tezosClient.wait_inclusion(op);
@@ -110,7 +97,7 @@ export class TokenService {
       nonce: { nonce: utf8.encode(''), timestamp: new Date() },
       dst_account: '0x01' /* secp256k1 */ + (request.recipientPublicKey as unknown as Buffer).toString('hex'),
       amount: BigInt(request.quantity),
-      shg,
+      shg: new Uint8Array(),
     });
     await this.tezosClient.wait_inclusion(op);
     return {
@@ -122,14 +109,13 @@ export class TokenService {
   }
 
   public async transfer(request: TransferRequest): Promise<Receipt> {
-    //TODO: add hashGroup
     const op = await this.tezosClient.transfer_tokens({
       asset_id: utf8.encode(request.assetId),
       nonce: { nonce: utf8.encode(request.nonce), timestamp: new Date() },
       src_account: '0x01' /* secp256k1 */ + (request.sourcePublicKey as unknown as Buffer).toString('hex'),
       dst_account: '0x01' /* secp256k1 */ + (request.recipientPublicKey as unknown as Buffer).toString('hex'),
       amount: BigInt(request.quantity),
-      shg,
+      shg: new Uint8Array(), //TODO: add hash group here
       signature: '0x' + request.signatureTemplate.signature,
     });
     await this.tezosClient.wait_inclusion(op);
@@ -151,13 +137,13 @@ export class TokenService {
 
   public async balance(assetId:string, sourcePublicKey:string): Promise<number> {
     //TODO: implement
-    logger.debug("balance", {assetId, sourcePublicKey});
+    logger.debug('balance', { assetId, sourcePublicKey });
     return 0;
   }
 
   public async redeem(request:RedeemRequest) : Promise<Receipt> {
     //TODO: implement
-    logger.debug("redeem", {request});
+    logger.debug('redeem', { request });
     return {
     } as Receipt;
   }

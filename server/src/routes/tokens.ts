@@ -17,9 +17,9 @@ export const register = (app: express.Application) => {
     `${TOKENS_BASE_URL}/balance`,
     tokenBalanceValidator,
     asyncMiddleware(async (req, res) => {
-        const { assetId, sourcePublicKey } = req.body;
-        const balance = await TokenService.GetService().balance(assetId, sourcePublicKey);
-        res.send({ quantity: balance });
+      const { assetId, sourcePublicKey } = req.body;
+      const balance = await TokenService.GetService().balance(assetId, sourcePublicKey);
+      res.send({ quantity: balance });
     }),
   );
 
@@ -54,11 +54,11 @@ export const register = (app: express.Application) => {
     `${TOKENS_BASE_URL}/redeem`,
     tokenRedeemValidator,
     asyncMiddleware(async (req, res) => {
-        const {
-            nonce, sourcePublicKey, quantity, signature, assetId,
-        } = req.body;
-        const receipt = await TokenService.GetService().redeem({ nonce, assetId, sourcePublicKey, quantity, signatureTemplate : { signature } });
-        res.json(receipt);
+      const {
+        nonce, sourcePublicKey, quantity, signature, assetId,
+      } = req.body;
+      const receipt = await TokenService.GetService().redeem({ nonce, assetId, sourcePublicKey, quantity, signatureTemplate : { signature } });
+      res.json(receipt);
     }),
   );
 
