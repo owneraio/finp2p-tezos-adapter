@@ -36,6 +36,16 @@ export interface RedeemRequest {
 
 export interface SignatureTemplate {
   signature: string
+  template: Template
+}
+
+export interface Template {
+  hashGroups: Array<HashGroup>
+  hash: string
+}
+
+export interface HashGroup {
+  hash: string
 }
 
 export interface Receipt {
@@ -109,13 +119,28 @@ export class TokenService {
   }
 
   public async transfer(request: TransferRequest): Promise<Receipt> {
+    let shg = new Uint8Array();
+    if (request.signatureTemplate.template.hashGroups) {
+      const hashGroups = request.signatureTemplate.template.hashGroups
+        .filter((hg, index) => {
+          return index != 0;
+        })
+        .map((hg) => {
+          return hg.hash;
+        });
+      //Currently the tezos contracts supports directly the settlement condition hash group so assuming just one hashGroup exists
+      if ( hashGroups.length > 0){
+        shg = Buffer.from(hashGroups[0], 'hex');
+      }
+    }
+    const nonceBytes = Buffer.from(request.nonce, 'hex');
     const op = await this.tezosClient.transfer_tokens({
       asset_id: utf8.encode(request.assetId),
-      nonce: { nonce: utf8.encode(request.nonce), timestamp: new Date() },
+      nonce: { nonce: nonceBytes.slice(0, 24), timestamp: new Date(Number(nonceBytes.readBigInt64BE(23)) * 1000 ) },
       src_account: '0x01' /* secp256k1 */ + (request.sourcePublicKey as unknown as Buffer).toString('hex'),
       dst_account: '0x01' /* secp256k1 */ + (request.recipientPublicKey as unknown as Buffer).toString('hex'),
       amount: BigInt(request.quantity),
-      shg: new Uint8Array(), //TODO: add hash group here
+      shg: shg,
       signature: '0x' + request.signatureTemplate.signature,
     });
     await this.tezosClient.wait_inclusion(op);

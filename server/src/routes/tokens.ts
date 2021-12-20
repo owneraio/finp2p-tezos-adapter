@@ -44,7 +44,7 @@ export const register = (app: express.Application) => {
       const {
         assetId, nonce, sourcePublicKey, recipientPublicKey, signature, quantity, settlementRef,
       } = req.body;
-      const receipt = await TokenService.GetService().transfer({ nonce, assetId, sourcePublicKey, recipientPublicKey, quantity, signatureTemplate : { signature }, settlementRef });
+      const receipt = await TokenService.GetService().transfer({ nonce, assetId, sourcePublicKey, recipientPublicKey, quantity, signatureTemplate : signature, settlementRef });
       res.json(receipt);
     }),
   );
@@ -57,7 +57,7 @@ export const register = (app: express.Application) => {
       const {
         nonce, sourcePublicKey, quantity, signature, assetId,
       } = req.body;
-      const receipt = await TokenService.GetService().redeem({ nonce, assetId, sourcePublicKey, quantity, signatureTemplate : { signature } });
+      const receipt = await TokenService.GetService().redeem({ nonce, assetId, sourcePublicKey, quantity, signatureTemplate : signature });
       res.json(receipt);
     }),
   );
