@@ -6,6 +6,7 @@ import {
   tokenTransferValidator,
 } from '../validators/tokens';
 import { asyncMiddleware } from '../helpers/middleware';
+import { TokenService } from '../services/tokens';
 
 
 const TOKENS_BASE_URL = '/api/tokens';
@@ -16,9 +17,9 @@ export const register = (app: express.Application) => {
     `${TOKENS_BASE_URL}/balance`,
     tokenBalanceValidator,
     asyncMiddleware(async (req, res) => {
-      const { assetId, sourcePublicKey } = req.body;
-      console.log(`balance ${assetId} ${sourcePublicKey}`);
-      res.send({ quantity: 0 });
+        const { assetId, sourcePublicKey } = req.body;
+        const balance = await TokenService.GetService().balance(assetId, sourcePublicKey);
+        res.send({ quantity: balance });
     }),
   );
 
@@ -30,8 +31,8 @@ export const register = (app: express.Application) => {
       const {
         assetId, recipientPublicKey, quantity, settlementRef,
       } = req.body;
-      console.log(`issue ${assetId} ${recipientPublicKey} ${quantity} ${settlementRef}`);
-      res.sendStatus(200);
+      const receipt = await TokenService.GetService().issue({ assetId, recipientPublicKey, quantity, settlementRef });
+      res.json(receipt);
     }),
   );
 
@@ -41,10 +42,10 @@ export const register = (app: express.Application) => {
     tokenTransferValidator,
     asyncMiddleware(async (req, res) => {
       const {
-        assetId, nonce, sourcePublicKey, recipientPublicKey, signature, quantity,
+        assetId, nonce, sourcePublicKey, recipientPublicKey, signature, quantity, settlementRef,
       } = req.body;
-      console.log(`transfer ${assetId} ${nonce} ${sourcePublicKey} ${recipientPublicKey} ${signature} ${quantity}`);
-      res.sendStatus(200);
+      const receipt = await TokenService.GetService().transfer({ nonce, assetId, sourcePublicKey, recipientPublicKey, quantity, signatureTemplate : { signature }, settlementRef });
+      res.json(receipt);
     }),
   );
 
@@ -53,11 +54,11 @@ export const register = (app: express.Application) => {
     `${TOKENS_BASE_URL}/redeem`,
     tokenRedeemValidator,
     asyncMiddleware(async (req, res) => {
-      const {
-        nonce, sourcePublicKey, quantity, signature, assetId,
-      } = req.body;
-      console.log(`redeem ${nonce} ${sourcePublicKey} ${quantity} ${signature} ${assetId}`);
-      res.sendStatus(200);
+        const {
+            nonce, sourcePublicKey, quantity, signature, assetId,
+        } = req.body;
+        const receipt = await TokenService.GetService().redeem({ nonce, assetId, sourcePublicKey, quantity, signatureTemplate : { signature } });
+        res.json(receipt);
     }),
   );
 
@@ -65,8 +66,8 @@ export const register = (app: express.Application) => {
     `${TOKENS_BASE_URL}/getReceipt/:id`,
     asyncMiddleware(async (req, res) => {
       const { id } = req.params;
-      console.log(`getReceipt ${id}`);
-      res.sendStatus(200);
+      const receipt = await TokenService.GetService().getReceipt(id);
+      res.json(receipt);
     }),
   );
 };

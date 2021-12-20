@@ -35,6 +35,13 @@ export type nonce = Uint8Array
 export type timestamp = Date
 export type signature = string
 
+let utf8 = new TextEncoder()
+
+function to_str(x : any) : string {
+  if (typeof x === 'string') { return x }
+  return JSON.stringify(x)
+}
+
 export interface fa2_token {
   address: address;
   id: nat;
@@ -240,7 +247,7 @@ class InjectionError extends Error {
 
   op : operation_result
   error : any
-  
+
   constructor(op : operation_result, error : any, ...params: any[]) {
     // Pass remaining arguments (including vendor specific ones) to parent constructor
     super(...params)
@@ -365,7 +372,7 @@ export class FinP2PTezos {
 
   async deployFinp2pAuth(admin = this.config.admin): Promise<OriginationOperation> {
     let initial_storage = {
-      storage: { 
+      storage: {
         admin,
         accredited : new MichelsonMap()
       },
@@ -403,7 +410,7 @@ export class FinP2PTezos {
   }
 
   private async sign_and_inject (
-    kind : 'transaction' | 'origination' | 'revelation', 
+    kind : 'transaction' | 'origination' | 'revelation',
     contents: Array<RPCOperation>) {
     let tk = this.tezosToolkit
     let branch = await tk.rpc.getBlockHash({ block: 'head~2' });
@@ -425,7 +432,7 @@ export class FinP2PTezos {
     return await op.confirmation()
   }
 
-  /** 
+  /**
    * @description This function allows to reveal an address's public key on the blockchain.
    * The address is supposed to have some XTZ on it for the revelation to work.
    * The functions throws "WalletAlreadyRevealed" if the public key is already
@@ -541,6 +548,21 @@ export class FinP2PTezos {
   get_fa2_address(kt1? : address) {
     return this.get_contract_address('FA2', this.config.finp2p_fa2_address, kt1)
   }
+
+  gen_new_token(symbol: string, asset_id: string, token_id: number): [fa2_token, MichelsonMap<string, bytes>]{
+    const m: Object = { symbol : symbol, name : asset_id, decimals : '0' };
+
+    let fa2_token = {
+      address : this.get_fa2_address(),
+      id : BigInt(token_id)
+    }
+    let metadata = new MichelsonMap<string, Uint8Array>()
+    Object.entries(m).forEach(
+        ([k, v]) => metadata.set (k, utf8.encode(to_str(v)))
+    )
+    return [fa2_token, metadata]
+  }
+
 
   /**
    * @description Call the entry-point `transfer_tokens` of the FinP2P proxy

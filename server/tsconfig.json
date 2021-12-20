@@ -6,6 +6,7 @@
     "target": "es2021",
     "skipLibCheck": true,
     "moduleResolution": "node",
+    "resolveJsonModule": true,
     "sourceMap": true,
     "strict": true,
     "outDir": "lib",

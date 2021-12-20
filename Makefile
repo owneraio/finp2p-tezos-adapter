@@ -32,17 +32,17 @@ build-deps: _opam
 	@opam install . --deps-only -y
 
 ts-deps:
-	@sudo npm i -g typescript
+#	@sudo npm i -g typescript
 	@npm --prefix tezos-lib install
 
 ts-dev-deps: ts-deps
 	@npm --prefix tezos-lib install --dev
 
 lib:
-	@tsc -p tezos-lib/tsconfig.json
+	@npm --prefix tezos-lib run build
 
 build-tests:
-	@tsc -p tezos-lib/tests/tsconfig.json
+	@npm --prefix tezos-lib run build-test
 
 test:
 	@cd tezos-lib && npm test

@@ -4,6 +4,7 @@ import {
   resourceCreateValidator,
   resourceUpdateValidator,
 } from '../validators/resources';
+import { TokenService } from '../services/tokens';
 
 const RESOURCES_BASE_URL = '/api/resources';
 
@@ -12,8 +13,7 @@ export const register = (app: express.Application) => {
   app.get(
     `${RESOURCES_BASE_URL}/getResourceProfile/:id`,
     asyncMiddleware(async (req, res) => {
-      const { id } = req.params;
-      console.log(`getResourceProfile ${id}`);
+      //      const { id } = req.params;
       res.sendStatus(200);
     }),
   );
@@ -24,9 +24,11 @@ export const register = (app: express.Application) => {
     resourceCreateValidator,
     asyncMiddleware(async (req, res) => {
       const {
-        resourceID, resourceHash, publicKey, signature,
+        resourceID, publicKey,
       } = req.body;
-      console.log(`createProfile ${resourceID} ${resourceHash} ${publicKey} ${signature}`);
+      if (!publicKey){ // asset resource
+        await TokenService.GetService().onCreateAsset(resourceID);
+      }
       return res.sendStatus(200);
     }),
   );
@@ -36,8 +38,7 @@ export const register = (app: express.Application) => {
     `${RESOURCES_BASE_URL}/updateResourceProfile`,
     resourceUpdateValidator,
     asyncMiddleware(async (req, res) => {
-      const { resourceID, resourceHash } = req.body;
-      console.log(`updateResourceProfile ${resourceID} ${resourceHash}`);
+      //      const { resourceID, resourceHash } = req.body;
       res.sendStatus(200);
     }),
   );
