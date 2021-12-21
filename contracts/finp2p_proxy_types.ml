@@ -20,6 +20,12 @@ type transfer_tokens_param = {
 }
 [@@comb] [@@param Transfer_tokens]
 
+type create_asset_param = {
+  ca_asset_id : asset_id;
+  ca_new_token_info : fa2_token * (string, bytes) map;
+}
+[@@comb] [@@param Create_asset]
+
 type issue_tokens_param = {
   it_nonce : finp2p_nonce;
   it_asset_id : asset_id;
@@ -28,7 +34,6 @@ type issue_tokens_param = {
   it_shg : bytes;
   (* 32 *)
   it_signature : signature option;
-  it_new_token_info : (fa2_token * (string, bytes) map) option;
 }
 [@@comb] [@@param Issue_tokens]
 
@@ -43,6 +48,7 @@ type redeem_tokens_param = {
 
 type finp2p_proxy_asset_param =
   | Transfer_tokens of transfer_tokens_param
+  | Create_asset of create_asset_param
   | Issue_tokens of issue_tokens_param
   | Redeem_tokens of redeem_tokens_param
 [@@param Finp2p_asset]
