@@ -48,4 +48,14 @@ let main ((param, s) : (param * storage)) : (operation list * storage) =
     | Assets p -> let () = fail_if_paused s in fa2 (p, s) in
   (((authorize param s) :: ops), s)
 
+
+[@view]
+let get_balance (((owner, token_id) : (address * nat)), (s : storage)) : nat =
+  if not (Big_map.mem token_id s.token_metadata)
+  then (failwith fa2_token_undefined : nat)
+  else
+    (match Big_map.find_opt (owner, token_id) s.ledger with
+     | None -> 0n
+     | Some b -> b)
+
 #endif

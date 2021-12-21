@@ -416,7 +416,7 @@ let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
 
 let encode_issue_tokens_payload (p : issue_tokens_param) =
   let { nonce = it_nonce; asset_id = it_asset_id; dst_account = it_dst_account;
-        amount = it_amount; shg = it_shg; signature = _; new_token_info = _ }
+        amount = it_amount; shg = it_shg; signature = _ }
     = p in
   let nonce =
     Bytes.concat it_nonce.nonce

@@ -27,14 +27,17 @@ type transfer_tokens_param = [@layout:comb]  {
     shg: bytes ;
     signature: signature }
 
+type create_asset_param = [@layout:comb]  {
+    asset_id: asset_id ;
+    new_token_info: (fa2_token * (string, bytes) map) }
+
 type issue_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
     asset_id: asset_id ;
     dst_account: key ;
     amount: token_amount ;
     shg: bytes ;
-    signature: signature option ;
-    new_token_info: (fa2_token * (string, bytes) map) option }
+    signature: signature option }
 
 type redeem_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
@@ -45,6 +48,7 @@ type redeem_tokens_param = [@layout:comb]  {
 
 type finp2p_proxy_asset_param =
   | Transfer_tokens of transfer_tokens_param 
+  | Create_asset of create_asset_param 
   | Issue_tokens of issue_tokens_param 
   | Redeem_tokens of redeem_tokens_param 
 

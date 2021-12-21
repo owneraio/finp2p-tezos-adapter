@@ -3,11 +3,16 @@
 
 #include "errors.mligo"
 #include "fa2_types.mligo"
-let get_balance (p : balance_of_param) (ledger : ledger) : operation =
+let get_balance (p : balance_of_param) (s : storage) : operation =
   let to_balance (r : balance_of_request) =
-    match Big_map.find_opt (r.owner, r.token_id) ledger with
-    | None -> (failwith fa2_token_undefined : balance_of_response)
-    | Some ba_balance -> { request = r; balance = ba_balance  } in
+    if not (Big_map.mem r.token_id s.token_metadata)
+    then (failwith fa2_token_undefined : balance_of_response)
+    else
+      (let ba_balance =
+         match Big_map.find_opt (r.owner, r.token_id) s.ledger with
+         | None -> 0n
+         | Some ba_balance -> ba_balance in
+       { request = r; balance = ba_balance  }) in
   let responses = List.map to_balance p.requests in
   Tezos.transaction responses 0mutez p.callback
 
@@ -62,7 +67,7 @@ let fa2 ((param, storage) : (fa2 * storage)) : (operation list * storage) =
   | Transfer txs ->
     let ledger = transfer txs storage in
     (([] : operation list), { storage with ledger = ledger  })
-  | Balance_of p -> let op = get_balance p storage.ledger in ([op], storage)
+  | Balance_of p -> let op = get_balance p storage in ([op], storage)
   | Update_operators ops ->
     let operators = update_operators storage.operators ops in
     let storage = { storage with operators = operators  } in
