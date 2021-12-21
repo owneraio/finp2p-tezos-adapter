@@ -55,6 +55,11 @@ export interface transfer_tokens_param {
   signature: signature;
 }
 
+export interface create_asset_param {
+  asset_id: asset_id;
+  new_token_info: [fa2_token, MichelsonMap<string, bytes>];
+}
+
 export interface issue_tokens_param {
   nonce: finp2p_nonce;
   asset_id: asset_id;
@@ -62,7 +67,6 @@ export interface issue_tokens_param {
   amount: token_amount;
   shg: bytes;
   signature?: signature;
-  new_token_info?: [fa2_token, MichelsonMap<string, bytes>];
 }
 
 export interface redeem_tokens_param {
@@ -74,8 +78,8 @@ export interface redeem_tokens_param {
 }
 
 export interface BatchParam {
-  kind: 'transfer_tokens' | 'issue_tokens' | 'redeem_tokens';
-  param: transfer_tokens_param | issue_tokens_param | redeem_tokens_param;
+  kind: 'transfer_tokens' | 'create_asset' | 'issue_tokens' | 'redeem_tokens';
+  param: transfer_tokens_param | create_asset_param | issue_tokens_param | redeem_tokens_param;
   kt1? : address;
 }
 
@@ -162,32 +166,40 @@ export namespace Michelson {
     return res
   }
 
+  export function create_asset_param(ca : create_asset_param) : MichelsonV1Expression {
+    let [fa2t, info] = ca.new_token_info
+    let mich_info =
+      [...info.entries()]
+        .sort(([k1, _v1], [k2, _v2]) => {
+          return (new String(k1)).localeCompare(k2)
+        })
+        .map(([k, b]) => {
+          return { prim: 'Elt',
+                   args: [
+                     { string: k }, { bytes: bytes_to_hex(b) }
+                   ] }
+        });
+    let mich_new_token_info =
+      {
+        prim: 'Pair',
+        args: [
+          fa2_token(fa2t),
+          mich_info
+        ]
+      }
+    return {
+      prim: 'Pair',
+      args: [
+        { /* asset_id */ bytes: bytes_to_hex(ca.asset_id) },
+        /* new_token_info */ mich_new_token_info
+      ]
+    }
+  }
+
   export function issue_tokens_param(it: issue_tokens_param): MichelsonV1Expression {
     let mich_signature =
       mk_opt(it.signature,
              ((s) => { return maybe_bytes(s) }))
-    let mich_new_token_info =
-      mk_opt(it.new_token_info,
-        (([fa2t, info]) => {
-          let mich_info =
-            [...info.entries()]
-              .sort(([k1, _v1], [k2, _v2]) => {
-                return (new String(k1)).localeCompare(k2)
-              })
-              .map(([k, b]) => {
-                return { prim: 'Elt',
-                         args: [
-                           { string: k }, { bytes: bytes_to_hex(b) }
-                         ] }
-              });
-          return {
-            prim: 'Pair',
-            args: [
-              fa2_token(fa2t),
-              mich_info
-            ]
-          }
-        }))
     return {
       prim: 'Pair',
       args: [
@@ -196,8 +208,7 @@ export namespace Michelson {
         /* dst_account */ maybe_bytes(it.dst_account),
         { /* amount */ int: it.amount.toString() },
         { /* shg */ bytes: bytes_to_hex(it.shg) },
-        /* signature */ mich_signature,
-        /* new_token_info */ mich_new_token_info
+        /* signature */ mich_signature
       ]
     }
   }
@@ -393,6 +404,7 @@ export class FinP2PTezos {
       operators : new MichelsonMap<[address, [address, nat]], void>(),
       token_metadata : new MichelsonMap<nat, [nat, Map<string, bytes>]>(),
       total_supply : new MichelsonMap<nat, nat>(),
+      max_token_id : BigInt(0),
       metadata: mich_metadata
     }
     this.debug("Deploying new FinP2P FA2 asset smart contract")
@@ -464,27 +476,32 @@ export class FinP2PTezos {
    */
   async make_transactions(transfersParams: Array<TransferParams>): Promise<operation_result> {
     let tk = this.tezosToolkit
+    let estimates = await tk.estimate.batch(
+      transfersParams.map((transferParams) => {
+        return { ...transferParams,
+                 kind : OpKind.TRANSACTION
+               }
+      }))
     let source = await tk.signer.publicKeyHash();
     let contract = await tk.rpc.getContract(source);
     let counter = parseInt(contract.counter || '0', 10)
-    let contents: Array<RPCOperation> = []
-    await Promise.all(
-      transfersParams.map(async function (transferParams) {
-        let estimate = await tk.estimate.transfer(transferParams);
-        const rpcTransferOperation = await createTransferOperation({
-          ...transferParams,
-          fee: estimate.suggestedFeeMutez,
-          gasLimit: estimate.gasLimit,
-          storageLimit: estimate.storageLimit
-        });
-        counter++;
-        let v = {
-          ...rpcTransferOperation,
-          source,
-          counter: counter,
-        };
-        contents.push(v)
-      }));
+    let contents =
+      await Promise.all(
+        transfersParams.map(async (transferParams, i) => {
+          let estimate = estimates[i]
+          let rpcTransferOperation = await createTransferOperation({
+            ...transferParams,
+            fee: estimate.suggestedFeeMutez,
+            gasLimit: estimate.gasLimit,
+            storageLimit: estimate.storageLimit
+          });
+          return {
+            ...rpcTransferOperation,
+            source,
+            counter: counter + 1 + i,
+          };
+        })
+      )
     return this.sign_and_inject('transaction', contents)
   }
 
@@ -555,6 +572,20 @@ export class FinP2PTezos {
     let addr = this.get_proxy_address(kt1)
     // let contract = await this.tezosToolkit.contract.at(kt1)
     return this.send(addr, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+  }
+
+  /**
+   * @description Call the entry-point `create_asset` of the FinP2P proxy
+   * @param ca: the parameters of the new asset
+   * @param kt1 : optional address of the contract
+   * @returns operation injection result
+   */
+  async create_asset(
+    ca: create_asset_param,
+    kt1? : address)
+  : Promise<operation_result> {
+    let addr = this.get_proxy_address(kt1)
+    return this.send(addr, 'create_asset', Michelson.create_asset_param(ca))
   }
 
   /**
@@ -650,6 +681,15 @@ export class FinP2PTezos {
             to : kt1_it,
             parameter : { entrypoint: bp.kind,
                           value: Michelson.issue_tokens_param(v_it) }
+          }
+        case 'create_asset':
+          let v_ca = <create_asset_param>bp.param
+          let kt1_ca  = _this.get_proxy_address(bp.kt1)
+          return {
+            amount : 0,
+            to : kt1_ca,
+            parameter : { entrypoint: bp.kind,
+                          value: Michelson.create_asset_param(v_ca) }
           }
         case 'redeem_tokens':
           let v_rt = <redeem_tokens_param>bp.param
