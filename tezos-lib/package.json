@@ -15,6 +15,6 @@
     "ts-node": "^10.4.0"
   },
     "scripts" : {
-        "test": "env TS_NODE_COMPILER_OPTIONS=\"$(cat tests/tsconfig.json | jq .compilerOptions)\" npx mocha --timeout 3000000 -r ts-node/register 'tests/**/*.ts'"
+        "test": "env TS_NODE_COMPILER_OPTIONS=\"$(cat tests/tsconfig.json | jq .compilerOptions)\" npx mocha -b --timeout 3000000 -r ts-node/register 'tests/**/*.ts'"
   }
 }

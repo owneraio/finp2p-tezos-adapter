@@ -14,7 +14,7 @@ import {
 } from "@taquito/taquito"
 import { defaultRPCOptions, MichelsonV1Expression } from "@taquito/rpc";
 import { localForger, LocalForger } from '@taquito/local-forging';
-import { encodeOpHash, validateAddress, validateContractAddress } from '@taquito/utils';
+import { getPkhfromPk, encodeKey, encodeOpHash, validateAddress, validateContractAddress } from '@taquito/utils';
 import { assert } from 'console';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
@@ -88,7 +88,7 @@ export interface operation_ttl  {
   allowed_in_the_future : bigint /* in seconds */
 }
 
-export interface storage {
+export interface proxy_storage {
   operation_ttl: operation_ttl;
   live_operations: BigMapAbstraction;
   finp2p_assets: BigMapAbstraction;
@@ -100,6 +100,17 @@ interface initial_storage {
   live_operations: MichelsonMap<bytes, timestamp>;
   finp2p_assets: MichelsonMap<asset_id, fa2_token>;
   admin: address;
+}
+
+export interface fa2_storage {
+  auth_contract : address,
+  paused : boolean,
+  ledger : BigMapAbstraction,
+  operators : BigMapAbstraction,
+  token_metadata : BigMapAbstraction,
+  total_supply : BigMapAbstraction,
+  max_token_id : bigint,
+  metadata: MichelsonMap<string, bytes>
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
@@ -232,6 +243,16 @@ export namespace Michelson {
       args: [
         { string: addr },
         { bytes: bytes_to_hex(data) }
+      ]
+    }
+  }
+
+  export function get_asset_balance_param(public_key : key, asset_id : asset_id) : MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        maybe_bytes(public_key),
+        { bytes: bytes_to_hex(asset_id) }
       ]
     }
   }
@@ -621,21 +642,27 @@ export class FinP2PTezos {
    * @param kt1 : optional address of the proxy contract
    * @returns a promise with the current storage
    */
-  async storage(
+  async get_proxy_storage(
     kt1?: address)
-  : Promise<storage> {
+  : Promise<proxy_storage> {
     let addr = this.get_proxy_address(kt1)
     const contract = await this.tezosToolkit.contract.at(addr)
-    let storage = await contract.storage() as storage
+    let storage = await contract.storage() as proxy_storage
     return storage
   }
 
-  async admin(
-    stor?: storage,
+  /**
+   * Retrieve the FinP2P FA2 contract current storage
+   * @param kt1 : optional address of the FA2 contract
+   * @returns a promise with the current storage
+   */
+  async get_fa2_storage(
     kt1?: address)
-  : Promise<address> {
-    let st = (stor == undefined) ? await this.storage(kt1) : stor!
-    return st.admin
+  : Promise<fa2_storage> {
+    let addr = this.get_fa2_address(kt1)
+    const contract = await this.tezosToolkit.contract.at(addr)
+    let storage = await contract.storage() as fa2_storage
+    return storage
   }
 
 
@@ -653,7 +680,7 @@ export class FinP2PTezos {
   }
 
   /**
-   * Make a batch call to the FinP2P proxy
+   * @description Make a batch call to the FinP2P proxy
    * @param p: the list of entry-points and parameters (anm optionally contract
    * addresses) with which to call the contract
    * @returns operation injection result
@@ -706,4 +733,40 @@ export class FinP2PTezos {
     })
     return await this.make_transactions(params);
   }
+
+
+  /**
+   * @description Retrieve balance of account in a given asset
+   * @param public_key: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param asset_id: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async get_asset_balance(
+    public_key : key,
+    asset_id : asset_id,
+    kt1?: address) : Promise<BigInt> {
+    let [proxy_storage, fa2_storage] =
+      await Promise.all([this.get_proxy_storage(kt1),
+                         this.get_fa2_storage()])
+    let fa2_token = await proxy_storage.finp2p_assets.get<fa2_token>(Michelson.bytes_to_hex(asset_id))
+    if (fa2_token === undefined) {
+      throw (new Error("FINP2P_UNKNOWN_ASSET_ID"))
+    }
+    if (fa2_token.address !== this.get_fa2_address()) {
+      throw (new Error('Retrieving balance of other fa2 asset not implemented'))
+      // TODO implement simulated call to `balance_of` in FA2
+    }
+    let pk = public_key
+    if (public_key.substring(0,2) == '0x') {
+      pk = encodeKey(public_key.substring(2))
+    }
+    let owner = getPkhfromPk(pk)
+    let balance = await fa2_storage.ledger.get<nat>([owner, fa2_token.id])
+    return (balance || BigInt(0))
+  }
+
 }
