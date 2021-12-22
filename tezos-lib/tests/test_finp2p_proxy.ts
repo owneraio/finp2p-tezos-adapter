@@ -25,41 +25,38 @@ import { strict as assert } from 'assert';
 
 import * as Finp2pProxy from '../finp2p_proxy'
 
-var debug = false
-
 let utf8 = new TextEncoder()
 // utf8.encoding
 
 // This is the account that we will use to sign transactions on Tezos Note that
 // this account must also be an admin of the `finp2p_proxy` contract
+// Testnet faucet accounts can be obtained here: https://teztnets.xyz
 let account = {
   pkh : "tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz",
   pk : "edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq",
   sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
 }
 
-function log (message?: any, ...optionalParams: any[]) {
-  if (debug) { console.log(message, ...optionalParams) }
-}
-
-
-// Initialize Taquito library with node enpoint
-// Testnet faucet accounts can be obtained here: https://teztnets.xyz
-let Tezos = new TezosToolkit("https://rpc.hangzhounet.teztnets.xyz")
-
-// Tell Taquito to use our private key for signing transactions
-Tezos.setSignerProvider(new InMemorySigner(account.sk))
-
 // Initialize FinP2P library
 let config: Finp2pProxy.config = {
+  url : "https://rpc.hangzhounet.teztnets.xyz",
   admin : account.pkh,
-  finp2p_auth_address : 'KT1KpXPYZsaBy5X4fQasPECPhWY1qAe3yNmA',
-  finp2p_fa2_address : 'KT1C7pjXW73mDyGg9Ad2hu5pbV4fFra4nzHe',
-  finp2p_proxy_address : 'KT1JDXMk59ZXcMf1A2mntrb8osz3EBTHxPZH',
-  debug
+  finp2p_auth_address : 'KT1RxCgxmi8r3Qei69yftpAbUM9ta275TGwx',
+  finp2p_fa2_address : 'KT1WGdJLfAhDyjfwPZqnaFzJsaNFFuUmHRAX',
+  finp2p_proxy_address : 'KT1GcXNHq5ii8fVHvUAV3JJMoC5tGdc84ic1',
+  // debug : true
 }
 
-let FinP2PTezos = new Finp2pProxy.FinP2PTezos(Tezos, config)
+let FinP2PTezos = new Finp2pProxy.FinP2PTezos(config)
+
+// Tell Taquito to use our private key for signing transactions
+FinP2PTezos.tezosToolkit.setSignerProvider(new InMemorySigner(account.sk))
+
+
+function log (message?: any, ...optionalParams: any[]) {
+  if (config.debug) { console.log(message, ...optionalParams) }
+}
+
 
 // Use same shg for everything
 let shg = crypto.randomBytes(32)

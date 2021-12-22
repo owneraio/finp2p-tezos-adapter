@@ -305,6 +305,7 @@ function toStrRec(input : any) {
 }
 
 export interface config {
+  url : string,
   admin : address;
   finp2p_proxy_address? : address;
   finp2p_fa2_address? : address;
@@ -318,8 +319,8 @@ export class FinP2PTezos {
   config : config
   forger : LocalForger
 
-  constructor(tk: TezosToolkit, config : config) {
-    this.tezosToolkit = tk;
+  constructor(config : config) {
+    this.tezosToolkit = new TezosToolkit(config.url);
     // Forge operations locally (instead of using RPCs to the node)
     this.tezosToolkit.setForgerProvider(localForger);
     this.check_config(config);
