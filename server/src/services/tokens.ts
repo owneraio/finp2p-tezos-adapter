@@ -105,7 +105,7 @@ export class TokenService {
     const op = await this.tezosClient.issue_tokens({
       asset_id: utf8.encode(request.assetId),
       nonce: { nonce: utf8.encode(''), timestamp: new Date() },
-      dst_account: '0x01' /* secp256k1 */ + (request.recipientPublicKey as unknown as Buffer).toString('hex'),
+      dst_account: '0x01' /* secp256k1 */ + request.recipientPublicKey,
       amount: BigInt(request.quantity),
       shg: new Uint8Array(),
     });
@@ -134,11 +134,12 @@ export class TokenService {
       }
     }
     const nonceBytes = Buffer.from(request.nonce, 'hex');
+
     const op = await this.tezosClient.transfer_tokens({
       asset_id: utf8.encode(request.assetId),
-      nonce: { nonce: nonceBytes.slice(0, 24), timestamp: new Date(Number(nonceBytes.readBigInt64BE(23)) * 1000 ) },
-      src_account: '0x01' /* secp256k1 */ + (request.sourcePublicKey as unknown as Buffer).toString('hex'),
-      dst_account: '0x01' /* secp256k1 */ + (request.recipientPublicKey as unknown as Buffer).toString('hex'),
+      nonce: { nonce: nonceBytes.slice(0, 24), timestamp: new Date(Number(nonceBytes.readBigInt64BE(24)) * 1000 ) },
+      src_account: '0x01' /* secp256k1 */ + request.sourcePublicKey,
+      dst_account: '0x01' /* secp256k1 */ + request.recipientPublicKey,
       amount: BigInt(request.quantity),
       shg: shg,
       signature: '0x' + request.signatureTemplate.signature,
