@@ -133,6 +133,7 @@ export class TokenService {
         shg = Buffer.from(hashGroups[0], 'hex');
       }
     }
+
     const nonceBytes = Buffer.from(request.nonce, 'hex');
 
     const op = await this.tezosClient.transfer_tokens({
@@ -141,7 +142,7 @@ export class TokenService {
       src_account: '0x01' /* secp256k1 */ + request.sourcePublicKey,
       dst_account: '0x01' /* secp256k1 */ + request.recipientPublicKey,
       amount: BigInt(request.quantity),
-      shg: shg,
+      shg: new Uint8Array(shg),
       signature: '0x' + request.signatureTemplate.signature,
     });
     await this.tezosClient.wait_inclusion(op);
