@@ -48,4 +48,4 @@ test:
 	@cd tezos-lib && npm test
 
 docker:
-	@docker build -f build/Dockerfile -t tezos-server:latest .
+	@docker build -f build/Dockerfile -t tezos-adapter:latest .

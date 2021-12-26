@@ -125,7 +125,7 @@ export interface fa2_storage {
 export namespace Michelson {
 
   export function bytes_to_hex(b: Uint8Array): string {
-    return Buffer.from(b.buffer).toString("hex");
+    return Buffer.from(b.buffer, b.byteOffset, b.length).toString("hex");
   }
 
   export function maybe_bytes(k : key) : MichelsonV1Expression {
