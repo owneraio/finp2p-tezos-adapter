@@ -37,11 +37,14 @@ let mint (p : mint_param) (s : storage) : storage =
           let supply = supply + mint_amount in (ledger, supply))
       (s.ledger, supply) p.owners in
   let total_supply = Big_map.add token_id supply s.total_supply in
+  let max_token_id =
+    if token_id > s.max_token_id then token_id else s.max_token_id in
   {
     s with
     token_metadata = token_metadata ;
     total_supply = total_supply ;
-    ledger = ledger 
+    ledger = ledger ;
+    max_token_id = max_token_id 
   }
 
 let burn (p : burn_param) (s : storage) : storage =

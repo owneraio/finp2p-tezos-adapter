@@ -491,7 +491,6 @@ let encode_issue_tokens_payload (p : issue_tokens_param) =
     it_amount;
     it_shg;
     it_signature = _;
-    it_new_token_info = _;
   } =
     p
   in
