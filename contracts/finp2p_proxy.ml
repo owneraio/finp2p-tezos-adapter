@@ -53,6 +53,29 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
   let relay_op = Tezos.transaction None [fa2_transfer] 0t transfer_ep in
   (relay_op, s)
 
+let create_asset (p : create_asset_param) (s : storage) : operation * storage =
+  let (fa2_token, token_info) = p.ca_new_token_info in
+  (* Create new asset *)
+  let (old_asset, finp2p_assets) =
+    Big_map.get_and_update p.ca_asset_id (Some fa2_token) s.finp2p_assets
+  in
+  let () =
+    match old_asset with
+    | Some _ -> (failwith asset_already_exists : unit)
+    | None -> ()
+  in
+  let fa2_mint =
+    {
+      mi_token_id = fa2_token.id;
+      mi_token_info = Some token_info;
+      mi_owners = ([] : (address * nat) list);
+    }
+  in
+  let mint_ep = get_mint_entrypoint fa2_token.address in
+  let relay_op = Tezos.transaction None fa2_mint 0t mint_ep in
+  let s = {s with finp2p_assets} in
+  (relay_op, s)
+
 let issue_tokens (p : issue_tokens_param) (s : storage) : operation * storage =
   let () =
     if not (is_operation_live p.it_nonce.timestamp s) then
@@ -62,42 +85,22 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : operation * storage =
   let live_operations =
     Big_map.add oph p.it_nonce.timestamp s.live_operations
   in
-  let (fa2_token, mi_token_info, finp2p_assets) =
-    match p.it_new_token_info with
-    | None -> (
-        (* Issuing more of an existing asset *)
-        match Big_map.find_opt p.it_asset_id s.finp2p_assets with
-        | None ->
-            (failwith unknown_asset_id
-              : fa2_token
-                * (string, bytes) map option
-                * (asset_id, fa2_token) big_map)
-        | Some fa2_token ->
-            (fa2_token, (None : (string, bytes) map option), s.finp2p_assets))
-    | Some (fa2_token, token_info) -> (
-        (* Issuing new asset *)
-        let (old_asset, finp2p_assets) =
-          Big_map.get_and_update p.it_asset_id (Some fa2_token) s.finp2p_assets
-        in
-        match old_asset with
-        | Some _ ->
-            (failwith asset_already_exists
-              : fa2_token
-                * (string, bytes) map option
-                * (asset_id, fa2_token) big_map)
-        | None -> (fa2_token, Some token_info, finp2p_assets))
+  let fa2_token =
+    match Big_map.find_opt p.it_asset_id s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
   in
   let issued_amount = match p.it_amount with Amount a -> a in
   let fa2_mint =
     {
       mi_token_id = fa2_token.id;
-      mi_token_info;
+      mi_token_info = (None : (string, bytes) map option);
       mi_owners = [(address_of_key p.it_dst_account, issued_amount)];
     }
   in
   let mint_ep = get_mint_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction None fa2_mint 0t mint_ep in
-  let s = {s with live_operations; finp2p_assets} in
+  let s = {s with live_operations} in
   (relay_op, s)
 
 let redeem_tokens (p : redeem_tokens_param) (s : storage) : operation * storage
@@ -166,6 +169,7 @@ let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
     operation * storage =
   match p with
   | Transfer_tokens p -> transfer_tokens p s
+  | Create_asset p -> create_asset p s
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
 
@@ -205,3 +209,20 @@ let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
   | Cleanup ops ->
       let s = cleanup ops s in
       (([] : operation list), s)
+
+(* Views *)
+
+let[@view] get_asset_balance
+    (((owner : key), (asset_id : asset_id)), (s : storage)) : nat =
+  let owner = address_of_key owner in
+  let fa2_token =
+    match Big_map.find_opt asset_id s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  match
+    (Tezos.call_view None "get_balance" (owner, fa2_token.id) fa2_token.address
+      : nat option)
+  with
+  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : nat)
+  | Some b -> b

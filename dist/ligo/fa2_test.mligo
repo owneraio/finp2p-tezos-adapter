@@ -16,6 +16,7 @@ let initial_storage  : storage =
     operators = (Big_map.empty : operators_storage);
     token_metadata = (Big_map.empty : token_metadata_storage);
     total_supply = (Big_map.empty : total_supply_storage);
+    max_token_id = 0n;
     metadata = (Big_map.empty : (string, bytes) big_map)
   }
 
