@@ -25,41 +25,38 @@ import { strict as assert } from 'assert';
 
 import * as Finp2pProxy from '../finp2p_proxy'
 
-var debug = false
-
 let utf8 = new TextEncoder()
 // utf8.encoding
 
 // This is the account that we will use to sign transactions on Tezos Note that
 // this account must also be an admin of the `finp2p_proxy` contract
+// Testnet faucet accounts can be obtained here: https://teztnets.xyz
 let account = {
   pkh : "tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz",
   pk : "edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq",
   sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
 }
 
-function log (message?: any, ...optionalParams: any[]) {
-  if (debug) { console.log(message, ...optionalParams) }
-}
-
-
-// Initialize Taquito library with node enpoint
-// Testnet faucet accounts can be obtained here: https://teztnets.xyz
-let Tezos = new TezosToolkit("https://rpc.hangzhounet.teztnets.xyz")
-
-// Tell Taquito to use our private key for signing transactions
-Tezos.setSignerProvider(new InMemorySigner(account.sk))
-
 // Initialize FinP2P library
 let config: Finp2pProxy.config = {
+  url : "https://rpc.hangzhounet.teztnets.xyz",
   admin : account.pkh,
-  finp2p_auth_address : 'KT1KpXPYZsaBy5X4fQasPECPhWY1qAe3yNmA',
-  finp2p_fa2_address : 'KT1C7pjXW73mDyGg9Ad2hu5pbV4fFra4nzHe',
-  finp2p_proxy_address : 'KT1JDXMk59ZXcMf1A2mntrb8osz3EBTHxPZH',
-  debug
+  finp2p_auth_address : 'KT1RxCgxmi8r3Qei69yftpAbUM9ta275TGwx',
+  finp2p_fa2_address : 'KT1WGdJLfAhDyjfwPZqnaFzJsaNFFuUmHRAX',
+  finp2p_proxy_address : 'KT1GcXNHq5ii8fVHvUAV3JJMoC5tGdc84ic1',
+  // debug : true
 }
 
-let FinP2PTezos = new Finp2pProxy.FinP2PTezos(Tezos, config)
+let FinP2PTezos = new Finp2pProxy.FinP2PTezos(config)
+
+// Tell Taquito to use our private key for signing transactions
+FinP2PTezos.tezosToolkit.setSignerProvider(new InMemorySigner(account.sk))
+
+
+function log (message?: any, ...optionalParams: any[]) {
+  if (config.debug) { console.log(message, ...optionalParams) }
+}
+
 
 // Use same shg for everything
 let shg = crypto.randomBytes(32)
@@ -251,6 +248,17 @@ async function transfer_tokens(i : {
   return await FinP2PTezos.transfer_tokens(param)
 }
 
+async function get_balance(i : {
+  owner : Buffer;
+  asset_id : string}) {
+  let balance = await FinP2PTezos.get_asset_balance(
+    '0x01' /* secp256k1 */ + i.owner.toString('hex'),
+    utf8.encode(i.asset_id)
+  )
+  return Number(balance)
+}
+
+
 var accounts : finp2p_account[] = []
 
 describe('FinP2P proxy contract',  () => {
@@ -288,6 +296,14 @@ describe('FinP2P proxy contract',  () => {
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
 
+  it('Retrieve balance of non-existing asset ' + asset_id1, async () => {
+    await assert.rejects(
+      async () => {
+        await get_balance({ owner : accounts[0].pubKey, asset_id : asset_id1 })
+      },
+      { message : "FINP2P_UNKNOWN_ASSET_ID"})
+  })
+
   it('Create new asset ' + asset_id1, async () => {
     let op = await create_asset(
       { asset_id : asset_id1,
@@ -299,13 +315,25 @@ describe('FinP2P proxy contract',  () => {
     await FinP2PTezos.wait_inclusion(op)
   })
 
-  it('Issue new token of asset ' + asset_id1, async () => {
+  it('Balance of account[0] should be 0 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                    asset_id : asset_id1 })
+    assert.equal(b, 0)
+  })
+
+  it('Issue 150 tokens of asset ' + asset_id1, async () => {
     let op = await issue_tokens(
       { dest : accounts[0],
         asset_id : asset_id1,
         amount : 150})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+  })
+
+  it('Balance of account[0] should be 150 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                    asset_id : asset_id1 })
+    assert.equal(b, 150)
   })
 
   it('Try to create already existing asset', async () => {
@@ -334,13 +362,19 @@ describe('FinP2P proxy contract',  () => {
       { message : "FA2_TOKEN_ALREADY_EXISTS"})
   })
 
-  it('Issue more of same token ', async () => {
+  it('Issue 220 more of same token ', async () => {
     let op = await issue_tokens(
       { dest : accounts[1],
         asset_id : asset_id1,
         amount : 220 })
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+  })
+
+  it('Balance of account[1] should be 220 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[1].pubKey,
+                                    asset_id : asset_id1 })
+    assert.equal(b, 220)
   })
 
   it('Batch create asset and issue tokens of ' + asset_id2, async () => {
@@ -364,6 +398,12 @@ describe('FinP2P proxy contract',  () => {
     let op = await FinP2PTezos.batch(ops)
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+  })
+
+  it('Balance of account[2] should be 99999 in ' + asset_id2, async () => {
+    let b = await get_balance({ owner : accounts[2].pubKey,
+                                    asset_id : asset_id2 })
+    assert.equal(b, 99999)
   })
 
   it('Create new asset with UTF8 asset_id ' + asset_id3_utf8, async () => {
@@ -390,6 +430,12 @@ describe('FinP2P proxy contract',  () => {
     await FinP2PTezos.wait_inclusion(op)
   })
 
+  it('Balance of account[3] should be 2 in ' + asset_id3_utf8, async () => {
+    let b = await get_balance({ owner : accounts[3].pubKey,
+                                asset_id : asset_id3_utf8 })
+    assert.equal(b, 2)
+  })
+
   it('Transfer 1 token of asset ' + asset_id1, async () => {
     let op = await transfer_tokens(
       { src : accounts[0],
@@ -398,6 +444,18 @@ describe('FinP2P proxy contract',  () => {
         amount : 1})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+  })
+
+  it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[3].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 1)
+  })
+
+  it('Balance of account[0] should be 149 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 149)
   })
 
   it('Try to transfer more than balance ' + asset_id1, async () => {
@@ -410,6 +468,12 @@ describe('FinP2P proxy contract',  () => {
         amount : 99999999999999})
       },
       { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Balance of account[0] should be 149 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 149)
   })
 
 })
