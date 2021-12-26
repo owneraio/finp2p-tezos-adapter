@@ -135,16 +135,18 @@ export class TokenService {
     }
 
     const nonceBytes = Buffer.from(request.nonce, 'hex');
+    const noncePre = nonceBytes.slice(0, 24);
 
-    const op = await this.tezosClient.transfer_tokens({
+    let params = {
       asset_id: utf8.encode(request.assetId),
-      nonce: { nonce: new Uint8Array(nonceBytes.slice(0, 24)), timestamp: new Date(Number(nonceBytes.readBigInt64BE(24)) * 1000 ) },
+      nonce: { nonce: noncePre, timestamp: new Date(Number(nonceBytes.readBigInt64BE(24)) * 1000 ) },
       src_account: '0x01' /* secp256k1 */ + request.sourcePublicKey,
       dst_account: '0x01' /* secp256k1 */ + request.recipientPublicKey,
       amount: BigInt(request.quantity),
-      shg: new Uint8Array(shg),
+      shg: shg,
       signature: '0x' + request.signatureTemplate.signature,
-    });
+    };
+    const op = await this.tezosClient.transfer_tokens(params);
     await this.tezosClient.wait_inclusion(op);
     return {
       transactionId: op.hash,
