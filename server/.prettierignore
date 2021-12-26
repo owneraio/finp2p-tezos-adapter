@@ -1,0 +1,4 @@
+.prettierignore
+*.md
+*.json
+*.lock
