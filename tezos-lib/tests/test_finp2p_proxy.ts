@@ -1,26 +1,10 @@
 import 'mocha'
-import {
-  TezosToolkit,
-  BigMapAbstraction,
-  MichelsonMap,
-  OpKind,
-  createTransferOperation,
-  TransferParams,
-  RPCOperation,
-  OriginationOperation,
-  createRevealOperation,
-  TransactionOperation,
-  Operation,
-  WalletOperation
-} from "@taquito/taquito"
-import { defaultRPCOptions, MichelsonV1Expression } from "@taquito/rpc";
-import { localForger, LocalForger } from '@taquito/local-forging';
-import { encodeOpHash, encodeKey } from '@taquito/utils';
-import { InMemorySigner, importKey } from '@taquito/signer'
+import { MichelsonMap } from "@taquito/taquito"
+import { InMemorySigner } from '@taquito/signer'
 
 import * as secp256k1 from 'secp256k1';
 import * as crypto from 'crypto';
-import { blake2b, createBLAKE2b } from 'hash-wasm';
+import { createBLAKE2b } from 'hash-wasm';
 import { strict as assert } from 'assert';
 
 import * as Finp2pProxy from '../finp2p_proxy'
@@ -122,10 +106,7 @@ function log_hashgroup (hg : any[]) {
 async function mk_issue_tokens(i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number,
-  new_token? : {
-    token_id : number,
-    metadata: any}}) {
+  amount : number}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
   let assetGroup = [
@@ -158,10 +139,7 @@ async function mk_issue_tokens(i : {
 async function issue_tokens (i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number,
-  new_token? : {
-    token_id : number,
-    metadata: any}}) {
+  amount : number}) {
   let param = await mk_issue_tokens(i)
   log("Issue parameters:", param)
   return await FinP2PTezos.issue_tokens(param)

@@ -7,15 +7,11 @@ import {
   TransferParams,
   RPCOperation,
   OriginationOperation,
-  createRevealOperation,
-  TransactionOperation,
-  Operation,
-  WalletOperation
+  createRevealOperation
 } from "@taquito/taquito"
-import { defaultRPCOptions, MichelsonV1Expression } from "@taquito/rpc";
+import { MichelsonV1Expression } from "@taquito/rpc";
 import { localForger, LocalForger } from '@taquito/local-forging';
-import { getPkhfromPk, encodeKey, encodeOpHash, validateAddress, validateContractAddress } from '@taquito/utils';
-import { assert } from 'console';
+import { getPkhfromPk, encodeKey, encodeOpHash, validateContractAddress } from '@taquito/utils';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -454,7 +450,6 @@ export class FinP2PTezos {
     let hash = encodeOpHash(signOp.sbytes);
     try {
       let injectedOpHash = await tk.rpc.injectOperation(signOp.sbytes)
-      assert(injectedOpHash == hash);
       return { hash }
     } catch (error) {
       throw new InjectionError({ hash }, error, `Error while injecting ${kind}`)
