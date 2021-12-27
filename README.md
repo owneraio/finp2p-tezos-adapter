@@ -58,3 +58,34 @@ $ make lib
 
 The JavaScript code will be produced in the [dist/js](dist/js) directory.
 
+## FinP2P DLT Adapter Server
+
+### Installation and compilation
+
+DLT Adapter server source in [server](server)
+
+Install the dependencies with
+
+```bash
+$ make server-deps
+```
+
+Compile the typescript library with
+
+```bash
+$ make server
+```
+
+The JavaScript code will be produced in the server/lib directory.
+
+Compile the typescript library with
+
+### Docker
+The prject can be built and baked using Docker in [dockerfile](build/dockerfile)
+
+```bash
+$ make docker
+```
+
+
+
