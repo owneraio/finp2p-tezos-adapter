@@ -47,5 +47,11 @@ build-tests:
 test:
 	@cd tezos-lib && npm test
 
+server-deps:
+	@npm --prefix server install
+
+server:
+	@npm --prefix server run build
+
 docker:
 	@docker build -f build/Dockerfile -t tezos-adapter:latest .

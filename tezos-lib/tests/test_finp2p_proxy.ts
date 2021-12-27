@@ -41,9 +41,9 @@ let account = {
 let config: Finp2pProxy.config = {
   url : "https://rpc.hangzhounet.teztnets.xyz",
   admin : account.pkh,
-  finp2p_auth_address : 'KT1RxCgxmi8r3Qei69yftpAbUM9ta275TGwx',
-  finp2p_fa2_address : 'KT1WGdJLfAhDyjfwPZqnaFzJsaNFFuUmHRAX',
-  finp2p_proxy_address : 'KT1GcXNHq5ii8fVHvUAV3JJMoC5tGdc84ic1',
+  finp2p_auth_address : 'KT1BPV7P3d48mTPGriEuaSihPswA23wugPw8',
+  finp2p_fa2_address : 'KT1F3NY97BUfAJ7CWFsVUB4LMXfg5Cjcuh4f',
+  finp2p_proxy_address : 'KT1WD9tFgM6LzQqPXvhpVEuuU65amMTiNbyv',
   // debug : true
 }
 
@@ -134,7 +134,7 @@ async function mk_issue_tokens(i : {
     'finp2p',
     i.asset_id,
     'finId',
-    i.dest.pubKey,
+    i.dest.pubKey.toString('hex'),
     '0x' + i.amount.toString(16)
   ]
   log_hashgroup(assetGroup)
@@ -213,9 +213,9 @@ async function mk_transfer_tokens(i : {
     'finp2p',
     i.asset_id,
     'finId',
-    i.src.pubKey,
+    i.src.pubKey.toString('hex'),
     'finId',
-    i.dest,
+    i.dest.toString('hex'),
     '0x' + i.amount.toString(16)
   ]
   log_hashgroup(assetGroup)
