@@ -26,7 +26,7 @@ RUN npm install --prefix server --only=production
 
 # ---- Release ----
 FROM base as release
-LABEL org.opencontainers.image.source=https://github.com/owneraio/tezos
+LABEL org.opencontainers.image.source=https://github.com/owneraio/finp2p-tezos-adapter
 
 COPY --from=ts-remover /usr/app ./
 RUN ls -la
