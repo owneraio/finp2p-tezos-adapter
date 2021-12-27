@@ -19,7 +19,7 @@ export const register = (app: express.Application) => {
     asyncMiddleware(async (req, res) => {
       const { assetId, sourcePublicKey } = req.body;
       const balance = await TokenService.GetService().balance(assetId, sourcePublicKey);
-      res.send({ quantity: balance });
+      res.send({ quantity: balance.toString() });
     }),
   );
 
