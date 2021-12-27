@@ -2,7 +2,7 @@
 DIST=dist
 BUILD=_build/default
 
-all: contracts lib
+all: contracts lib server
 
 contracts: build copy
 
@@ -50,6 +50,7 @@ test:
 server-deps:
 	@npm --prefix server install
 
+.PHONY: server
 server:
 	@npm --prefix server run build
 
