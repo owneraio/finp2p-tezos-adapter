@@ -7,6 +7,7 @@ import * as crypto from 'crypto';
 import { createBLAKE2b } from 'hash-wasm';
 import { strict as assert } from 'assert';
 
+import '../taquito_wrapper'
 import * as Finp2pProxy from '../finp2p_proxy'
 
 let utf8 = new TextEncoder()
@@ -34,7 +35,7 @@ let config: Finp2pProxy.config = {
 let FinP2PTezos = new Finp2pProxy.FinP2PTezos(config)
 
 // Tell Taquito to use our private key for signing transactions
-FinP2PTezos.tezosToolkit.setSignerProvider(new InMemorySigner(account.sk))
+FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(account.sk))
 
 
 function log (message?: any, ...optionalParams: any[]) {

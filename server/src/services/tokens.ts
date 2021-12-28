@@ -73,7 +73,7 @@ export class TokenService {
       debug: false,
     };
     this.tezosClient = new FINP2PProxy.FinP2PTezos(config);
-    this.tezosClient.tezosToolkit.setSignerProvider(new InMemorySigner(account.sk));
+    this.tezosClient.taquito.setSignerProvider(new InMemorySigner(account.sk));
   }
 
   public static GetService(): TokenService {
