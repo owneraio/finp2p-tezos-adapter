@@ -36,6 +36,11 @@ export interface fa2_token {
   id: nat;
 }
 
+export interface create_fa2_token {
+  address: address;
+  id?: nat;
+}
+
 export interface finp2p_nonce {
   nonce: nonce;
   timestamp: timestamp;
@@ -53,7 +58,7 @@ export interface transfer_tokens_param {
 
 export interface create_asset_param {
   asset_id: asset_id;
-  new_token_info: [fa2_token, MichelsonMap<string, bytes>];
+  new_token_info: [create_fa2_token, MichelsonMap<string, bytes>];
 }
 
 export interface issue_tokens_param {
@@ -89,6 +94,7 @@ export interface proxy_storage {
   live_operations: BigMapAbstraction;
   finp2p_assets: BigMapAbstraction;
   admin: address;
+  next_token_ids: BigMapAbstraction;
 }
 
 interface initial_storage {
@@ -96,6 +102,7 @@ interface initial_storage {
   live_operations: MichelsonMap<bytes, timestamp>;
   finp2p_assets: MichelsonMap<asset_id, fa2_token>;
   admin: address;
+  next_token_ids: MichelsonMap<address, nat>;
 }
 
 export interface fa2_storage {
@@ -131,6 +138,19 @@ export namespace Michelson {
       args: [
         { /* address */ string: token.address },
         { /* id */ int: token.id.toString() }
+      ]
+    }
+  }
+
+  export function create_fa2_token(token: create_fa2_token): MichelsonV1Expression {
+    let id =
+      mk_opt(token.id,
+             ((id) => { return { int: id.toString() }}))
+    return {
+      prim: 'Pair',
+      args: [
+        { /* address */ string: token.address },
+        /* id */ id
       ]
     }
   }
@@ -190,7 +210,7 @@ export namespace Michelson {
       {
         prim: 'Pair',
         args: [
-          fa2_token(fa2t),
+          create_fa2_token(fa2t),
           mich_info
         ]
       }
@@ -339,7 +359,8 @@ export class FinP2PTezos {
       operation_ttl,
       live_operations: new MichelsonMap(),
       finp2p_assets: new MichelsonMap(),
-      admin
+      admin,
+      next_token_ids: new MichelsonMap(),
     }
     this.taquito.debug("Deploying new FinP2P Proxy smart contract")
     return this.taquito.contract.originate({
