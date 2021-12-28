@@ -73,3 +73,5 @@ let[@view] get_balance (((owner, token_id) : address * nat), (s : storage)) :
     match Big_map.find_opt (owner, token_id) s.ledger with
     | None -> 0n
     | Some b -> b
+
+let[@view] get_max_token_id ((), (s : storage)) : nat = s.max_token_id

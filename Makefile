@@ -4,6 +4,7 @@ BUILD=_build/default
 
 all: contracts lib server
 
+.PHONY: contracts
 contracts: build copy
 
 copy: dist-dir
@@ -15,6 +16,7 @@ dist-dir:
 	@mkdir -p $(DIST)/ligo
 	@mkdir -p $(DIST)/michelson
 
+.PHONY: build
 build:
 	@dune build
 
