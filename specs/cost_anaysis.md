@@ -61,3 +61,47 @@ solution the code declares two constants that map integers, to bytes
 We also declare the map using _inlined Michelson_ code in the source, instead of
 relying on the builtin `Map.litteral` of Ligo which is compiled sub-optimally
 to Michelson.
+
+
+## Costs of deployment
+
+Contract | Gas | Storage | Cost (Fees + burn)
+---|---:|---:|---:
+Authorization | 2072 | 3842 B | 0.965 ꜩ
+FA2 | 3642 | 4418 B | 1.109 ꜩ
+Proxy | 3727 | 13951 B | 3.502 ꜩ
+
+
+## Costs of calls
+
+Entry-point | Gas | Storage | Fees | Burn | Total cost
+---|---:|---:|---:|---:|---:
+`add_accredited` | 3353 | 71 B | 0.001 ꜩ | 0.017 ꜩ | **0.018 ꜩ**
+`create_asset` | 8560 | 396 B | 0.001 ꜩ | 0.099 ꜩ | **0.100 ꜩ**
+`issue_tokens` | 9402 | 138 B | 0.001 ꜩ | 0.035 ꜩ | **0.036 ꜩ**
+`transfer_tokens` to new | 9718 | 138 B | 0.002 ꜩ | 0.034 ꜩ | **0.036 ꜩ**
+`transfer_tokens` to existing | 9688 | 71 B | 0.002 ꜩ | 0.017 ꜩ | **0.019 ꜩ**
+`cleanup` (11) | 13491 | 0 B | 0.002 ꜩ | 0 ꜩ | **0.002 ꜩ**
+
+
+The cost of smart contract calls is dominated by the cost of the storage. This
+is why it is important to reclaim the used space when possible, with the
+`cleanup` entry-point.
+
+
+## Costs after cleanup
+
+Entry-point | Gas | Storage | Fees | Burn | Total cost
+---|---:|---:|---:|---:|---:
+`create_asset` | 13508 | 247 B | 0.002 ꜩ | 0.062 ꜩ | **0.064 ꜩ**
+`issue_tokens` | 9452 | 69 B | 0.002 ꜩ | 0.017 ꜩ | **0.019 ꜩ**
+`transfer_tokens` to new | 9718 | 67 B | 0.001 ꜩ | 0.017 ꜩ | **0.018 ꜩ**
+`transfer_tokens` to existing | 9928  | 0 B | 0.0016 ꜩ | 0 ꜩ| **0.0016 ꜩ**
+
+If the frequency of operations is relatively stable, then there will be a stable
+number of _live operations_ stored by the proxy contract. These operations can
+be regularly cleaned, which in practice makes the operation **free** in terms of
+storage used (burn) in the proxy contract. This means that, in practice, we
+can expect token transfer between existing users to cost around 0.0016 ꜩ (or
+$0.0076 at current Tezos price) an token transfers to new users to cost around
+0.019 ꜩ (or $0.09 at current Tezos price).
