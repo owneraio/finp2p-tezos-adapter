@@ -434,12 +434,12 @@ export class FinP2PTezos {
     return this.get_contract_address('FA2', this.config.finp2p_fa2_address, kt1)
   }
 
-  gen_new_token(symbol: string, asset_id: string, token_id: number): [fa2_token, MichelsonMap<string, bytes>]{
+  gen_new_token(symbol: string, asset_id: string, token_id?: number): [create_fa2_token, MichelsonMap<string, bytes>]{
     const m: Object = { symbol : symbol, name : asset_id, decimals : '0' };
 
     let fa2_token = {
       address : this.get_fa2_address(),
-      id : BigInt(token_id)
+      id : (token_id === undefined) ? undefined : BigInt(token_id)
     }
     let metadata = new MichelsonMap<string, Uint8Array>()
     Object.entries(m).forEach(

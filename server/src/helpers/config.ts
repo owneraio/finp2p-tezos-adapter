@@ -12,7 +12,7 @@ export let account = {
 // Initialize FinP2P library
 //TODO: move this to configuration
 export const contracts = {
-  finp2p_auth_address : 'KT1BPV7P3d48mTPGriEuaSihPswA23wugPw8',
-  finp2p_fa2_address : 'KT1F3NY97BUfAJ7CWFsVUB4LMXfg5Cjcuh4f',
-  finp2p_proxy_address : 'KT1WD9tFgM6LzQqPXvhpVEuuU65amMTiNbyv',
+  finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
+  finp2p_fa2_address : 'KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk',
+  finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
 };
