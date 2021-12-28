@@ -478,5 +478,6 @@
          MEM ;
          NOT ;
          IF { DROP 3 ; PUSH string "FA2_TOKEN_UNDEFINED" ; FAILWITH }
-            { DIG 2 ; GET 5 ; DUG 2 ; PAIR ; GET ; IF_NONE { PUSH nat 0 } {} } } }
+            { DIG 2 ; GET 5 ; DUG 2 ; PAIR ; GET ; IF_NONE { PUSH nat 0 } {} } } ;
+  view "get_max_token_id" unit nat { CDR ; GET 13 } }
 
