@@ -63,8 +63,9 @@ The contract will have the following entry points:
 - `balance_of`
 - `mint`
 - `burn`
-
-**Question**: Do we want more?
+- Some extra administrative functions:
+  - `pause`
+  - `update_auth_contract`
 
 #### Authorization policy
 
@@ -100,9 +101,10 @@ wallets).
 }
 ```
 
-**TODO**: should we use the `no-transfer` policy (users cannot transfer tokens
-directly) or have the `owner-or-operator` policy with the additional custom
-policy.
+We use the `owner-or-operator` policy with an additional custom policy here but
+note that we can also deploy specialized FA2 contracts with the `no-transfer`
+policy if we want to completely prevent users from transferring tokens
+directly, ever.
 
 #### `transfer`
 
@@ -112,9 +114,9 @@ entry point `authorize` with the parameter:
 ```ocaml
 { 
   sender = "KT1proxy";
-  sender_is_operator = false;
+  sender_is_operator = [[false]; ...];
   fa2_address = "KT1fa2X";
-  parameters = Transfer [
+  action = Assets_action Transfer [
     { from_ = src_account_pkh; 
       txs = [ {to_ = dst_account_pkh ; token_id; amount}] };
     ...
@@ -146,7 +148,8 @@ entry point `authorize` with the parameter:
 { 
   sender = "KT1proxy";
   fa2_address = "KT1fa2X";
-  parameters = Mint [
+  sender_if_operator = [];
+  action = Manage_action Mint [
     {to_ = dst_account_pkh ; token_id; amount};
     ...
   ] 
@@ -180,7 +183,8 @@ entry point `authorize` with the parameter:
 { 
   sender = "KT1proxy";
   fa2_address = "KT1fa2X";
-  parameters = Burn [
+  sender_if_operator = [[false; ...]];
+  action = Manage_action Burn [
     {from_ = src_account_pkh ; token_id; amount};
     ...
   ] 
@@ -192,20 +196,22 @@ balance in this token will be decremented by `amount`).
 
 ### `update_operators`
 
-We think that we can keep the usual semantic (i.e. without calling the
-authorization contract), where users must sign transaction themselves to update
-their operators. This is for future proofing in case we want to relax the
-restrictions. 
+The semantic of `update_operators` is the usual, but the authorization of who
+can update operators for a user is handled by the **Authorization** contract.
 
 > The standard does not specify who is permitted to update operators on behalf
 > of the token owner. Depending on the business use case, the particular
 > implementation of the FA2 contract MAY limit operator updates to a token owner
 > (`owner == SENDER`) or be limited to an administrator.
 
-Note that a user having operators does not impact the contract in the V1.
+In the V1, the update operator operation must be signed by the operator for it
+to take effect and the information of "being an operator" is passed on to the
+**Authorization** contract (in the field `sender_is_operator`) when one calls
+either `transfer` or `burn`. In the authorization logic for the V1, this
+information is not used (_i.e._ being an operator does not grant any additional
+rights).
 
-**TODO**: decide if it is necessary or not (in the latter case there is no need
-to have `sender_is_operator` as a parameter to the administrator contract).
+Note that a user having operators does not impact the contract in the V1.
 
 ### `balance_of`
 
@@ -214,6 +220,12 @@ This entry point implements the usual semantics:
 > Gets the balance of multiple account/token pairs. Accepts a list of
 > `balance_of_requests` and a callback contract callback which accepts a list of
 > `balance_of_response` records.
+
+### `update_auth_contract`
+
+The address of the authorization contract can be changed, and this change must
+be authorized by the old authorization contract (basically just checking that
+the request comes from an administrator).
 
 
 ## Proxy contract
@@ -233,9 +245,8 @@ contract as the latter acts as an extra indirection layer.
 To operate correctly, the **Proxy** contract needs to keep track and maintain
 the following information:
 
-- a set of administrator addresses (updatable); only these administrators
-  are allowed to inject `transfer_asset`, `issue_asset`, and `burn_asset`
-  operations
+- an administrator address (updatable); only this administrator is allowed to
+  call entry-points of the Proxy contract (with the exception of `cleanup`)
 - a value `operation_ttl` in seconds that indicates how long an operation can be
   relayed depending on its timestamp (within the nonce); this value is updatable
   by an administrator and should match the retention policy of operations in the
@@ -246,13 +257,8 @@ the following information:
   id>:<resource type>:<resource>`) to pairs of the form `(<KT1>, <id>)` where
   `<KT1>` is the address of the FA2 contract for this asset on Tezos and `<id>`
   is a natural number for this asset within the FA2 contract. Note that the
-  FinP2P asset identifier can be opaque to the **Proxy** contract (simply a byte
+  FinP2P asset identifier is opaque to the **Proxy** contract (simply a byte
   sequence, as long as they are unique within FinP2P).
-  
-<!--
-- (optional) a mapping of account addresses (`tz2`) to public keys (_i.e._,
-  `finId_pkh -> finId`)[^Necessary to check signatures as there are no builtin public key recovery mechanism in Tezos. Unless the source and destination of transfers are already identified by their full `finId`.]
--->
 
 ### Entry points
 
@@ -269,13 +275,13 @@ the following information:
 
 ```ocaml
 type transfer_param = {
-  nonce : bytes; (* 24 bytes *)
-  nonce_timestamp : timestamp;
+  nonce : { nonce :bytes; (* 24 bytes *)
+            timestamp : timestamp };
   asset_id : bytes;
   src_account : public_key;
   dst_account : public_key;
   amount : nat;
-  shg : bytes; (* 32 bytes hash *)
+  shg : bytes; (* 32 bytes hash, for settlement hash group *)
   signature : signature;
 }
 
@@ -335,15 +341,20 @@ The entry point to transfer an asset (`transfer_asset`) does the following:
 2. encode the parameter (without the signature) in bytes to recover the original
    signed message in the FinP2P node.
    - We need to convert the timestamp to seconds from epoch (easy) then to int64
-     big endian bytes (cumbersome but possible, need to encode by hand)
-   - encode public_key to bytes (easy, pack then trim prefix)
-   - convert the amount to hex string (must be done by hand) and encode this hex
-     string to utf8 bytes (cumbersome as well).
+     big endian bytes (cumbersome but possible, need to encode by hand, for each
+     uint8 byte)
+   - encode public_key to hexadecimal representation (pack, then trim prefix,
+     then convert bytes to hex one by one), then encode this string to utf8
+     (pack then trim, we're on the ascii subset)
+   - convert the amount to hex string (must be done by "hand", for each hex
+     digit) and encode this hex string to utf8 bytes (pack and trim, we're also
+     on the ascii subset).
 3. Hash the produced bytes (this is in fact the `hashGroup`) and ensure that it
    is not in our `live_operations` table.
 4. Register the hash -> timestamp in the `live_operations` table.
-   - **TODO**: Should we store the timestamp or the expiry date (depends on
-     guarantees we want in case of `operation_ttl` update) ?
+   - We store the timestamp rather than the expiry date so that in case the
+     `operation_ttl` is updated, the new ttl takes effect immediately (even for
+     existing operations).
 5. check that the encoded message was signed by the public key `src_account`
    [^Tezos requires the signature to be done on a `hashGroup` whose top hash is [BLAKE2b](https://en.wikipedia.org/wiki/BLAKE_(hash_function))]
 6. retrieve the FA2 and token id corresponding to `asset_id`
@@ -357,8 +368,8 @@ unchanged.
 
 ```ocaml
 type issue_asset_param = {
-  nonce : bytes; (* 24 bytes *)
-  nonce_timestamp : timestamp;
+  nonce : { nonce :bytes; (* 24 bytes *)
+            timestamp : timestamp };
   asset_id : bytes;
   dst_account : public_key;
   amount : nat;
@@ -422,8 +433,6 @@ The entry point to issue a new asset (`issue_asset`) does the following:
 1. Do the same steps 1-4 of [transfer asset](#verifying-asset-signatures)
 5. **If the signature is present**, check that the encoded message was signed by
    the public key `dst_account` (otherwise skip signature the check)
-   - **TODO**: Do we want a flag in the contract that says if the signature is
-     required?
 6. store the `asset_id` with `fa2_token` and check if does not already exist
 7. call the `mint` entry point of the FA2
    - **Question**: What token metadata? 
@@ -437,7 +446,8 @@ The entry point to issue a new asset (`issue_asset`) does the following:
 
 ```ocaml
 type redeem_asset_param = {
-  nonce : bytes; (* 24 bytes *)
+  nonce : { nonce :bytes; (* 24 bytes *)
+            timestamp : timestamp };
   nonce_timestamp : timestamp;
   asset_id : bytes;
   quantity : nat;
@@ -523,11 +533,7 @@ let update_administrators
 This is callable only by an administrator. We will use a configurable
 multi-signature scheme if desired for this.
 
-**TODO**: we can probably reuse the administrators field of the
-**Authorization** contract by adding an extra "authorization kind" `Admin`.
-This would prevent to have the same information/code in two places, but it might
-not be desirable to have this coupling.
-
+The administrator is the only one 
 
 ### Update `operation_ttl`
 
@@ -539,8 +545,6 @@ let update_operation_ttl
 
 This is callable only by an administrator. This does not need a multi-signature
 scheme at first glance.
-
-**TODO**: group other updatable configuration information for the Proxy here.
 
 ### Update FA2 token for an asset
 
@@ -572,9 +576,9 @@ FA2s](external-fa2s)).
 ## Authorization contract
 
 The authorization contract acts as an indirection point for the FA2 contracts to
-access the Proxy contract (the proxy can be replaced). It will receive
-authorization requests from the FA2 asset contracts (see [Authorization
-policy](#authorization-policy)).
+allow the Proxy contract(s) to perform actions (the proxy can be replaced, or
+more can be added). It receives authorization requests from the FA2 asset
+contracts (see [Authorization policy](#authorization-policy)).
 
 ### Stored information
 
@@ -586,7 +590,8 @@ However, for flexibility and future-proofing, the address of the Proxy contract
 can be updated and the authorization logic can be updated as well.
 
 In particular, we want
-- a set of administrators (addresses) for this contract
+- an administrator (address) for this contract, which also acts as an
+  administrator contract for the FA2
 - a table `accredited` (big map) of addresses to bytes (the associated bytes
   value will be empty at the beginning but can contain arbitrary encoded
   information in the long run); this table is initialized with the Proxy
@@ -597,6 +602,7 @@ In particular, we want
 ### Entry points
 
 - `authorize`
+- `add_accredited`
 - `update_accredited`
 - `update_authorization_logic`
 - `update_administrator`
@@ -604,21 +610,29 @@ In particular, we want
 ### `authorize`
 
 ```ocaml
-type authorize_fa2_param =
-| Transfer of fa2_transfer_param
-| Mint of fa2_transfer_mint
-| Burn of fa2_transfer_burn
-| ...
+type fa2 = 
+  | Transfer of fa2_transfer_param
+  | Balance_of of ...
+  | Update_operators of ...
 
-type authorize_param = {
+type manmger = 
+  | Mint of fa2_transfer_mint
+  | Burn of fa2_transfer_burn
+
+type authorizable_action =
+  | Assets_action of fa2
+  | Manage_action of manager
+  | Admin_action
+
+type auth_param = {
   sender : address;
-  sender_is_operator : bool;
+  sender_is_operator : bool list list;
   fa2_address : address;
-  parameters = authorize_fa2_param;
+  action : authorizable_action;
 }
 
 let authorize
-  (param * store : authorize_param * storage) :
+  (param * store : auth_param * storage) :
   (operation list * storage) = ...
 ```
 
@@ -627,16 +641,29 @@ the storage and apply it to its parameter. The initial authorization logic will
 contain a function which simply checks if the `sender` is in the table
 `accredited`.
 
-#### `update_accredited`
+#### `add_accredited`
 
 ```ocaml
-let update_accredited
-  (param * store : (address * bytes option) * storage) :
+let add_accredited
+  (param * store : (address * bytes) * storage) :
   (operation * storage) = ...
 ```
 
-This is callable only by an administrator. We will use a configurable
-multi-signature scheme if desired for this.
+Adds an accredited address with the `bytes` accreditation.
+
+This is callable only by an administrator
+
+#### `remove_accredited`
+
+```ocaml
+let remove_accredited
+  (param * store : address * storage) :
+  (operation * storage) = ...
+```
+
+Removes an accredited address.
+
+This is callable only by an administrator
 
 #### `update_authorization_logic`
 
@@ -647,8 +674,8 @@ let update_authorization_logic
   (operation list * storage) = ...
 ```
 
-This is callable only by an administrator. We will use a configurable
-multi-signature scheme if desired for this.
+This is callable only by an administrator. This entry point changes the code for
+the authorization logic of the contract.
 
 
 ## Scenarios
