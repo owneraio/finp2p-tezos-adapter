@@ -6,6 +6,8 @@ import { MichelsonV1Expression } from "@taquito/rpc";
 import { getPkhfromPk, encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
 import { ContractsLibrary } from '@taquito/contracts-library';
+import { HttpBackend } from '@taquito/http-utils';
+import { b58cdecode, prefix } from '@taquito/utils';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -26,6 +28,7 @@ export type timestamp = Date
 export type signature = string
 
 let utf8 = new TextEncoder()
+let utf8dec = new TextDecoder()
 
 function to_str(x : any) : string {
   if (typeof x === 'string') { return x }
@@ -115,6 +118,24 @@ export interface fa2_storage {
   total_supply : BigMapAbstraction,
   max_token_id : bigint,
   metadata: MichelsonMap<string, bytes>
+}
+
+type op_status =
+  'applied' | 'failed' | 'backtracked' | 'skipped'
+
+export interface op_receipt {
+  kind: string,
+  asset_id: string,
+  amount?: bigint;
+  src_account? : Buffer,
+  dst_account? : Buffer,
+  status?: op_status,
+  errors?: any,
+  block?: string,
+  level?: number,
+  confirmations?: number,
+  confirmed: boolean,
+  node_agree?: boolean,
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
@@ -276,6 +297,11 @@ export namespace Michelson {
 
 }
 
+export interface explorer_url {
+  kind : 'TzKT',
+  url : string,
+}
+
 export interface config {
   url : string,
   admin : address;
@@ -284,6 +310,7 @@ export interface config {
   finp2p_auth_address? : address;
   debug? : boolean;
   confirmations? : number;
+  explorer_url? : explorer_url;
 }
 
 export class FinP2PTezos {
@@ -661,6 +688,105 @@ export class FinP2PTezos {
         throw Error (matches[1])
       } else { throw e }
     }
+  }
+
+  async get_tzkt_receipt(op : OperationResult,
+                         explorer_url : { kind : 'TzKT', url : string }) :
+  Promise<op_receipt> {
+    const ops = await (new HttpBackend()).createRequest<any>(
+      {
+        url: explorer_url.url + '/v1/operations/' + op.hash,
+        method: 'GET'
+      }
+    )
+    const get_pk_bytes = (pk : any) => {
+      if (pk === undefined) { return undefined }
+      return Buffer.from(b58cdecode(pk, prefix['sppk']))
+    }
+    const op0 = ops[0]
+    const v = op0.parameter.value
+    return {
+      kind : ops[0].parameter.entrypoint as string,
+      asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+      amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+      src_account : get_pk_bytes(v.src_account),
+      dst_account : get_pk_bytes(v.dst_account),
+      status: op0.status ? op0.status as op_status : undefined,
+      block: op0.block ? op0.block as string : undefined,
+      level: op0.level ? op0.level as number : undefined,
+      errors: op0.errors ? op0.errors : undefined,
+      confirmed: false, // placeholder
+    }
+  }
+
+  async get_receipt(op : OperationResult,
+                    { throw_on_fail = true,
+                      throw_on_unconfirmed = false,
+                      check_with_node = true,
+                      throw_on_node_error = false } = {}) :
+  Promise<op_receipt> {
+    if (this.config.explorer_url === undefined) {
+      throw Error('Cannot get receipt, no explorer configured')
+    }
+    let head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
+    let receipt : op_receipt
+    switch (this.config.explorer_url.kind) {
+      case 'TzKT':
+        receipt = await this.get_tzkt_receipt(op, this.config.explorer_url)
+        break
+    }
+    if (receipt.level) {
+      let head = await head_p
+      receipt.confirmations = head.level - receipt.level
+      receipt.confirmed = (this.config.confirmations === undefined) ||
+        (receipt.confirmations >= this.config.confirmations)
+    }
+    if (check_with_node && receipt.block) {
+      try {
+        const block = await this.taquito.rpc.getBlock({ block: receipt.block })
+        const found =
+          block.operations.find((l) => {
+            return l.find((block_op) => {
+              return (block_op.hash === op.hash)
+            })
+          })
+        if (found) { receipt.node_agree = true }
+        else { receipt.node_agree = false }
+      } catch (e) {
+        if (throw_on_node_error) {
+          throw new InclusionError(op, receipt)
+        }
+      }
+      if (receipt.node_agree === false) {
+        throw new InclusionError(op, receipt)
+      }
+    }
+    if (throw_on_fail && receipt.status !== 'applied') {
+      throw new InclusionError(op, receipt)
+    }
+    if (throw_on_unconfirmed && !receipt.confirmed) {
+      throw new InclusionError(op, receipt)
+    }
+    return receipt
+  }
+
+}
+
+
+export class InclusionError extends Error {
+
+  op : OperationResult
+  receipt : op_receipt
+
+  constructor(op : OperationResult, receipt : op_receipt, ...params: any[]) {
+    super(...params)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, InclusionError)
+    }
+
+    this.name = 'InclusionError'
+    this.op = op
+    this.receipt = receipt
   }
 
 }

@@ -25,6 +25,7 @@ let account = {
 // Initialize FinP2P library
 let config: Finp2pProxy.config = {
   url : "https://rpc.hangzhounet.teztnets.xyz",
+  explorer_url : { kind : 'TzKT', url : 'https://api.hangzhou2net.tzkt.io' },
   admin : account.pkh,
   finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
   finp2p_fa2_address : 'KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk',
@@ -288,6 +289,7 @@ describe('FinP2P proxy contract',  () => {
         })
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+    console.log(await FinP2PTezos.get_receipt(op))
   })
 
   it('Balance of account[0] should be 0 in ' + asset_id1, async () => {
@@ -303,6 +305,7 @@ describe('FinP2P proxy contract',  () => {
         amount : 150})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+    console.log(await FinP2PTezos.get_receipt(op))
   })
 
   it('Balance of account[0] should be 150 in ' + asset_id1, async () => {
@@ -413,6 +416,7 @@ describe('FinP2P proxy contract',  () => {
         amount : 1})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
+    console.log(await FinP2PTezos.get_receipt(op))
   })
 
   it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
