@@ -1,4 +1,14 @@
 export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.hangzhounet.teztnets.xyz';
+export const explorers = [
+  {
+    kind : 'TzKT' as 'TzKT',
+    url : process.env.TZKT_ADDR || 'https://api.hangzhou2net.tzkt.io',
+  },
+  {
+    kind : 'tzstats' as 'tzstats',
+    url : process.env.TZSTATS_ADDR || 'https://api.hangzhou.tzstats.com',
+  },
+];
 
 //TODO: move this to configuration
 // This is the account that we will use to sign transactions on Tezos Note that

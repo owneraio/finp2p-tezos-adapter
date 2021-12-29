@@ -2,7 +2,7 @@ import { InMemorySigner } from '@taquito/signer';
 import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
 import { logger } from '../helpers/logger';
-import { account, contracts, nodeAddr } from '../helpers/config';
+import { account, contracts, nodeAddr, explorers } from '../helpers/config';
 
 let service:TokenService;
 let utf8 = new TextEncoder();
@@ -64,6 +64,7 @@ export class TokenService {
     // Initialize FinP2P library
     let config: FINP2PProxy.config = {
       url : nodeAddr,
+      explorers,
       admin : account.pkh,
       finp2p_auth_address : contracts.finp2p_auth_address,
       finp2p_fa2_address : contracts.finp2p_fa2_address,
@@ -149,9 +150,15 @@ export class TokenService {
   }
 
   public async getReceipt(id: string) : Promise<Receipt> {
-    //TODO: implement
+    const r = await this.tezosClient.get_receipt({ hash : id });
     return {
       transactionId: id,
+      assetId: r.asset_id,
+      sourcePublicKey:
+        (r.src_account === undefined) ? undefined : r.src_account.toString('hex'),
+      recipientPublicKey:
+        (r.dst_account === undefined) ? undefined : r.dst_account.toString('hex'),
+      quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
     } as Receipt;
   }
 
