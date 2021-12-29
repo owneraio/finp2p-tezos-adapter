@@ -5,6 +5,7 @@ import {
 import { MichelsonV1Expression } from "@taquito/rpc";
 import { getPkhfromPk, encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
+import { ContractsLibrary } from '@taquito/contracts-library';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -289,11 +290,14 @@ export class FinP2PTezos {
 
   taquito : TaquitoWrapper
   config : config
+  contracts : ContractsLibrary
 
   constructor(config : config) {
     this.taquito = new TaquitoWrapper(config.url, config.debug);
     this.check_config(config);
     this.config = config;
+    this.contracts = new ContractsLibrary();
+    this.taquito.addExtension(this.contracts);
   }
 
   check_config (c : config) {
@@ -344,6 +348,7 @@ export class FinP2PTezos {
       console.log('Proxy', op.contractAddress)
       accredit = true
     }
+    this.add_finp2p_contracts();
     if (accredit && typeof this.config.finp2p_proxy_address === 'string') {
       console.log('Adding Proxy to accredited contracts')
       let op = await this.add_accredited(this.config.finp2p_proxy_address,
@@ -408,6 +413,26 @@ export class FinP2PTezos {
       storage: initial_storage
     });
   }
+
+  async add_to_contracts(kt1 : address | undefined) {
+    if (kt1 !== undefined) {
+      const [script, entrypoints] = await Promise.all([
+        this.taquito.rpc.getNormalizedScript(kt1),
+        this.taquito.rpc.getEntrypoints(kt1)
+      ])
+      this.contracts.addContract({
+        kt1: { script, entrypoints }
+      })
+    }
+  }
+
+  add_finp2p_contracts () {
+    // Don't wait for promises to resolve
+    this.add_to_contracts(this.config.finp2p_auth_address)
+    this.add_to_contracts(this.config.finp2p_fa2_address)
+    this.add_to_contracts(this.config.finp2p_proxy_address)
+  }
+
 
   get_contract_address(kind : 'Proxy' | 'FA2' |'Auth',
                        addr : address | undefined,
