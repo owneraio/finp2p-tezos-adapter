@@ -618,24 +618,24 @@ export class FinP2PTezos {
     public_key : key,
     asset_id : asset_id,
     kt1?: address) : Promise<BigInt> {
-    let [proxy_storage, fa2_storage] =
-      await Promise.all([this.get_proxy_storage(kt1),
-                         this.get_fa2_storage()])
-    let fa2_token = await proxy_storage.finp2p_assets.get<fa2_token>(Michelson.bytes_to_hex(asset_id))
-    if (fa2_token === undefined) {
-      throw (new Error("FINP2P_UNKNOWN_ASSET_ID"))
-    }
-    if (fa2_token.address !== this.get_fa2_address()) {
-      throw (new Error('Retrieving balance of other fa2 asset not implemented'))
-      // TODO implement simulated call to `balance_of` in FA2
-    }
+    let addr = this.get_proxy_address(kt1)
+    const contract = await this.taquito.contract.at(addr)
     let pk = public_key
     if (public_key.substring(0,2) == '0x') {
       pk = encodeKey(public_key.substring(2))
     }
-    let owner = getPkhfromPk(pk)
-    let balance = await fa2_storage.ledger.get<nat>([owner, fa2_token.id])
-    return (balance || BigInt(0))
+    try {
+      let balance =
+        await contract.contractViews.get_asset_balance(
+          [pk, asset_id]
+        ).executeView({ viewCaller : addr }) as bigint | undefined
+      return (balance || BigInt(0))
+    } catch (e : any) {
+      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
+      if (matches) {
+        throw Error (matches[1])
+      } else { throw e }
+    }
   }
 
 }
