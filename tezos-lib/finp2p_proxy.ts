@@ -82,9 +82,11 @@ export interface redeem_tokens_param {
   signature: signature;
 }
 
+type cleanup_param = string[] | undefined
+
 export interface BatchParam {
-  kind: 'transfer_tokens' | 'create_asset' | 'issue_tokens' | 'redeem_tokens';
-  param: transfer_tokens_param | create_asset_param | issue_tokens_param | redeem_tokens_param;
+  kind: 'transfer_tokens' | 'create_asset' | 'issue_tokens' | 'redeem_tokens' | 'cleanup';
+  param: transfer_tokens_param | create_asset_param | issue_tokens_param | redeem_tokens_param | cleanup_param;
   kt1? : address;
 }
 
@@ -295,6 +297,11 @@ export namespace Michelson {
     }
   }
 
+  export function cleanup_param(ophs : string[]) : MichelsonV1Expression {
+    return ophs.map(bytes => {
+      return { bytes }
+    })
+  }
 }
 
 export interface explorer_url {
@@ -600,6 +607,50 @@ export class FinP2PTezos {
                                                     accreditatiaon))
   }
 
+  async get_ops_to_cleanup(kt1?: address) : Promise<string[]>{
+    let proxy_storage = await this.get_proxy_storage(kt1)
+    let ttl = Number(proxy_storage.operation_ttl.ttl)
+    let live_ops_big_map_id = parseInt(proxy_storage.live_operations.toString())
+    let explorer = this.config.explorers?.find(e => {
+      return (e.kind === 'TzKT')
+    })
+    if(!explorer) {
+      throw "No TzKT explorer set, cannot get live operations for cleanup"
+    }
+    let now_s = Math.floor((new Date()).getTime() / 1000)
+    // Only get expired operations
+    let max_date = new Date((now_s - ttl) * 1000)
+    let keys = await (new HttpBackend()).createRequest<any>(
+      {
+        url: `${explorer.url}/v1/bigmaps/${live_ops_big_map_id}/keys`,
+        method: 'GET',
+        query: {
+          active : true,
+          limit : 200,
+          'value.lt' : max_date.toISOString()
+        }
+      }
+    )
+    return keys.map((k : any) => { return k.key }) as string[]
+  }
+
+  /**
+   * @description Call the entry-point `cleanup` of the FinP2P proxy
+   * @param kt1 : optional address of the contract
+   * @param ophs: the live operations hashes to cleanup. If this argument
+   * is not provided, the 200 first live operations are retrieved from a
+   * block explorer.
+   * @returns operation injection result
+   */
+  async cleanup(kt1?:address, ophs? : string[]) : Promise<OperationResult> {
+    let keys = ophs
+    if (keys === undefined) {
+      keys = await this.get_ops_to_cleanup(kt1)
+    }
+    let addr = this.get_proxy_address(kt1)
+    return this.taquito.send(addr, 'cleanup', Michelson.cleanup_param(keys))
+  }
+
   /**
    * @description Make a batch call to the FinP2P proxy
    * @param p: the list of entry-points and parameters (anm optionally contract
@@ -610,7 +661,7 @@ export class FinP2PTezos {
     p: BatchParam[])
   : Promise<OperationResult> {
     let _this = this
-    const params = p.map(function (bp) {
+    const params = await Promise.all(p.map(async function (bp) {
       switch (bp.kind) {
         case 'transfer_tokens':
           let v_tt = <transfer_tokens_param>bp.param
@@ -648,10 +699,22 @@ export class FinP2PTezos {
             parameter : { entrypoint: bp.kind,
                           value: Michelson.redeem_tokens_param(v_rt) }
           }
+        case 'cleanup':
+          let v_cl = <cleanup_param>bp.param
+          let kt1_cl = _this.get_proxy_address(bp.kt1)
+          if (v_cl === undefined) {
+            v_cl = await _this.get_ops_to_cleanup()
+          }
+          return {
+            amount : 0,
+            to : kt1_cl,
+            parameter : { entrypoint: bp.kind,
+                          value: Michelson.cleanup_param(v_cl) }
+          }
         default:
           throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
       }
-    })
+    }))
     return await this.taquito.batch_transactions(params);
   }
 
@@ -895,6 +958,7 @@ export class FinP2PTezos {
     }
     return receipt
   }
+
 
 }
 
