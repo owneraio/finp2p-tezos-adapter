@@ -1017,7 +1017,6 @@ export class FinP2PTezos {
     return receipt
   }
 
-
 }
 
 

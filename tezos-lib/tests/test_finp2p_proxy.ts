@@ -182,10 +182,12 @@ async function create_asset (i : {
 }
 
 async function mk_transfer_tokens(i : {
-  src : finp2p_account;
-  dest : Buffer;
+  src : finp2p_account,
+  dest : Buffer,
   asset_id : string,
-  amount : number}) {
+  amount : number,
+  signer? : finp2p_account
+}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
   let assetGroup = [
@@ -204,7 +206,8 @@ async function mk_transfer_tokens(i : {
   log('AHG:', assetHashGroup.toString('hex'))
   let digest = await hashValues([assetHashGroup, shg])
   log('digest:', digest.toString('hex'))
-  let signature = secp256k1.ecdsaSign(digest, i.src.privKey).signature;
+  let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
+  let signature = secp256k1.ecdsaSign(digest, privKey).signature;
 
   let param: Finp2pProxy.transfer_tokens_param = {
     nonce,
@@ -220,17 +223,59 @@ async function mk_transfer_tokens(i : {
 }
 
 async function transfer_tokens(i : {
-  src : finp2p_account;
-  dest : Buffer;
+  src : finp2p_account,
+  dest : Buffer,
   asset_id : string,
-  amount : number}) {
+  amount : number,
+  signer? : finp2p_account
+}) {
   let param = await mk_transfer_tokens(i)
   log("Transfer parameters:", param)
   return await FinP2PTezos.transfer_tokens(param)
 }
 
+async function mk_redeem_tokens(i : {
+  src : finp2p_account,
+  asset_id : string,
+  amount : number,
+  signer? : finp2p_account}) {
+  let nonce = generateNonce()
+  let nonce_bytes = nonce_to_bytes(nonce)
+  let assetGroup = [
+    nonce_bytes,
+    'redeem',
+    i.asset_id,
+    '0x' + i.amount.toString(16)
+  ]
+  log_hashgroup(assetGroup)
+  let assetHashGroup = await hashValues(assetGroup);
+  log('AHG:', assetHashGroup.toString('hex'))
+  let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
+  let signature = secp256k1.ecdsaSign(assetHashGroup, privKey).signature;
+
+  let param: Finp2pProxy.redeem_tokens_param = {
+    nonce,
+    asset_id : utf8.encode(i.asset_id),
+    src_account : '0x01' /* secp256k1 */ + i.src.pubKey.toString('hex'),
+    amount: BigInt(i.amount),
+    signature: '0x' + (Buffer.from(signature)).toString('hex'),
+  }
+
+  return param
+}
+
+async function redeem_tokens(i : {
+  src : finp2p_account,
+  asset_id : string,
+  amount : number,
+  signer? : finp2p_account}) {
+  let param = await mk_redeem_tokens(i)
+  log("Redeem parameters:", param)
+  return await FinP2PTezos.redeem_tokens(param)
+}
+
 async function get_balance(i : {
-  owner : Buffer;
+  owner : Buffer,
   asset_id : string}) {
   let balance = await FinP2PTezos.get_asset_balance(
     '0x01' /* secp256k1 */ + i.owner.toString('hex'),
@@ -457,6 +502,59 @@ describe('FinP2P proxy contract',  () => {
     let b = await get_balance({ owner : accounts[0].pubKey,
                                 asset_id : asset_id1 })
     assert.equal(b, 149)
+  })
+
+  it('Redeem 49 tokens for account[0] in ' + asset_id1, async () => {
+    let op = await redeem_tokens(
+      { src : accounts[0],
+        asset_id : asset_id1,
+        amount : 49})
+    log("waiting inclusion")
+    await FinP2PTezos.wait_inclusion(op)
+  })
+
+  it('Balance of account[0] should be 100 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 100)
+  })
+
+  it('Try to redeem more than balance ' + asset_id1, async () => {
+    await assert.rejects(
+      async () => {
+    await redeem_tokens(
+      { src : accounts[0],
+        asset_id : asset_id1,
+        amount : 101})
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Try to transfer with wrong signature', async () => {
+    await assert.rejects(
+      async () => {
+    await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[3].pubKey,
+        asset_id : asset_id1,
+        amount : 1,
+        signer : accounts[3] // should have been accounts[0]
+      })
+      },
+      { message : "FINP2P_INVALID_SIGNATURE"})
+  })
+
+  it('Try to redeem with wrong signature', async () => {
+    await assert.rejects(
+      async () => {
+    await redeem_tokens(
+      { src : accounts[0],
+        asset_id : asset_id1,
+        amount : 1,
+        signer : accounts[1] // should have been accounts[0]
+      })
+      },
+      { message : "FINP2P_INVALID_SIGNATURE"})
   })
 
 })
