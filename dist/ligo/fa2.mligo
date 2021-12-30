@@ -58,4 +58,9 @@ let get_balance (((owner, token_id) : (address * nat)), (s : storage)) : nat =
      | None -> 0n
      | Some b -> b)
 
+
+[@view]
+let get_max_token_id ((), (s : storage)) : nat =
+  s.max_token_id
+
 #endif

@@ -49,7 +49,21 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation * sto
   (relay_op, s)
 
 let create_asset (p : create_asset_param) (s : storage) : (operation * storage) =
-  let (fa2_token, token_info) = p.new_token_info in
+  let ({ address = ca_address; id = ca_id }, token_info) = p.new_token_info in
+  let next_token_id = Big_map.find_opt ca_address s.next_token_ids in
+  let token_id =
+    match ca_id with
+    | Some id -> id
+    | None ->
+      (match next_token_id with
+       | Some id -> id
+       | None ->
+         (match (Tezos.call_view "get_max_token_id" () ca_address : 
+                   nat option)
+          with
+          | None -> (failwith "CANNOT_COMPUTE_NEXT_TOKEN_ID" : nat)
+          | Some id -> id + 1n)) in
+  let fa2_token = { address = ca_address; id = token_id } in
   let (old_asset, finp2p_assets) =
     Big_map.get_and_update p.asset_id (Some fa2_token) s.finp2p_assets in
   let () =
@@ -64,7 +78,14 @@ let create_asset (p : create_asset_param) (s : storage) : (operation * storage) 
     } in
   let mint_ep = get_mint_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction fa2_mint 0tez mint_ep in
-  let s = { s with finp2p_assets = finp2p_assets  } in (relay_op, s)
+  let next_token_id =
+    match next_token_id with
+    | None -> token_id + 1n
+    | Some id -> if token_id >= id then token_id + 1n else id in
+  let next_token_ids = Big_map.add ca_address next_token_id s.next_token_ids in
+  let s =
+    { s with finp2p_assets = finp2p_assets ; next_token_ids = next_token_ids  } in
+  (relay_op, s)
 
 let issue_tokens (p : issue_tokens_param) (s : storage) : (operation * storage) =
   let () =
@@ -118,7 +139,17 @@ let update_admin (admin : address) (s : storage) =
 
 let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
   let () = check_fa2_contract fa2.address in
-  { s with finp2p_assets = (Big_map.add asset_id fa2 s.finp2p_assets) }
+  let (old_next_token_id, next_token_ids) =
+    Big_map.get_and_update fa2.address (Some (fa2.id + 1n)) s.next_token_ids in
+  let next_token_ids =
+    match old_next_token_id with
+    | None -> next_token_ids
+    | Some id -> if id > fa2.id then s.next_token_ids else next_token_ids in
+  {
+    s with
+    finp2p_assets = (Big_map.add asset_id fa2 s.finp2p_assets);
+    next_token_ids = next_token_ids 
+  }
 
 let cleanup (ops : operation_hash list) (s : storage) : storage =
   let live_operations =

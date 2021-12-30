@@ -57,8 +57,6 @@ export interface Receipt {
   //TODO: add transactionDetails
 }
 
-let tokenId =  Math.floor((new Date()).getTime() / 1000);
-
 export class TokenService {
   tezosClient: FINP2PProxy.FinP2PTezos;
 
@@ -86,7 +84,7 @@ export class TokenService {
   public async onCreateAsset(assetId: string) {
     logger.info('creating asset', { assetId });
     // @ts-ignore
-    let newTokenParams = this.tezosClient.gen_new_token(assetId, assetId, ++tokenId);
+    let newTokenParams = this.tezosClient.gen_new_token(assetId, assetId);
     const op = await this.tezosClient.create_asset({
       asset_id: utf8.encode(assetId),
       new_token_info: newTokenParams,

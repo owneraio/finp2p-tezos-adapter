@@ -18,6 +18,8 @@ type finp2p_nonce = [@layout:comb]  {
 type token_amount =
   | Amount of nat 
 
+type token_metadata = (string, bytes) map
+
 type transfer_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
     asset_id: asset_id ;
@@ -27,9 +29,13 @@ type transfer_tokens_param = [@layout:comb]  {
     shg: bytes ;
     signature: signature }
 
+type create_fa2_token = [@layout:comb]  {
+  address: address ;
+  id: nat option }
+
 type create_asset_param = [@layout:comb]  {
     asset_id: asset_id ;
-    new_token_info: (fa2_token * (string, bytes) map) }
+    new_token_info: (create_fa2_token * token_metadata) }
 
 type issue_tokens_param = [@layout:comb]  {
     nonce: finp2p_nonce ;
@@ -73,7 +79,8 @@ type storage = [@layout:comb]  {
     operation_ttl: operation_ttl ;
     live_operations: (operation_hash, timestamp) big_map ;
     finp2p_assets: (asset_id, fa2_token) big_map ;
-    admin: address }
+    admin: address ;
+    next_token_ids: (address, nat) big_map }
 
 
 
