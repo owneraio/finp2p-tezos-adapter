@@ -1,17 +1,10 @@
 import {
-  TezosToolkit,
   BigMapAbstraction,
   MichelsonMap,
-  OpKind,
-  createTransferOperation,
-  TransferParams,
-  RPCOperation,
-  OriginationOperation,
-  createRevealOperation
-} from "@taquito/taquito"
+  OriginationOperation} from "@taquito/taquito"
 import { MichelsonV1Expression } from "@taquito/rpc";
-import { localForger, LocalForger } from '@taquito/local-forging';
-import { getPkhfromPk, encodeKey, encodeOpHash, validateContractAddress } from '@taquito/utils';
+import { getPkhfromPk, encodeKey, validateContractAddress } from '@taquito/utils';
+import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -262,51 +255,6 @@ export namespace Michelson {
 
 }
 
-
-/** Some wrapper functions on top of Taquito to make calls, transfer xtz and reveal public keys.
- * With these functions, we have a better control on the operations hashs being injected.
-*/
-
-export interface operation_result {
-  hash: string;
-}
-
-class InjectionError extends Error {
-
-  op : operation_result
-  error : any
-
-  constructor(op : operation_result, error : any, ...params: any[]) {
-    // Pass remaining arguments (including vendor specific ones) to parent constructor
-    super(...params)
-
-    // Maintains proper stack trace for where our error was thrown (only available on V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, InjectionError)
-    }
-
-    this.name = 'InjectionError'
-    // Failed operation
-    this.op = op
-    this.error = error
-  }
-
-}
-
-function toStrRec(input : any) {
-  Object.keys(input).forEach(k => {
-    let elt = input[k]
-    if (elt === undefined || elt === null) {
-      input[k] = undefined
-    } else if (typeof elt === 'object') {
-      input[k] = toStrRec(elt);
-    } else {
-      input[k] = elt.toString();
-    }
-  });
-  return input;
-}
-
 export interface config {
   url : string,
   admin : address;
@@ -314,22 +262,18 @@ export interface config {
   finp2p_fa2_address? : address;
   finp2p_auth_address? : address;
   debug? : boolean;
+  confirmations? : number;
 }
 
 export class FinP2PTezos {
 
-  tezosToolkit : TezosToolkit
+  taquito : TaquitoWrapper
   config : config
-  forger : LocalForger
 
   constructor(config : config) {
-    this.tezosToolkit = new TezosToolkit(config.url);
-    // Forge operations locally (instead of using RPCs to the node)
-    this.tezosToolkit.setForgerProvider(localForger);
+    this.taquito = new TaquitoWrapper(config.url, config.debug);
     this.check_config(config);
     this.config = config;
-    if (this.config.debug === undefined) { this.config.debug = false };
-    this.forger = new LocalForger();
   }
 
   check_config (c : config) {
@@ -345,6 +289,15 @@ export class FinP2PTezos {
         validateContractAddress(c.finp2p_proxy_address) !== 3) {
         throw new Error("Invalid Proxy contract address")
     }
+  }
+
+  /**
+   * @description Re-export `wait_inclusion` for ease of use.
+   * By default, waits for the number of confirmations in the `config`.
+   * @see TaquitoWrapper.wait_inclusion for details
+  */
+  async wait_inclusion(op : OperationResult, confirmations = this.config.confirmations) {
+    return await this.taquito.wait_inclusion(op, confirmations)
   }
 
   async init (p : { operation_ttl : operation_ttl,
@@ -375,12 +328,8 @@ export class FinP2PTezos {
       console.log('Adding Proxy to accredited contracts')
       let op = await this.add_accredited(this.config.finp2p_proxy_address,
                                          this.proxy_accreditation)
-      await this.wait_inclusion(op)
+      await this.taquito.wait_inclusion(op)
     }
-  }
-
-  private debug (message?: any, ...optionalParams: any[]) {
-    if (this.config.debug) { console.log(message, ...optionalParams) }
   }
 
   async deployFinp2pProxy(
@@ -392,8 +341,8 @@ export class FinP2PTezos {
       finp2p_assets: new MichelsonMap(),
       admin
     }
-    this.debug("Deploying new FinP2P Proxy smart contract")
-    return this.tezosToolkit.contract.originate({
+    this.taquito.debug("Deploying new FinP2P Proxy smart contract")
+    return this.taquito.contract.originate({
       code: finp2p_proxy_code,
       storage: initial_storage
     });
@@ -407,8 +356,8 @@ export class FinP2PTezos {
       },
       authorize : auth_init[2].args[0] // code
     }
-    this.debug("Deploying new FinP2P Authorization smart contract")
-    return this.tezosToolkit.contract.originate({
+    this.taquito.debug("Deploying new FinP2P Authorization smart contract")
+    return this.taquito.contract.originate({
       code: authorization_code,
       storage: initial_storage
     });
@@ -432,131 +381,12 @@ export class FinP2PTezos {
       max_token_id : BigInt(0),
       metadata: mich_metadata
     }
-    this.debug("Deploying new FinP2P FA2 asset smart contract")
-    return this.tezosToolkit.contract.originate({
+    this.taquito.debug("Deploying new FinP2P FA2 asset smart contract")
+    return this.taquito.contract.originate({
       code: fa2_code,
       storage: initial_storage
     });
   }
-
-  private async sign_and_inject (
-    kind : 'transaction' | 'origination' | 'revelation',
-    contents: Array<RPCOperation>) {
-    let tk = this.tezosToolkit
-    let branch = await tk.rpc.getBlockHash({ block: 'head~2' });
-    let strop = toStrRec({ branch, contents })
-    let forgedOp = await this.forger.forge(strop)
-    let signOp = await tk.signer.sign(forgedOp, new Uint8Array([3]));
-    let hash = encodeOpHash(signOp.sbytes);
-    try {
-      let injectedOpHash = await tk.rpc.injectOperation(signOp.sbytes)
-      return { hash }
-    } catch (error) {
-      throw new InjectionError({ hash }, error, `Error while injecting ${kind}`)
-    }
-  }
-
-  async wait_inclusion({ hash } : operation_result) {
-    let op = await this.tezosToolkit.operation.createOperation(hash);
-    return await op.confirmation()
-  }
-
-  /**
-   * @description This function allows to reveal an address's public key on the blockchain.
-   * The address is supposed to have some XTZ on it for the revelation to work.
-   * The functions throws "WalletAlreadyRevealed" if the public key is already
-   * revealed.
-   * @returns injection result
-   */
-  async revealWallet(): Promise<operation_result> {
-    let tk = this.tezosToolkit
-    let estimate = await tk.estimate.reveal();
-    if (estimate == undefined) {
-      throw "WalletAlreadyRevealed";
-    }
-    let publicKey = await tk.signer.publicKey();
-    let source = await tk.signer.publicKeyHash();
-    let revealParams = {
-      fee: estimate.suggestedFeeMutez,
-      gasLimit: estimate.gasLimit,
-      storageLimit: estimate.storageLimit
-    };
-    let rpcRevealOperation = await createRevealOperation(revealParams, source, publicKey);
-    let contract = await tk.rpc.getContract(source);
-    let counter = parseInt(contract.counter || '0', 10)
-    let contents = [{
-      ...rpcRevealOperation,
-      source,
-      counter: counter + 1
-    }]
-    return this.sign_and_inject('revelation', contents)
-  }
-
-
-  /**
-   * @description Generic auxiliary function for transfers and contracts calls
-   * @param transferParams : the transaction's parameters
-   * @returns injection result
-   */
-  async make_transactions(transfersParams: Array<TransferParams>): Promise<operation_result> {
-    let tk = this.tezosToolkit
-    let estimates = await tk.estimate.batch(
-      transfersParams.map((transferParams) => {
-        return { ...transferParams,
-                 kind : OpKind.TRANSACTION
-               }
-      }))
-    let source = await tk.signer.publicKeyHash();
-    let contract = await tk.rpc.getContract(source);
-    let counter = parseInt(contract.counter || '0', 10)
-    let contents =
-      await Promise.all(
-        transfersParams.map(async (transferParams, i) => {
-          let estimate = estimates[i]
-          let rpcTransferOperation = await createTransferOperation({
-            ...transferParams,
-            fee: estimate.suggestedFeeMutez,
-            gasLimit: estimate.gasLimit,
-            storageLimit: estimate.storageLimit
-          });
-          return {
-            ...rpcTransferOperation,
-            source,
-            counter: counter + 1 + i,
-          };
-        })
-      )
-    return this.sign_and_inject('transaction', contents)
-  }
-
-  /**
-   * @description Instantiation of function `make_call` to transfer the given amount of
-   * xtz from an account to the others.
-   * @param destinations : the transfers' destinations
-   * @param amount: the amount to transfer in Tez (will be converted internally to muTez)
-   * @returns operation injection result
-   */
-  async transfer_xtz(destinations: string[], amount: number): Promise<operation_result> {
-    var dests: TransferParams[] = [];
-    destinations.forEach(function (dest) {
-      let e = { amount: amount, to: dest };
-      dests.push(e)
-    });
-    return await this.make_transactions(dests);
-  }
-
-  async send(
-    kt1: string,
-    entrypoint: string,
-    value: MichelsonV1Expression): Promise<operation_result> {
-    this.debug("Calling", entrypoint, "with", value)
-    return await this.make_transactions([{
-      amount: 0,
-      to: kt1,
-      parameter: { entrypoint, value }
-    }]);
-  }
-  // await op.confirmation(confirmations);
 
   get_contract_address(kind : 'Proxy' | 'FA2' |'Auth',
                        addr : address | undefined,
@@ -607,10 +437,10 @@ export class FinP2PTezos {
   async transfer_tokens(
     tt : transfer_tokens_param,
     kt1? : address)
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let addr = this.get_proxy_address(kt1)
-    // let contract = await this.tezosToolkit.contract.at(kt1)
-    return this.send(addr, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+    // let contract = await this.taquito.contract.at(kt1)
+    return this.taquito.send(addr, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
   }
 
   /**
@@ -622,9 +452,9 @@ export class FinP2PTezos {
   async create_asset(
     ca: create_asset_param,
     kt1? : address)
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let addr = this.get_proxy_address(kt1)
-    return this.send(addr, 'create_asset', Michelson.create_asset_param(ca))
+    return this.taquito.send(addr, 'create_asset', Michelson.create_asset_param(ca))
   }
 
   /**
@@ -636,9 +466,9 @@ export class FinP2PTezos {
   async issue_tokens(
     it: issue_tokens_param,
     kt1? : address)
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let addr = this.get_proxy_address(kt1)
-    return this.send(addr, 'issue_tokens', Michelson.issue_tokens_param(it))
+    return this.taquito.send(addr, 'issue_tokens', Michelson.issue_tokens_param(it))
   }
 
   /**
@@ -650,9 +480,9 @@ export class FinP2PTezos {
   async redeem_tokens(
     rt: redeem_tokens_param,
     kt1? : address)
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let addr = this.get_proxy_address(kt1)
-    return this.send(addr, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
+    return this.taquito.send(addr, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
   }
 
   /**
@@ -664,7 +494,7 @@ export class FinP2PTezos {
     kt1?: address)
   : Promise<proxy_storage> {
     let addr = this.get_proxy_address(kt1)
-    const contract = await this.tezosToolkit.contract.at(addr)
+    const contract = await this.taquito.contract.at(addr)
     let storage = await contract.storage() as proxy_storage
     return storage
   }
@@ -678,7 +508,7 @@ export class FinP2PTezos {
     kt1?: address)
   : Promise<fa2_storage> {
     let addr = this.get_fa2_address(kt1)
-    const contract = await this.tezosToolkit.contract.at(addr)
+    const contract = await this.taquito.contract.at(addr)
     let storage = await contract.storage() as fa2_storage
     return storage
   }
@@ -690,9 +520,9 @@ export class FinP2PTezos {
   async add_accredited(new_accredited : address,
                        accreditatiaon : Uint8Array,
                        kt1?:address)
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let addr = this.get_auth_address(kt1)
-    return this.send(addr, 'add_accredited',
+    return this.taquito.send(addr, 'add_accredited',
                      Michelson.add_accredited_param(new_accredited,
                                                     accreditatiaon))
   }
@@ -705,7 +535,7 @@ export class FinP2PTezos {
    */
   async batch(
     p: BatchParam[])
-  : Promise<operation_result> {
+  : Promise<OperationResult> {
     let _this = this
     const params = p.map(function (bp) {
       switch (bp.kind) {
@@ -749,7 +579,7 @@ export class FinP2PTezos {
           throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
       }
     })
-    return await this.make_transactions(params);
+    return await this.taquito.batch_transactions(params);
   }
 
 
