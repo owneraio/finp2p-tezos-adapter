@@ -84,9 +84,23 @@ export interface redeem_tokens_param {
 
 type cleanup_param = string[] | undefined
 
+type batch_ep =
+  | 'transfer_tokens'
+  | 'create_asset'
+  | 'issue_tokens'
+  | 'redeem_tokens'
+  | 'cleanup'
+
+type batch_param =
+  | transfer_tokens_param
+  | create_asset_param
+  | issue_tokens_param
+  | redeem_tokens_param
+  | cleanup_param
+
 export interface BatchParam {
-  kind: 'transfer_tokens' | 'create_asset' | 'issue_tokens' | 'redeem_tokens' | 'cleanup';
-  param: transfer_tokens_param | create_asset_param | issue_tokens_param | redeem_tokens_param | cleanup_param;
+  kind: batch_ep;
+  param: batch_param;
   kt1? : address;
 }
 
@@ -304,6 +318,12 @@ export namespace Michelson {
   }
 }
 
+export interface call_options {
+  kt1? : address,
+  cleanup : boolean,
+  min_cleanup : number,
+}
+
 export interface explorer_url {
   kind : 'TzKT' | 'tzstats' ,
   url : string,
@@ -318,6 +338,8 @@ export interface config {
   debug? : boolean;
   confirmations? : number;
   explorers? : explorer_url[];
+  auto_cleanup? : boolean;
+  min_cleanup? : number;
 }
 
 export class FinP2PTezos {
@@ -325,6 +347,10 @@ export class FinP2PTezos {
   taquito : TaquitoWrapper
   config : config
   contracts : ContractsLibrary
+  default_call_options : call_options = {
+    cleanup : true,
+    min_cleanup : 8
+  }
 
   constructor(config : config) {
     this.taquito = new TaquitoWrapper(config.url, config.debug);
@@ -332,6 +358,12 @@ export class FinP2PTezos {
     this.config = config;
     this.contracts = new ContractsLibrary();
     this.taquito.addExtension(this.contracts);
+    if (this.config.min_cleanup !== undefined) {
+      this.default_call_options.min_cleanup = this.config.min_cleanup
+    }
+    if (this.config.auto_cleanup !== undefined) {
+      this.default_call_options.cleanup = this.config.auto_cleanup
+    }
   }
 
   check_config (c : config) {
@@ -507,62 +539,88 @@ export class FinP2PTezos {
     return [fa2_token, metadata]
   }
 
-
+  // Call the proxy with the given entry-point / parameter, and insert a cleanup
+  // operation before if there are expired operations to cleanup
+  async cleanup_and_call_proxy(
+    entrypoint : batch_ep,
+    param : batch_param,
+    { kt1, cleanup, min_cleanup } : call_options ) : Promise<OperationResult> {
+    let addr = this.get_proxy_address(kt1)
+    const call_param : BatchParam = {
+      kind: entrypoint,
+      param,
+      kt1: addr,
+    }
+    let batch_params = [call_param]
+    if (cleanup) {
+      let expired_ops : string[] = []
+      try {
+        expired_ops = await this.get_ops_to_cleanup(addr)
+      } catch (e) {
+        this.taquito.debug("Cannot retrieve expired ops, no cleanup")
+      }
+      if (expired_ops.length >= min_cleanup) {
+        const cleanup_param : BatchParam = {
+          kind: 'cleanup',
+          param : expired_ops,
+          kt1: addr,
+        }
+        batch_params = [cleanup_param, call_param]
+      }
+    }
+    return await this.batch(batch_params)
+  }
+  
   /**
    * @description Call the entry-point `transfer_tokens` of the FinP2P proxy
    * @param tt: the parameters of the transfer
-   * @param kt1 : optional address of the contract
+   * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
   async transfer_tokens(
     tt : transfer_tokens_param,
-    kt1? : address)
+    options : call_options = this.default_call_options)
   : Promise<OperationResult> {
-    let addr = this.get_proxy_address(kt1)
-    // let contract = await this.taquito.contract.at(kt1)
-    return this.taquito.send(addr, 'transfer_tokens', Michelson.transfer_tokens_param(tt))
+    return this.cleanup_and_call_proxy('transfer_tokens', tt, options)
   }
 
   /**
    * @description Call the entry-point `create_asset` of the FinP2P proxy
    * @param ca: the parameters of the new asset
-   * @param kt1 : optional address of the contract
+   * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
   async create_asset(
     ca: create_asset_param,
-    kt1? : address)
+    options : call_options = this.default_call_options)
   : Promise<OperationResult> {
-    let addr = this.get_proxy_address(kt1)
-    return this.taquito.send(addr, 'create_asset', Michelson.create_asset_param(ca))
+    return this.cleanup_and_call_proxy('create_asset', ca, options)
   }
 
   /**
    * @description Call the entry-point `issue_tokens` of the FinP2P proxy
    * @param it: the parameters of the issuance
-   * @param kt1 : optional address of the contract
+   * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
   async issue_tokens(
     it: issue_tokens_param,
-    kt1? : address)
+    options : call_options = this.default_call_options)
   : Promise<OperationResult> {
-    let addr = this.get_proxy_address(kt1)
-    return this.taquito.send(addr, 'issue_tokens', Michelson.issue_tokens_param(it))
+    return this.cleanup_and_call_proxy('issue_tokens', it, options)
   }
 
   /**
    * @description Call the entry-point `redeem_tokens` of the FinP2P proxy
    * @param rt: the parameters of the redeem
-   * @param kt1 : optional address of the contract
+   * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
   async redeem_tokens(
     rt: redeem_tokens_param,
-    kt1? : address)
+    options : call_options = this.default_call_options)
   : Promise<OperationResult> {
-    let addr = this.get_proxy_address(kt1)
-    return this.taquito.send(addr, 'redeem_tokens', Michelson.redeem_tokens_param(rt))
+    return this.cleanup_and_call_proxy('redeem_tokens', rt, options)
   }
 
   /**
