@@ -53,9 +53,14 @@ type manager =
   | Mint of mint_param 
   | Burn of burn_param 
 
+type update_token_metadata_param = [@layout:comb]  {
+    token_id: nat ;
+    metadata: (string, bytes) map }
+
 type admin =
   | Update_auth_contract of address 
   | Pause of bool 
+  | Update_token_metadata of update_token_metadata_param 
 
 type param =
   | Assets of fa2 

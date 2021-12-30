@@ -23,6 +23,6 @@ export let account = {
 //TODO: move this to configuration
 export const contracts = {
   finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
-  finp2p_fa2_address : 'KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk',
+  finp2p_fa2_address : 'KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL',
   finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
 };
