@@ -7,6 +7,7 @@ import * as crypto from 'crypto';
 import { createBLAKE2b } from 'hash-wasm';
 import { strict as assert } from 'assert';
 
+import '../taquito_wrapper'
 import * as Finp2pProxy from '../finp2p_proxy'
 
 let utf8 = new TextEncoder()
@@ -25,16 +26,16 @@ let account = {
 let config: Finp2pProxy.config = {
   url : "https://rpc.hangzhounet.teztnets.xyz",
   admin : account.pkh,
-  finp2p_auth_address : 'KT1BPV7P3d48mTPGriEuaSihPswA23wugPw8',
-  finp2p_fa2_address : 'KT1F3NY97BUfAJ7CWFsVUB4LMXfg5Cjcuh4f',
-  finp2p_proxy_address : 'KT1WD9tFgM6LzQqPXvhpVEuuU65amMTiNbyv',
+  finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
+  finp2p_fa2_address : 'KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk',
+  finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
   // debug : true
 }
 
 let FinP2PTezos = new Finp2pProxy.FinP2PTezos(config)
 
 // Tell Taquito to use our private key for signing transactions
-FinP2PTezos.tezosToolkit.setSignerProvider(new InMemorySigner(account.sk))
+FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(account.sk))
 
 
 function log (message?: any, ...optionalParams: any[]) {
@@ -147,20 +148,18 @@ async function issue_tokens (i : {
 
 function mk_create_asset (i : {
   asset_id : string,
-  new_token : {
-    token_id : number,
-    metadata: any
-  }
+  metadata: any,
+  token_id?: number,
 }): Finp2pProxy.create_asset_param {
   let fa2_token  = {
     address : FinP2PTezos.get_fa2_address(),
-    id : BigInt(i.new_token.token_id)
+    id : (i.token_id === undefined) ? undefined : BigInt(i.token_id)
   }
   let metadata = new MichelsonMap<string, Uint8Array>()
-  Object.entries(i.new_token.metadata).forEach(
+  Object.entries(i.metadata).forEach(
     ([k, v]) => metadata.set (k, utf8.encode(to_str(v)))
   )
-  let new_token_info : [Finp2pProxy.fa2_token, MichelsonMap<string, Uint8Array>] =
+  let new_token_info : [Finp2pProxy.create_fa2_token, MichelsonMap<string, Uint8Array>] =
     [fa2_token, metadata]
   return {
     asset_id : utf8.encode(i.asset_id),
@@ -170,9 +169,9 @@ function mk_create_asset (i : {
 
 async function create_asset (i : {
   asset_id : string,
-  new_token : {
-    token_id : number,
-    metadata: any}}) {
+  metadata: any,
+  token_id? : number,
+}) {
   let param = mk_create_asset(i)
   log("Create parameters:", param)
   return await FinP2PTezos.create_asset(param)
@@ -330,10 +329,8 @@ describe('FinP2P proxy contract',  () => {
   it('Create new asset ' + asset_id1, async () => {
     let op = await create_asset(
       { asset_id : asset_id1,
-        new_token : {
-          token_id : token_id1,
-          metadata : { symbol : "FP2P1", name : asset_id1, decimals : '0' }
-        }})
+        metadata : { symbol : "FP2P1", name : asset_id1, decimals : '0' }
+        })
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
   })
@@ -364,25 +361,10 @@ describe('FinP2P proxy contract',  () => {
       async () => {
         await create_asset(
           { asset_id : asset_id1,
-            new_token : {
-              token_id : token_id1,
-              metadata : { symbol : "FP2P1", name : asset_id1, decimals : '0' }
-            }})
+            metadata : { symbol : "FP2P1", name : asset_id1, decimals : '0' }
+          })
       },
       { message : "FINP2P_ASSET_ALREADY_EXISTS"})
-  })
-
-  it('Try to create asset with already taken token_id', async () => {
-    await assert.rejects(
-      async () => {
-        await create_asset(
-          { asset_id : asset_id2,
-            new_token : {
-              token_id : token_id1,
-              metadata : { symbol : "FP2P2", name : asset_id2, decimals : '0' }
-            }})
-      },
-      { message : "FA2_TOKEN_ALREADY_EXISTS"})
   })
 
   it('Issue 220 more of same token ', async () => {
@@ -403,10 +385,9 @@ describe('FinP2P proxy contract',  () => {
   it('Batch create asset and issue tokens of ' + asset_id2, async () => {
     let op1 =  mk_create_asset ({
       asset_id : asset_id2,
-      new_token : {
-        token_id : token_id1 + 1,
-        metadata : { symbol : "FP2P2", name : asset_id2, decimals : '0' }
-      }})
+      token_id : token_id1,
+      metadata : { symbol : "FP2P2", name : asset_id2, decimals : '0' }
+      })
     let op2 = await mk_issue_tokens(
       { dest : accounts[2],
         asset_id : asset_id2,
@@ -429,14 +410,24 @@ describe('FinP2P proxy contract',  () => {
     assert.equal(b, 99999)
   })
 
+  it('Try to create asset with already taken token_id', async () => {
+    await assert.rejects(
+      async () => {
+        await create_asset(
+          { asset_id : asset_id3_utf8,
+            token_id : token_id1,
+            metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
+          })
+      },
+      { message : "FA2_TOKEN_ALREADY_EXISTS"})
+  })
+
   it('Create new asset with UTF8 asset_id ' + asset_id3_utf8, async () => {
     try {
     let op = await create_asset(
       { asset_id : asset_id3_utf8,
-        new_token : {
-          token_id : token_id1 + 2,
-          metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
-        }})
+        metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
+        })
     log("waiting inclusion")
       await FinP2PTezos.wait_inclusion(op)
     } catch (e) {

@@ -1554,5 +1554,10 @@
                     "args":
                       [ [ { "prim": "PUSH",
                             "args": [ { "prim": "nat" }, { "int": "0" } ] } ],
-                        [] ] } ] ] } ] ] } ]
+                        [] ] } ] ] } ] ] },
+  { "prim": "view",
+    "args":
+      [ { "string": "get_max_token_id" }, { "prim": "unit" },
+        { "prim": "nat" },
+        [ { "prim": "CDR" }, { "prim": "GET", "args": [ { "int": "13" } ] } ] ] } ]
 
