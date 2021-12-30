@@ -321,6 +321,12 @@ describe('FinP2P proxy contract',  () => {
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
 
+  // it('Cleanup the expired operations', async () => {
+  //   let op = await FinP2PTezos.cleanup()
+  //   log("waiting inclusion")
+  //   await FinP2PTezos.wait_inclusion(op)
+  // })
+
   it('Retrieve balance of non-existing asset ' + asset_id1, async () => {
     await assert.rejects(
       async () => {
@@ -399,6 +405,8 @@ describe('FinP2P proxy contract',  () => {
         amount : 99999
       })
     let ops : Finp2pProxy.BatchParam[] = [
+      { kind : 'cleanup',
+        param : undefined },
       { kind : 'create_asset',
         param : op1 },
       { kind : 'issue_tokens',
