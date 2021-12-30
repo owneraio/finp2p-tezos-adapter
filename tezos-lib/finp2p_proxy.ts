@@ -2,9 +2,12 @@ import {
   BigMapAbstraction,
   MichelsonMap,
   OriginationOperation} from "@taquito/taquito"
-import { MichelsonV1Expression } from "@taquito/rpc";
-import { getPkhfromPk, encodeKey, validateContractAddress } from '@taquito/utils';
+import { BlockHeaderResponse, MichelsonV1Expression } from "@taquito/rpc";
+import { encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
+import { ContractsLibrary } from '@taquito/contracts-library';
+import { HttpBackend } from '@taquito/http-utils';
+import { b58cdecode, prefix } from '@taquito/utils';
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -25,6 +28,7 @@ export type timestamp = Date
 export type signature = string
 
 let utf8 = new TextEncoder()
+let utf8dec = new TextDecoder()
 
 function to_str(x : any) : string {
   if (typeof x === 'string') { return x }
@@ -114,6 +118,24 @@ export interface fa2_storage {
   total_supply : BigMapAbstraction,
   max_token_id : bigint,
   metadata: MichelsonMap<string, bytes>
+}
+
+type op_status =
+  'applied' | 'failed' | 'backtracked' | 'skipped'
+
+export interface op_receipt {
+  kind: string,
+  asset_id: string,
+  amount?: bigint;
+  src_account? : Buffer,
+  dst_account? : Buffer,
+  status?: op_status,
+  errors?: any,
+  block?: string,
+  level?: number,
+  confirmations?: number,
+  confirmed: boolean,
+  node_agree?: boolean,
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
@@ -275,6 +297,11 @@ export namespace Michelson {
 
 }
 
+export interface explorer_url {
+  kind : 'TzKT' | 'tzstats' ,
+  url : string,
+}
+
 export interface config {
   url : string,
   admin : address;
@@ -283,17 +310,21 @@ export interface config {
   finp2p_auth_address? : address;
   debug? : boolean;
   confirmations? : number;
+  explorers? : explorer_url[];
 }
 
 export class FinP2PTezos {
 
   taquito : TaquitoWrapper
   config : config
+  contracts : ContractsLibrary
 
   constructor(config : config) {
     this.taquito = new TaquitoWrapper(config.url, config.debug);
     this.check_config(config);
     this.config = config;
+    this.contracts = new ContractsLibrary();
+    this.taquito.addExtension(this.contracts);
   }
 
   check_config (c : config) {
@@ -344,6 +375,7 @@ export class FinP2PTezos {
       console.log('Proxy', op.contractAddress)
       accredit = true
     }
+    this.add_finp2p_contracts();
     if (accredit && typeof this.config.finp2p_proxy_address === 'string') {
       console.log('Adding Proxy to accredited contracts')
       let op = await this.add_accredited(this.config.finp2p_proxy_address,
@@ -408,6 +440,26 @@ export class FinP2PTezos {
       storage: initial_storage
     });
   }
+
+  async add_to_contracts(kt1 : address | undefined) {
+    if (kt1 !== undefined) {
+      const [script, entrypoints] = await Promise.all([
+        this.taquito.rpc.getNormalizedScript(kt1),
+        this.taquito.rpc.getEntrypoints(kt1)
+      ])
+      this.contracts.addContract({
+        kt1: { script, entrypoints }
+      })
+    }
+  }
+
+  add_finp2p_contracts () {
+    // Don't wait for promises to resolve
+    this.add_to_contracts(this.config.finp2p_auth_address)
+    this.add_to_contracts(this.config.finp2p_fa2_address)
+    this.add_to_contracts(this.config.finp2p_proxy_address)
+  }
+
 
   get_contract_address(kind : 'Proxy' | 'FA2' |'Auth',
                        addr : address | undefined,
@@ -618,24 +670,249 @@ export class FinP2PTezos {
     public_key : key,
     asset_id : asset_id,
     kt1?: address) : Promise<BigInt> {
-    let [proxy_storage, fa2_storage] =
-      await Promise.all([this.get_proxy_storage(kt1),
-                         this.get_fa2_storage()])
-    let fa2_token = await proxy_storage.finp2p_assets.get<fa2_token>(Michelson.bytes_to_hex(asset_id))
-    if (fa2_token === undefined) {
-      throw (new Error("FINP2P_UNKNOWN_ASSET_ID"))
-    }
-    if (fa2_token.address !== this.get_fa2_address()) {
-      throw (new Error('Retrieving balance of other fa2 asset not implemented'))
-      // TODO implement simulated call to `balance_of` in FA2
-    }
+    let addr = this.get_proxy_address(kt1)
+    const contract = await this.taquito.contract.at(addr)
     let pk = public_key
     if (public_key.substring(0,2) == '0x') {
       pk = encodeKey(public_key.substring(2))
     }
-    let owner = getPkhfromPk(pk)
-    let balance = await fa2_storage.ledger.get<nat>([owner, fa2_token.id])
-    return (balance || BigInt(0))
+    try {
+      let balance =
+        await contract.contractViews.get_asset_balance(
+          [pk, asset_id]
+        ).executeView({ viewCaller : addr }) as bigint | undefined
+      return (balance || BigInt(0))
+    } catch (e : any) {
+      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
+      if (matches) {
+        throw Error (matches[1])
+      } else { throw e }
+    }
+  }
+
+  async get_tzkt_receipt(op : OperationResult,
+                         explorer_url : { kind : 'TzKT', url : string }) :
+  Promise<op_receipt> {
+    const ops = await (new HttpBackend()).createRequest<any>(
+      {
+        url: explorer_url.url + '/v1/operations/' + op.hash,
+        method: 'GET'
+      }
+    )
+    const get_pk_bytes = (pk : any) => {
+      if (pk === undefined) { return undefined }
+      return Buffer.from(b58cdecode(pk, prefix['sppk']))
+    }
+    const op0 = ops[0]
+    try {
+      const v = op0.parameter.value
+      return {
+        kind : ops[0].parameter.entrypoint as string,
+        asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+        src_account : get_pk_bytes(v.src_account),
+        dst_account : get_pk_bytes(v.dst_account),
+        status: op0.status ? op0.status as op_status : undefined,
+        block: op0.block ? op0.block as string : undefined,
+        level: op0.level ? op0.level as number : undefined,
+        errors: op0.errors ? op0.errors : undefined,
+        confirmed: false, // placeholder
+      }
+    } catch(e) {
+      throw new ReceiptError(op, [], `Cannot parse TzKT receipt (${e}): ${op0}`)
+    }
+  }
+
+  async get_tzstats_receipt(op : OperationResult,
+                         explorer_url : { kind : 'tzstats', url : string }) :
+  Promise<op_receipt> {
+    const ops = await (new HttpBackend()).createRequest<any>(
+      {
+        url: explorer_url.url + '/explorer/op/' + op.hash,
+        method: 'GET'
+      }
+    )
+    const get_pk_bytes = (pk : any) => {
+      if (pk === undefined) { return undefined }
+      return Buffer.from(b58cdecode(pk, prefix['sppk']))
+    }
+    const op0 = ops[0]
+    try {
+      const kind = op0.parameters.entrypoint as string
+      const v = op0.parameters.value[kind]
+      return {
+        kind,
+        asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+        src_account : get_pk_bytes(v.src_account),
+        dst_account : get_pk_bytes(v.dst_account),
+        status: op0.status ? op0.status as op_status : undefined,
+        block: op0.block ? op0.block as string : undefined,
+        level: op0.height ? op0.height as number : undefined,
+        errors: op0.errors ? op0.errors : undefined,
+        // confirmations: op0.confirmations ? op0.confirmations : undefined,
+        confirmed: false, // placeholder
+      }
+    } catch(e) {
+      throw new ReceiptError(op, [], `Cannot parse tzstats receipt (${e}): ${op0}`)
+    }
+  }
+
+  async get_explorer_receipt(op : OperationResult, explorer : explorer_url, head_p : Promise<BlockHeaderResponse>) :
+  Promise<op_receipt> {
+    let receipt: op_receipt
+    switch (explorer.kind) {
+      case 'TzKT':
+        receipt = await this.get_tzkt_receipt(
+          op, explorer as { kind : 'TzKT', url : string }
+        )
+        break
+      case 'tzstats':
+        receipt = await this.get_tzstats_receipt(
+          op, explorer as { kind : 'tzstats', url : string }
+        )
+        break
+    }
+    if (receipt.level && receipt.confirmations === undefined) {
+      let head = await head_p
+      receipt.confirmations = head.level - receipt.level
+    }
+    if (receipt.confirmations !== undefined) {
+      receipt.confirmed = (this.config.confirmations === undefined) ||
+        (receipt.confirmations >= this.config.confirmations)
+    }
+    return receipt
+  }
+
+
+  receipt_proj_eq<T>(name : string,
+                     proj : ((_ :op_receipt) => T),
+                     eq : ((p1 : T, p2 : T) => boolean),
+                     r0 : op_receipt,
+                     r2 : op_receipt,
+                     r2_index : number,
+                     op : OperationResult) {
+    if (!eq(proj(r0), proj(r2))) {
+      throw new ReceiptError(op, [r0, r2],
+                             `receipts 0 and ${r2_index} disagree on ${name}`)
+    }
+  }
+
+  merge_receipts(receipts : op_receipt[], op : OperationResult, { throw_on_diff = true } = {} )
+  : op_receipt {
+    let receipt = receipts[0]
+    let others = receipts.slice(1)
+    let receiptj = receipt as any
+    let poly_eq = (x : any, y : any) => { return (x == y) }
+    let buf_eq = (x? : Buffer, y? : Buffer) => {
+      return ((x === undefined && y === undefined) ||
+        (x !== undefined && y !== undefined && x.equals(y)))
+    }
+    others.forEach((r, i) => {
+      if (throw_on_diff) {
+        this.receipt_proj_eq('kind', ((r : op_receipt) => r.kind), poly_eq,
+                             receipt, r, i+1, op)
+        this.receipt_proj_eq('assetId', ((r : op_receipt) => r.asset_id),
+                             poly_eq, receipt, r, i+1, op)
+        this.receipt_proj_eq('amount', ((r : op_receipt) => r.amount),
+                             poly_eq, receipt, r, i+1, op)
+        this.receipt_proj_eq('src_account', ((r : op_receipt) => r.src_account),
+                             buf_eq, receipt, r, i+1, op)
+        this.receipt_proj_eq('dst_account', ((r : op_receipt) => r.dst_account),
+                             buf_eq, receipt, r, i+1, op)
+        this.receipt_proj_eq('status', ((r : op_receipt) => r.status),
+                             poly_eq, receipt, r, i+1, op)
+      }
+      let rj = r as any
+      Object.keys(r).forEach(k => {
+        if (rj[k] != undefined && receiptj[k] == undefined) {
+          receiptj[k] = rj[k]
+        }
+      })
+    })
+    return receipt
+  }
+
+
+  /**
+   * @description Get a receipt from a transaction hash (with block explorers)
+   * and confirm with node
+   * @param op: the operation hash
+   * @param throw_on_fail: throws an exception if the operation is not included
+   * as "applied" (true by default)
+   * @param throw_on_unconfirmed: throws an exception if the operation is not
+   * does not have enough confirmations w.r.t the `config` (false by default)
+   * @param throw_on_node_error: throws an exception if the node does not have
+   * the block in its storage (can happen if the block is too old and the node
+   * is not in archive mode) or can't be reached (false by default)
+   * @param throw_on_diff: throws an exception if block explorers disagree on
+   * the value of the receipt (true by default)
+   * @returns a receipt
+   * @throws `ReceiptError`
+   */
+  async get_receipt(op : OperationResult,
+                    { throw_on_fail = true,
+                      throw_on_unconfirmed = false,
+                      check_with_node = true,
+                      throw_on_node_error = false,
+                      throw_on_diff = true } = {}) :
+  Promise<op_receipt> {
+    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
+      throw Error('Cannot get receipt, no explorers configured')
+    }
+    let head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
+    let receipts = await Promise.all(this.config.explorers.map((explorer) => {
+      return this.get_explorer_receipt(op, explorer, head_p)
+    }))
+    let receipt = this.merge_receipts(receipts, op, {throw_on_diff})
+    if (check_with_node && receipt.block) {
+      try {
+        const block = await this.taquito.rpc.getBlock({ block: receipt.block })
+        const found =
+          block.operations.find((l) => {
+            return l.find((block_op) => {
+              return (block_op.hash === op.hash)
+            })
+          })
+        if (found) { receipt.node_agree = true }
+        else { receipt.node_agree = false }
+      } catch (e) {
+        if (throw_on_node_error) {
+          throw new ReceiptError(op, receipts, "Node could not find block")
+        }
+      }
+      if (receipt.node_agree === false) {
+        throw new ReceiptError(op, receipts, "Node says operation is not in block")
+      }
+    }
+    if (throw_on_fail && receipt.status !== 'applied') {
+      throw new ReceiptError(op, receipts,
+                             `Operation is included with status ${receipt.status}`)
+    }
+    if (throw_on_unconfirmed && !receipt.confirmed) {
+      throw new ReceiptError(op, receipts,
+                             `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`)
+    }
+    return receipt
+  }
+
+}
+
+
+export class ReceiptError extends Error {
+
+  op : OperationResult
+  receipts : op_receipt[]
+
+  constructor(op : OperationResult, receipts : op_receipt[], ...params: any[]) {
+    super(...params)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ReceiptError)
+    }
+
+    this.name = 'ReceiptError'
+    this.op = op
+    this.receipts = receipts
   }
 
 }

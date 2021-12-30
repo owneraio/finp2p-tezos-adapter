@@ -64,6 +64,7 @@ export class TaquitoWrapper extends TezosToolkit {
     // Forge operations locally (instead of using RPCs to the node)
     this.setForgerProvider(localForger)
     this.forger = new LocalForger()
+    this.setProvider({config : {streamerPollingIntervalMilliseconds : 3000}})
     this.activated_debug = debug
   }
 
@@ -144,7 +145,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns injection result
    */
   async batch_transactions(transfersParams: Array<TransferParams>): Promise<OperationResult> {
-    let estimates = await this.estimate.batch(
+    let estimates = this.estimate.batch(
       transfersParams.map((transferParams) => {
         return { ...transferParams,
                  kind : OpKind.TRANSACTION
@@ -156,7 +157,7 @@ export class TaquitoWrapper extends TezosToolkit {
     let contents =
       await Promise.all(
         transfersParams.map(async (transferParams, i) => {
-          let estimate = estimates[i]
+          let estimate = (await estimates)[i]
           let rpcTransferOperation = await createTransferOperation({
             ...transferParams,
             fee: estimate.suggestedFeeMutez,
