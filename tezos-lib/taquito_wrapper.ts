@@ -6,9 +6,10 @@ import {
   RPCOperation,
   createRevealOperation
 } from "@taquito/taquito"
-import { MichelsonV1Expression, RpcClientInterface } from "@taquito/rpc";
+import { BlockResponse, MichelsonV1Expression, RpcClientInterface } from "@taquito/rpc";
 import { localForger, LocalForger } from '@taquito/local-forging';
 import { encodeOpHash } from '@taquito/utils';
+import { XMLHttpRequest } from 'xhr2-cookies'
 
 /** Some wrapper functions on top of Taquito to make calls, transfer xtz and reveal public keys.
  * With these functions, we have a better control on the operations hashs being injected.
@@ -88,8 +89,101 @@ export class TaquitoWrapper extends TezosToolkit {
     }
   }
 
-  // TODO implement better with monitor blocks
+
+  stream_head_hashes<T>(callback : ((_ : string, xhr : XMLHttpRequest) => T)) : Promise<void>{
+    const path = `${this.rpc.getRpcUrl()}/monitor/heads/main`
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.onprogress = () => {
+        // XXX: Cannot use responseText, because it's always empty for
+        // some reason
+        let parts : Buffer[]= (xhr as any)._responseParts
+        let last_part = parts[parts.length - 1]
+        let hash = last_part.slice(9,60).toString()
+        callback(hash, xhr);
+      };
+      xhr.onload = () => { reject(new Error("Stream terminated " + path)) };
+      xhr.onabort = () => { resolve() };
+      xhr.onerror = () => { reject(new Error("Unreachable stream " + path)) };
+      xhr.open("GET", path);
+      xhr.send();
+    })
+  }
+
+  private in_block(block : BlockResponse, op : OperationResult) : boolean {
+    const r = block.operations.find((l) => {
+      return l.find((block_op) => {
+        return (block_op.hash === op.hash)
+      })
+    })
+    return (r !== undefined)
+  }
+
+  private async in_prev_block(op : OperationResult, head? : string, nb = 5) : Promise<BlockResponse | undefined> {
+    if (nb == 0) { return undefined }
+    const block = await this.rpc.getBlock({ block: (head || 'head')})
+    if (this.in_block(block, op)) {
+      return(block)
+    }
+    return await this.in_prev_block(op, block.header.predecessor, nb - 1)
+  }
+
   /**
+   * @description Wait for an operation to be included with the specified
+   * number of confirmations, i.e. included in a block with `confirmations`
+   * block on top.
+   * @param hash : the hash op the operation to wait for
+   * @param confirmations : the number of confirmations to wait for before
+   * returning (by default 0, i.e. returns as soon as the operation is
+   * included in a block)
+   * @param max : the maximum number of blocks to wait before bailing (default 10)
+   * @returns information about inclusion, such as the inclusion block, the
+   * number of confirmations, etc.
+   */
+  wait_inclusion(op : OperationResult, confirmations? : number, max = 10) : Promise<[BlockResponse, number]> {
+    var found_level : number
+    const _this = this
+    var count = 0
+    return new Promise(function(resolve, reject) {
+      // start looking in the previous blocks
+      _this.in_prev_block(op).then(block => {
+        if (block !== undefined) {
+          found_level = block.header.level;
+        }
+      })
+      // in parallel, wait for new heads
+      _this.stream_head_hashes(
+        async (hash, xhr) => {
+          count++
+          // console.log(hash, count, found_level)
+          if (count > max) {
+            xhr.abort();
+            return reject(new Error(`Did not see operation for ${max} blocks`))
+          }
+          const block = await _this.rpc.getBlock({ block: hash })
+          if (found_level === undefined) {
+            if (_this.in_block(block, op)) {
+              found_level = block.header.level;
+              if (confirmations === undefined || confirmations === 0) {
+                xhr.abort()
+                return resolve([block, 0])
+              }
+            }
+          } else {
+            // already found
+            let obtained_confirmations = block.header.level - found_level
+            if (confirmations === undefined
+              || confirmations <= obtained_confirmations) {
+              xhr.abort()
+              return resolve([block, obtained_confirmations])
+            }
+          }
+        })
+    })
+  }
+
+  /**
+   * @deprecated
    * @description Wait for an operation to be included with the specified
    * number of confirmations, i.e. included in a block with `confirmations`
    * block on top.
@@ -100,12 +194,11 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion, such as the inclusion block, the
    * number of confirmations, etc.
    */
-  async wait_inclusion({ hash } : OperationResult, confirmations? : number) {
+  async taquito_wait_inclusion({ hash } : OperationResult, confirmations? : number) {
     let op = await this.operation.createOperation(hash);
     if (confirmations === 0) { confirmations = undefined }
     return await op.confirmation(confirmations)
   }
-
 
   /**
    * @description This function allows to reveal an address's public key on the blockchain.

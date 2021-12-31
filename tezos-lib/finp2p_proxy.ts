@@ -386,8 +386,8 @@ export class FinP2PTezos {
    * By default, waits for the number of confirmations in the `config`.
    * @see TaquitoWrapper.wait_inclusion for details
   */
-  async wait_inclusion(op : OperationResult, confirmations = this.config.confirmations) {
-    return await this.taquito.wait_inclusion(op, confirmations)
+  wait_inclusion(op : OperationResult, confirmations = this.config.confirmations) {
+    return this.taquito.wait_inclusion(op, confirmations)
   }
 
   async init (p : { operation_ttl : operation_ttl,
