@@ -1096,6 +1096,13 @@ export class FinP2PTezos {
     const block_p = this.taquito.rpc.getBlock({ block: block_hash })
     const head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
     const [block, head] = await Promise.all([block_p, head_p])
+    let confirmations = head.level - block.header.level
+    // check if the inclusion block is reachable back from head
+    const block_hash_at_incl_level =
+      await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}`})
+    if (block_hash_at_incl_level != block_hash) {
+      throw new ReceiptError(op, [], 'Operation is not included in the main chain')
+    }
     const op_content =
       // manager operations in [3]
       block.operations[3].find(block_op => {
@@ -1126,7 +1133,6 @@ export class FinP2PTezos {
       return Buffer.from(b58cdecode(pk, prefix['sppk']))
     }
     const kind = op0.parameters.entrypoint as string
-    let confirmations = head.level - block.header.level
     let receipt = {
       kind,
       asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
