@@ -1,5 +1,7 @@
 { parameter
-    (or (or (or %admin (bool %pause) (address %update_auth_contract))
+    (or (or (or %admin
+               (or (bool %pause) (address %update_auth_contract))
+               (pair %update_token_metadata (nat %token_id) (map %metadata string bytes)))
             (or %assets
                (or (pair %balance_of
                       (list %requests (pair (address %owner) (nat %token_id)))
@@ -32,11 +34,22 @@
          IF_LEFT
            { IF_LEFT
                { DIG 3 ;
-                 DIG 4 ;
-                 DROP 2 ;
+                 DROP ;
                  DIG 2 ;
                  SWAP ;
-                 IF_LEFT { UPDATE 3 } { UPDATE 1 } ;
+                 IF_LEFT
+                   { DIG 3 ; DROP ; IF_LEFT { UPDATE 3 } { UPDATE 1 } }
+                   { UNPAIR ;
+                     DUP 3 ;
+                     GET 9 ;
+                     DUG 2 ;
+                     DUP ;
+                     DUG 3 ;
+                     PAIR ;
+                     SOME ;
+                     DIG 2 ;
+                     GET_AND_UPDATE ;
+                     IF_NONE { DROP 2 ; SWAP ; FAILWITH } { DIG 4 ; DROP 2 ; UPDATE 9 } } ;
                  NIL operation ;
                  PAIR }
                { DUP 3 ;

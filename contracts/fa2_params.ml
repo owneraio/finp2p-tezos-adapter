@@ -63,7 +63,17 @@ type manager = Mint of mint_param | Burn of burn_param [@@entry Tokens]
 
 (* Admin *)
 
-type admin = Update_auth_contract of address | Pause of bool [@@entry Admin]
+type update_token_metadata_param = {
+  utm_token_id : nat;
+  utm_metadata : (string, bytes) map;
+}
+[@@comb] [@@param Update_token_metadata]
+
+type admin =
+  | Update_auth_contract of address
+  | Pause of bool
+  | Update_token_metadata of update_token_metadata_param
+[@@entry Admin]
 
 (* Main *)
 
