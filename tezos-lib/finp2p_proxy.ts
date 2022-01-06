@@ -1,4 +1,5 @@
 import {
+  OpKind,
   BigMapAbstraction,
   MichelsonMap,
   OriginationOperation} from "@taquito/taquito"
@@ -8,6 +9,8 @@ import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix } from '@taquito/utils';
+import { ParameterSchema } from "@taquito/michelson-encoder";
+const PromiseAny = require('promise-any');
 
 import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
 import * as fa2_code from '../dist/michelson/fa2.json';
@@ -34,6 +37,11 @@ function to_str(x : any) : string {
   if (typeof x === 'string') { return x }
   return JSON.stringify(x)
 }
+
+function hasOwnProperty<X extends {}, Y extends PropertyKey>
+  (obj: X, prop: Y): obj is X & Record<Y, unknown> {
+    return obj.hasOwnProperty(prop)
+  }
 
 export interface fa2_token {
   address: address;
@@ -971,7 +979,7 @@ export class FinP2PTezos {
    * @returns a receipt
    * @throws `ReceiptError`
    */
-  async get_receipt(op : OperationResult,
+  async get_receipt_explorers(op : OperationResult,
                     { throw_on_fail = true,
                       throw_on_unconfirmed = false,
                       check_with_node = true,
@@ -1015,6 +1023,140 @@ export class FinP2PTezos {
                              `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`)
     }
     return receipt
+  }
+
+  async get_tzkt_inclusion_block(op : OperationResult,
+                         explorer_url : { kind : 'TzKT', url : string }) :
+  Promise<string> {
+    const ops = await (new HttpBackend()).createRequest<any>(
+      {
+        url: explorer_url.url + '/v1/operations/' + op.hash,
+        method: 'GET'
+      }
+    )
+    if (ops[0].block === undefined) {
+      throw new ReceiptError(op, [], `Operation is not known by TzKT`)
+    }
+    return ops[0].block
+  }
+
+  async get_tzstats_inclusion_block(op : OperationResult,
+                         explorer_url : { kind : 'tzstats', url : string }) :
+  Promise<string> {
+    const ops = await (new HttpBackend()).createRequest<any>(
+      {
+        url: explorer_url.url + '/explorer/op/' + op.hash,
+        method: 'GET'
+      }
+    )
+    if (ops[0].block === undefined) {
+      throw new ReceiptError(op, [], `Operation is not known by tzstats`)
+    }
+    return ops[0].block
+  }
+
+  async get_explorer_inclusion_block(op : OperationResult, explorer : explorer_url) :
+  Promise<string> {
+    switch (explorer.kind) {
+      case 'TzKT':
+        return await this.get_tzkt_inclusion_block(
+          op, explorer as { kind : 'TzKT', url : string }
+        )
+      case 'tzstats':
+        return await this.get_tzstats_inclusion_block(
+          op, explorer as { kind : 'tzstats', url : string }
+        )
+    }
+  }
+
+  /**
+   * @description Get a receipt from a transaction hash and confirm with node.
+   * Same as `get_receipt_explorers` but only use the explorer to find out the
+   * inclusion block. The receipt is extracted from the node, with confidence.
+   * Note that you need a Tezos node in mode **archive** to retrieve old
+   * receipts.
+   * @param op: the operation hash
+   * @param throw_on_fail: throws an exception if the operation is not included
+   * as "applied" (true by default)
+   * @param throw_on_unconfirmed: throws an exception if the operation is not
+   * does not have enough confirmations w.r.t the `config` (false by default)
+   * @returns a receipt
+   * @throws `ReceiptError`
+   */
+  async get_receipt(op : OperationResult,
+                    { throw_on_fail = true,
+                      throw_on_unconfirmed = false } = {}) :
+  Promise<op_receipt> {
+    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
+      throw Error('Cannot get receipt, no explorers configured')
+    }
+    let block_hash = await PromiseAny(this.config.explorers.map((explorer) => {
+      return this.get_explorer_inclusion_block(op, explorer)
+    }))
+    const block_p = this.taquito.rpc.getBlock({ block: block_hash })
+    const head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
+    const [block, head] = await Promise.all([block_p, head_p])
+    let confirmations = head.level - block.header.level
+    // check if the inclusion block is reachable back from head
+    const block_hash_at_incl_level =
+      await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}`})
+    if (block_hash_at_incl_level != block_hash) {
+      throw new ReceiptError(op, [], 'Operation is not included in the main chain')
+    }
+    const op_content =
+      // manager operations in [3]
+      block.operations[3].find(block_op => {
+        return (block_op.hash === op.hash)
+      })
+    if (op_content === undefined) {
+      throw new ReceiptError(op, [], "Node could not find operation")
+    }
+    let op0 = op_content.contents[0]
+    if (op0.kind !== OpKind.TRANSACTION) {
+      throw "Operation is not a transaction"
+    }
+    if(!hasOwnProperty(op0, 'metadata')) {
+      throw new ReceiptError(op, [], "Metadata not known for operation")
+    }
+    if (throw_on_fail && op0.metadata.operation_result.status !== 'applied') {
+      throw new
+      ReceiptError(op, [],
+                   `Operation is included with status ${op0.metadata.operation_result.status}`)
+    }
+    const contract = await this.taquito.contract.at(op0.destination)
+    // if ( op0 === undefined ) { throw new ReceiptError(op, [],"No operation") }
+    if ( op0.parameters === undefined ) { throw new ReceiptError(op, [],"No parameters in operation") }
+    let schema = new ParameterSchema(contract.entrypoints.entrypoints[op0.parameters.entrypoint]);
+    let v = schema.Execute(op0.parameters.value)
+    const get_pk_bytes = (pk : any) => {
+      if (pk === undefined) { return undefined }
+      return Buffer.from(b58cdecode(pk, prefix['sppk']))
+    }
+    const kind = op0.parameters.entrypoint as string
+    let receipt = {
+      kind,
+      asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+      amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+      src_account : get_pk_bytes(v.src_account),
+      dst_account : get_pk_bytes(v.dst_account),
+      status: op0.metadata.operation_result.status,
+      block: block.hash,
+      level: block.header.level,
+      errors: op0.metadata.operation_result.errors,
+      confirmations,
+      confirmed: (this.config.confirmations === undefined) ||
+        (confirmations >= this.config.confirmations)
+    }
+    if (throw_on_fail && receipt.status !== 'applied') {
+      throw new ReceiptError(op, [receipt],
+                             `Operation is included with status ${receipt.status}`)
+    }
+    if (throw_on_unconfirmed && !receipt.confirmed) {
+      throw new ReceiptError(op, [receipt],
+                             `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`)
+    }
+    return receipt
+
   }
 
 }
