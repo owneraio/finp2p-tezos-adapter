@@ -1,3 +1,5 @@
+![](https://github.com/owneraio/finp2p-tezos-adapter/actions/workflows/test-ts-lib.yml/badge.svg)
+
 # Tezos FinP2P adapter
 
 ## Typescript Tezos Library
