@@ -77,11 +77,27 @@ module Flextesa {
   let flextesa_image = 'oxheadalpha/flextesa:20211221'
   let flexteas_script = 'hangzbox'
 
-  let sleep = promisify(setTimeout);
   let block_time = 1
 
+  async function rec_wait_for_level(level : number, timeout_stamp : Date) {
+    if (new Date() > timeout_stamp) { throw Error(`Timeout waiting for level ${level} in flextesa`)}
+    try
+    { const { stdout } =
+      await exec('docker exec finp2p-sandbox tezos-client rpc get /chains/main/blocks/head/header | jq .level')
+      const cur_level = parseInt(stdout)
+      if (cur_level >= level) { return }
+    } catch (_) { /* ignore errors */ }
+    process.stdout.write('.')
+    return await rec_wait_for_level(level, timeout_stamp)
+  }
+  async function wait_for_level(level : number, timeout = 30 /* seconds */) {
+    const timeout_stamp = new Date()
+    timeout_stamp.setSeconds(timeout_stamp.getSeconds() + timeout);
+    return await rec_wait_for_level(level, timeout_stamp)
+  }
+
   export async function start_network (script = flexteas_script) {
-    console.log('Starting sandbox')
+    process.stdout.write('Starting sandbox ')
     await exec (
       ['docker run --rm --name finp2p-sandbox',
        '--detach -p 20000:20000',
@@ -90,9 +106,8 @@ module Flextesa {
        script, 'start'
       ].join(' ')
     )
-    await sleep((block_time + 4) * 1000)
-    await exec('docker exec finp2p-sandbox tezos-client bootstrapped')
-    console.log('Started')
+    await wait_for_level(2) // level 0 = genesis, level 1 = activation block
+    console.log('\nStarted')
   }
 
   export async function stop_network () {
