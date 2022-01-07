@@ -52,6 +52,9 @@ test:
 server-deps:
 	@npm --prefix server install
 
+server-dev-deps:
+	@npm --prefix server install --dev
+
 .PHONY: server
 server:
 	@npm --prefix server run build
