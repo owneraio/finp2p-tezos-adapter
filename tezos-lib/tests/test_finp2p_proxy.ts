@@ -6,46 +6,160 @@ import * as secp256k1 from 'secp256k1';
 import * as crypto from 'crypto';
 import { createBLAKE2b } from 'hash-wasm';
 import { strict as assert } from 'assert';
+import * as child_process from "child_process";
+import { promisify } from "util";
+const exec = promisify(child_process.exec);
 
 import '../taquito_wrapper'
 import * as Finp2pProxy from '../finp2p_proxy'
+import { OperationResult } from '../taquito_wrapper';
 
 let utf8 = new TextEncoder()
 // utf8.encoding
 
-// This is the account that we will use to sign transactions on Tezos Note that
-// this account must also be an admin of the `finp2p_proxy` contract
-// Testnet faucet accounts can be obtained here: https://teztnets.xyz
-let account = {
-  pkh : "tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz",
-  pk : "edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq",
-  sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
+let debug = false
+switch (process.env.DEBUG) {
+  case 'true':
+    debug = true
+    break
+  default:
 }
 
-// Initialize FinP2P library
-let config: Finp2pProxy.config = {
-  url : "https://rpc.hangzhounet.teztnets.xyz",
-  explorers : [
-    { kind : 'TzKT', url : 'https://api.hangzhou2net.tzkt.io' },
-    { kind : 'tzstats', url : 'https://api.hangzhou.tzstats.com' },
-  ],
-  admin : account.pkh,
-  finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
-  finp2p_fa2_address : 'KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk',
-  finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
-  // debug : true
+module Hangzhounet {
+
+  // This is the account that we will use to sign transactions on Tezos Note that
+  // this account must also be an admin of the `finp2p_proxy` contract
+  // Testnet faucet accounts can be obtained here: https://teztnets.xyz
+  export const account = {
+    pkh : "tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz",
+    pk : "edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq",
+    sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
+  }
+
+  export async function start_network() { }
+  export async function stop_network() { }
+
+  export const config: Finp2pProxy.config = {
+    url : "https://rpc.hangzhounet.teztnets.xyz",
+    explorers : [
+      { kind : 'TzKT', url : 'https://api.hangzhou2net.tzkt.io' },
+      { kind : 'tzstats', url : 'https://api.hangzhou.tzstats.com' },
+    ],
+    admin : account.pkh,
+    finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
+    finp2p_fa2_address : 'KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL',
+    finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
+    debug
+  }
+
+  export const poll = undefined
+
 }
 
-let FinP2PTezos = new Finp2pProxy.FinP2PTezos(config)
+module Flextesa {
+
+  // default accounts in the flextesa sandbox
+  let accounts = {
+    'alice' : {
+      pk : 'edpkvGfYw3LyB1UcCahKQk4rF2tvbMUk8GFiTuMjL75uGXrpvKXhjn',
+      pkh : 'tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb',
+      sk : 'edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq'
+    },
+    'bob': {
+      pk : 'edpkurPsQ8eUApnLUJ9ZPDvu98E8VNj4KtJa1aZr16Cr5ow5VHKnz4',
+      pkh : 'tz1aSkwEot3L2kmUvcoxzjMomb9mvBNuzFK6',
+      sk : 'edsk3RFfvaFaxbHx8BMtEW1rKQcPtDML3LXjNqMNLCzC3wLC1bWbAt'
+    }
+  }
+
+  export const account = accounts['alice']
+
+  let flextesa_image = 'oxheadalpha/flextesa:20211221'
+  let flexteas_script = 'hangzbox'
+
+  let block_time = 1
+
+  async function rec_wait_for_level(level : number, timeout_stamp : Date) {
+    if (new Date() > timeout_stamp) { throw Error(`Timeout waiting for level ${level} in flextesa`)}
+    try
+    { const { stdout } =
+      await exec('docker exec finp2p-sandbox tezos-client rpc get /chains/main/blocks/head/header | jq .level')
+      const cur_level = parseInt(stdout)
+      if (cur_level >= level) { return }
+    } catch (_) { /* ignore errors */ }
+    process.stdout.write('.')
+    return await rec_wait_for_level(level, timeout_stamp)
+  }
+  async function wait_for_level(level : number, timeout = 30 /* seconds */) {
+    const timeout_stamp = new Date()
+    timeout_stamp.setSeconds(timeout_stamp.getSeconds() + timeout);
+    return await rec_wait_for_level(level, timeout_stamp)
+  }
+
+  export async function start_network (script = flexteas_script) {
+    process.stdout.write('Starting sandbox ')
+    await exec (
+      ['docker run --rm --name finp2p-sandbox',
+       '--detach -p 20000:20000',
+       `-e block_time=${block_time}`,
+       flextesa_image,
+       script, 'start'
+      ].join(' ')
+    )
+    await wait_for_level(2) // level 0 = genesis, level 1 = activation block
+    console.log('\nStarted')
+  }
+
+  export async function stop_network () {
+    console.log('Stopping sandbox')
+    await exec ('docker stop finp2p-sandbox')
+  }
+
+  export const config: Finp2pProxy.config = {
+    url : "http://localhost:20000",
+    explorers : [],
+    admin : account.pkh,
+    debug
+  }
+
+  export const poll : number | undefined = 500 // ms
+
+}
+
+var Net : typeof Flextesa
+
+switch (process.env.FINP2P_TEST_NETWORK) {
+  case 'hangzhounet':
+    Net = Hangzhounet
+    break
+  default:
+    Net = Flextesa
+}
+
+let FinP2PTezos = new Finp2pProxy.FinP2PTezos(Net.config)
 
 // Tell Taquito to use our private key for signing transactions
-FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(account.sk))
+FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(Net.account.sk))
+if (Net.poll !== undefined) {
+  FinP2PTezos.taquito.setProvider(
+    {config :
+     {streamerPollingIntervalMilliseconds : Net.poll}})
+}
 
 
 function log (message?: any, ...optionalParams: any[]) {
-  if (config.debug) { console.log(message, ...optionalParams) }
+  if (Net.config.debug) { console.log(message, ...optionalParams) }
 }
 
+// Only get receipts if network has explorers associated
+function get_receipt (op : OperationResult) : Promise<any>{
+  if (Net.config.explorers.length > 0) {
+    return FinP2PTezos.get_receipt(op)
+  }
+  else {
+    return new Promise(resolve => {resolve({})})
+  }
+}
 
 // Use same shg for everything
 let shg = crypto.randomBytes(32)
@@ -342,7 +456,7 @@ describe('FinP2P proxy contract',  () => {
         })
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
-    await FinP2PTezos.get_receipt(op)
+    await get_receipt(op)
   })
 
   it('Balance of account[0] should be 0 in ' + asset_id1, async () => {
@@ -358,7 +472,7 @@ describe('FinP2P proxy contract',  () => {
         amount : 150})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
-    await FinP2PTezos.get_receipt(op)
+    await get_receipt(op)
   })
 
   it('Balance of account[0] should be 150 in ' + asset_id1, async () => {
@@ -405,13 +519,16 @@ describe('FinP2P proxy contract',  () => {
         amount : 99999
       })
     let ops : Finp2pProxy.BatchParam[] = [
-      { kind : 'cleanup',
-        param : undefined },
       { kind : 'create_asset',
         param : op1 },
       { kind : 'issue_tokens',
         param : op2 }
     ]
+    if (Net.config.explorers.length > 0) {
+      // cleanup needs at least one configured explorer
+      ops = [{ kind : 'cleanup',
+               param : undefined } as Finp2pProxy.BatchParam].concat(ops)
+    }
     let op = await FinP2PTezos.batch(ops)
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
@@ -471,7 +588,7 @@ describe('FinP2P proxy contract',  () => {
         amount : 1})
     log("waiting inclusion")
     await FinP2PTezos.wait_inclusion(op)
-    await FinP2PTezos.get_receipt(op)
+    await get_receipt(op)
   })
 
   it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
@@ -558,3 +675,5 @@ describe('FinP2P proxy contract',  () => {
   })
 
 })
+  .beforeAll(Net.start_network)
+  .afterAll(Net.stop_network)

@@ -1,3 +1,5 @@
+![](https://github.com/owneraio/finp2p-tezos-adapter/actions/workflows/test-ts-lib.yml/badge.svg)
+
 # Tezos FinP2P adapter
 
 ## Typescript Tezos Library
@@ -92,7 +94,7 @@ the following addresses:
 Contract | Address
 ---|---
 FinP2P Proxy | [KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD](https://better-call.dev/hangzhou2net/KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD)
-FinP2P FA2 | [KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk](https://better-call.dev/hangzhou2net/KT1EHgvTiafJWkdQXeTENJqFbCUx4EBy8mtk)
+FinP2P FA2 | [KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL](https://better-call.dev/hangzhou2net/KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL)
 Authorization contract | [KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC](https://better-call.dev/hangzhou2net/KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC)
 
 The provided links to the BetterCallDev explorer allows to see the different

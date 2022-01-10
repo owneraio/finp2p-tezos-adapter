@@ -8,7 +8,8 @@
     "@taquito/taquito": "^11.1.0",
     "hacl-wasm": "^1.1.0",
     "hash-wasm": "^4.9.0",
-    "xhr2": "^0.2.1"
+    "xhr2": "^0.2.1",
+    "promise-any": "^0.2.0"
   },
   "devDependencies": {
     "@types/mocha": "^9.0.0",
@@ -22,6 +23,7 @@
   "scripts": {
     "build": "tsc",
     "build-test": "tsc -p tests/tsconfig.json",
-    "test": "env TS_NODE_COMPILER_OPTIONS=\"$(cat tests/tsconfig.json | jq .compilerOptions)\" npx mocha -b --timeout 3000000 -r ts-node/register 'tests/**/*.ts'"
+    "test-hangzhou": "env FINP2P_TEST_NETWORK=hangzhounet TS_NODE_COMPILER_OPTIONS=\"$(cat tests/tsconfig.json | jq .compilerOptions)\" npx mocha -b --timeout 3000000 -r ts-node/register 'tests/**/*.ts'",
+    "test": "env TS_NODE_COMPILER_OPTIONS=\"$(cat tests/tsconfig.json | jq .compilerOptions)\" npx mocha --timeout 200000 -r ts-node/register 'tests/**/*.ts'"
   }
 }
