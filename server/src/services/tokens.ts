@@ -62,13 +62,13 @@ export class TokenService {
 
   private constructor() {
     // Initialize FinP2P library
-    let config: FINP2PProxy.config = {
+    let config: FINP2PProxy.Config = {
       url : nodeAddr,
       explorers,
       admin : account.pkh,
-      finp2p_auth_address : contracts.finp2p_auth_address,
-      finp2p_fa2_address : contracts.finp2p_fa2_address,
-      finp2p_proxy_address : contracts.finp2p_proxy_address,
+      finp2pAuthAddress : contracts.finp2pAuthAddress,
+      finp2pFA2Address : contracts.finp2pFA2Address,
+      finp2pProxyAddress : contracts.finp2pProxyAddress,
       debug: false,
     };
     this.tezosClient = new FINP2PProxy.FinP2PTezos(config);
@@ -86,22 +86,22 @@ export class TokenService {
     logger.info('creating asset', { assetId });
     // @ts-ignore
     let newTokenParams = this.tezosClient.gen_new_token(assetId, assetId);
-    const op = await this.tezosClient.create_asset({
+    const op = await this.tezosClient.createAsset({
       asset_id: utf8.encode(assetId),
       new_token_info: newTokenParams,
     });
-    await this.tezosClient.wait_inclusion(op);
+    await this.tezosClient.waitInclusion(op);
   }
 
   public async issue(request: IssueRequest): Promise<Receipt> {
-    const op = await this.tezosClient.issue_tokens({
+    const op = await this.tezosClient.issueTokens({
       asset_id: utf8.encode(request.assetId),
       nonce: { nonce: utf8.encode(''), timestamp: new Date() },
       dst_account: '0x01' /* secp256k1 */ + request.recipientPublicKey,
       amount: BigInt(request.quantity),
       shg: new Uint8Array(),
     });
-    await this.tezosClient.wait_inclusion(op);
+    await this.tezosClient.waitInclusion(op);
     return {
       transactionId: op.hash,
       assetId: request.assetId,
@@ -114,7 +114,7 @@ export class TokenService {
     let shg = new Uint8Array();
     if (request.signatureTemplate.template.hashGroups) {
       const hashGroups = request.signatureTemplate.template.hashGroups
-        .filter((hg, index) => {
+        .filter((_, index) => {
           return index != 0;
         })
         .map((hg) => {
@@ -138,8 +138,8 @@ export class TokenService {
       shg: shg,
       signature: '0x' + request.signatureTemplate.signature,
     };
-    const op = await this.tezosClient.transfer_tokens(params);
-    await this.tezosClient.wait_inclusion(op);
+    const op = await this.tezosClient.transferTokens(params);
+    await this.tezosClient.waitInclusion(op);
     return {
       transactionId: op.hash,
       assetId: request.assetId,
@@ -150,21 +150,21 @@ export class TokenService {
   }
 
   public async getReceipt(id: string) : Promise<Receipt> {
-    const r = await this.tezosClient.get_receipt({ hash : id });
+    const r = await this.tezosClient.getReceipt({ hash : id });
     return {
       transactionId: id,
-      assetId: r.asset_id,
+      assetId: r.assetId,
       sourcePublicKey:
-        (r.src_account === undefined) ? undefined : r.src_account.toString('hex'),
+        (r.srcAccount === undefined) ? undefined : r.srcAccount.toString('hex'),
       recipientPublicKey:
-        (r.dst_account === undefined) ? undefined : r.dst_account.toString('hex'),
+        (r.dstAccount === undefined) ? undefined : r.dstAccount.toString('hex'),
       quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
     } as Receipt;
   }
 
   public async balance(assetId:string, sourcePublicKey:string): Promise<number> {
     logger.debug('balance', { assetId, sourcePublicKey });
-    const balance = await this.tezosClient.get_asset_balance(
+    const balance = await this.tezosClient.getAssetBalance(
       '0x01' /* secp256k1 */ + sourcePublicKey,
       utf8.encode(assetId),
     );
