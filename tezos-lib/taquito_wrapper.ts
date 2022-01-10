@@ -119,13 +119,34 @@ export class TaquitoWrapper extends TezosToolkit {
     return (r !== undefined)
   }
 
-  private async in_prev_block(op : OperationResult, head? : string, nb = 5) : Promise<BlockResponse | undefined> {
-    if (nb == 0) { return undefined }
-    const block = await this.rpc.getBlock({ block: (head || 'head')})
-    if (this.in_block(block, op)) {
-      return(block)
+  private async check_in_main_chain (
+    block_hash : string,
+    head_hash : string,
+    confirmations : number) : Promise<void>{
+    const block_hash_at_incl_level =
+      await this.rpc.getBlockHash({ block: `${head_hash}~${confirmations}`})
+    if (block_hash_at_incl_level != block_hash) {
+      throw new Error('Operation is not included in the main chain')
     }
-    return await this.in_prev_block(op, block.header.predecessor, nb - 1)
+  }
+
+  private async in_prev_blocks(
+    op : OperationResult,
+    nb = 5,
+    block_hash? : string,
+    head? : BlockResponse
+  ) : Promise<[BlockResponse, number] | undefined> {
+    if (nb == 0) { return undefined }
+    const block = await this.rpc.getBlock({ block: (block_hash || 'head')})
+    if (head === undefined) { head = block }
+    if (this.in_block(block, op)) {
+      const confirmations = block.header.level - head.header.level
+      await this.check_in_main_chain(block.hash, head.hash, confirmations)
+      return([block, confirmations])
+    }
+    return await this.in_prev_blocks(
+      op, nb - 1, block.header.predecessor, head
+    )
   }
 
   /**
@@ -141,14 +162,19 @@ export class TaquitoWrapper extends TezosToolkit {
    * number of confirmations, etc.
    */
   wait_inclusion(op : OperationResult, confirmations? : number, max = 10) : Promise<[BlockResponse, number]> {
-    var found_level : number
+    var found_block : BlockResponse
     const _this = this
     var count = 0
     return new Promise(function(resolve, reject) {
       // start looking in the previous blocks
-      _this.in_prev_block(op).then(block => {
-        if (block !== undefined) {
-          found_level = block.header.level;
+      _this.in_prev_blocks(op).then(block_and_conf => {
+        if (block_and_conf !== undefined) {
+          const [block, block_confirmations] = block_and_conf
+          found_block = block
+          if (confirmations === undefined
+            || confirmations <= block_confirmations) {
+            return resolve([found_block, block_confirmations])
+          }
         }
       })
       // in parallel, wait for new heads
@@ -161,21 +187,23 @@ export class TaquitoWrapper extends TezosToolkit {
             return reject(new Error(`Did not see operation for ${max} blocks`))
           }
           const block = await _this.rpc.getBlock({ block: hash })
-          if (found_level === undefined) {
+          if (found_block === undefined) {
             if (_this.in_block(block, op)) {
-              found_level = block.header.level;
+              found_block = block
               if (confirmations === undefined || confirmations === 0) {
                 xhr.abort()
-                return resolve([block, 0])
+                return resolve([found_block, 0])
               }
             }
           } else {
             // already found
-            let obtained_confirmations = block.header.level - found_level
+            let obtained_confirmations = block.header.level - found_block.header.level
             if (confirmations === undefined
               || confirmations <= obtained_confirmations) {
               xhr.abort()
-              return resolve([block, obtained_confirmations])
+              await _this.check_in_main_chain(
+                found_block.hash, block.hash, obtained_confirmations)
+              return resolve([found_block, obtained_confirmations])
             }
           }
         })
