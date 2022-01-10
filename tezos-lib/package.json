@@ -1,6 +1,7 @@
 {
   "name": "@owneraio/tezos-lib",
   "dependencies": {
+    "@stablelib/blake2b": "^1.0.1",
     "@taquito/contracts-library": "^11.1.0",
     "@taquito/local-forging": "^11.1.0",
     "@taquito/rpc": "^11.1.0",
@@ -8,8 +9,8 @@
     "@taquito/taquito": "^11.1.0",
     "hacl-wasm": "^1.1.0",
     "hash-wasm": "^4.9.0",
-    "xhr2": "^0.2.1",
-    "promise-any": "^0.2.0"
+    "promise-any": "^0.2.0",
+    "xhr2": "^0.2.1"
   },
   "devDependencies": {
     "@types/mocha": "^9.0.0",

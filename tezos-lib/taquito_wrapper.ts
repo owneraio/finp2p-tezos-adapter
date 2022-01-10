@@ -8,8 +8,9 @@ import {
 } from "@taquito/taquito"
 import { BlockResponse, MichelsonV1Expression, RpcClientInterface } from "@taquito/rpc";
 import { localForger, LocalForger } from '@taquito/local-forging';
-import { encodeOpHash } from '@taquito/utils';
+import { encodeOpHash, b58cdecode, b58cencode, prefix } from '@taquito/utils';
 import { XMLHttpRequest } from 'xhr2-cookies'
+import * as Blake2b from '@stablelib/blake2b'
 
 /** Some wrapper functions on top of Taquito to make calls, transfer xtz and reveal public keys.
  * With these functions, we have a better control on the operations hashs being injected.
@@ -17,6 +18,22 @@ import { XMLHttpRequest } from 'xhr2-cookies'
 
 export interface OperationResult {
   hash: string;
+}
+
+/** @description Returns the contract address of an origination from the
+ * operation hash.
+ * @param hash the hash of the operation in base58
+ * @param index the origination index in the hash (by default 0) in case
+ * the operation originatres multiple contracts.
+*/
+export function contractAddressOfOpHash(hash : string, index = 0) : string {
+  const hashBytes = Buffer.from(b58cdecode(hash, prefix['o']))
+  const indexBytes = Buffer.alloc(4, 0)
+  indexBytes.writeInt32BE(index)
+  const originationNonce = Buffer.concat([hashBytes, indexBytes])
+  const addrBytes = Blake2b.hash(new Uint8Array(originationNonce), 20)
+  const addr : string = b58cencode(addrBytes, prefix['KT1'])
+  return addr
 }
 
 export class InjectionError extends Error {
