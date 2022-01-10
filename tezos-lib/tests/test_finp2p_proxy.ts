@@ -1,6 +1,7 @@
 import 'mocha'
 import { MichelsonMap } from "@taquito/taquito"
 import { InMemorySigner } from '@taquito/signer'
+import { getPkhfromPk, b58cencode, encodeKey, prefix } from '@taquito/utils';
 
 import * as secp256k1 from 'secp256k1';
 import * as crypto from 'crypto';
@@ -36,8 +37,16 @@ module Hangzhounet {
     sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
   }
 
+  export const other_account = {
+    pkh : "tz1Uxpw1ojH9r2k48vfNiB7CTrPbniJgmeGG",
+    pk : "edpkuwHfFne6tDwVzu4R68zms2peRCTCeqXVWQBKnH9QVgpfAfCKq7",
+    sk : "edsk3FDTtBzp7M5ktcjdSy8tPezGDfjwGxQXuSyGhLaHGQ5uStTcq3"
+  }
+
   export async function start_network() { }
   export async function stop_network() { }
+
+  export var block_time = 30
 
   export const config: Finp2pProxy.Config = {
     url : "https://rpc.hangzhounet.teztnets.xyz",
@@ -72,12 +81,13 @@ module Flextesa {
     }
   }
 
-  export const account = accounts['alice']
+  export const account = accounts.alice
+  export const other_account = accounts.bob
 
   let flextesa_image = 'oxheadalpha/flextesa:20211221'
   let flexteas_script = 'hangzbox'
 
-  let block_time = 1
+  export var block_time = 1
 
   async function rec_wait_for_level(level : number, timeout_stamp : Date) {
     if (new Date() > timeout_stamp) { throw Error(`Timeout waiting for level ${level} in flextesa`)}
@@ -398,18 +408,26 @@ async function get_balance(i : {
   return Number(balance)
 }
 
+function accountPkh(account : finp2p_account) {
+  return getPkhfromPk(encodeKey('01' + account.pubKey.toString('hex')))
+}
+
+function accountSk(account : finp2p_account) {
+  return b58cencode(account.privKey.toString('hex'), prefix.spsk)
+}
+
 
 var accounts : finp2p_account[] = []
 
-describe('FinP2P proxy contract',  () => {
+describe('FinP2P Contracts',  () => {
 
   it('Initialize library',  async () => {
     // Deploy the smart contracts (this is not necessary if the smart contract are
     // already deplopyed on the network we want to use)
     await FinP2PTezos.init({
       operationTTL : {
-        ttl : BigInt(900), // 15 minutes
-        allowed_in_the_future : BigInt(120) // 2 minutes
+        ttl : BigInt(15 * Net.block_time), // 15 blocks
+        allowed_in_the_future : BigInt(2 * Net.block_time) // 2 block
       },
       fa2Metadata : new Map([['symbol', utf8.encode("FP2P")]])
     })
@@ -434,6 +452,9 @@ describe('FinP2P proxy contract',  () => {
   var asset_id3_utf8 = "ORG:102:asset-طزوس-" + (new Date()).toISOString()
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
+
+
+describe('FinP2P proxy contract',  () => {
 
   // it('Cleanup the expired operations', async () => {
   //   let op = await FinP2PTezos.cleanup()
@@ -673,6 +694,181 @@ describe('FinP2P proxy contract',  () => {
       },
       { message : "FINP2P_INVALID_SIGNATURE"})
   })
+
+  it('Update admin', async () => {
+    let op = await FinP2PTezos.updateAdmin(Net.other_account.pkh)
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(Net.other_account.sk))
+  })
+
+  it('Update operation_ttl', async () => {
+    let ttl = {
+      ttl : BigInt(10 * Net.block_time), // 10 blocks
+      allowed_in_the_future : BigInt(2 * Net.block_time + 1)
+    }
+    let op = await FinP2PTezos.updateOperationTTL(ttl)
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let storage = await FinP2PTezos.getProxyStorage()
+    assert.deepEqual(storage.operation_ttl, ttl)
+  })
+
+  it('Update back admin', async () => {
+    let op = await FinP2PTezos.updateAdmin(Net.account.pkh)
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    FinP2PTezos.taquito.setSignerProvider(new InMemorySigner(Net.account.sk))
+  })
+
+  describe("Injections with non admin", () => {
+
+    it('Inject redeem with non admin', async () => {
+      await assert.rejects(
+        async () => {
+          await redeem_tokens(
+            { src : accounts[0],
+              asset_id : asset_id1,
+              amount : 1,
+            })
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+    it('Inject create asset with non admin', async () => {
+      await assert.rejects(
+        async () => {
+          await create_asset(
+            { asset_id : "New id",
+              metadata : { symbol : "NID", name : "New id", decimals : '0' }
+            })
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+    it('Inject issue asset with non admin', async () => {
+      await assert.rejects(
+        async () => {
+          await issue_tokens(
+            { asset_id : asset_id3_utf8,
+              dest : accounts[3],
+              amount : 1 })
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+    it('Inject transfer asset with non admin', async () => {
+      await assert.rejects(
+        async () => {
+          await transfer_tokens(
+            { src : accounts[0],
+              dest : accounts[3].pubKey,
+              asset_id : asset_id1,
+              amount : 1})
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+    it('Inject update operation_ttl with wrong admin', async () => {
+      await assert.rejects(
+        async () => {
+          let ttl = {
+            ttl : BigInt(1000),
+            allowed_in_the_future : BigInt(2000)
+          }
+          await FinP2PTezos.updateOperationTTL(ttl)
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+    it('Inject update admin with wrong admin', async () => {
+      await assert.rejects(
+        async () => {
+          await FinP2PTezos.updateAdmin(Net.other_account.pkh)
+        },
+        { message : "FINP2P_UNAUTHORIZED_ACTION"})
+    })
+
+  })
+    .beforeAll(() =>
+      FinP2PTezos.taquito
+        .setSignerProvider(new InMemorySigner(Net.other_account.sk)))
+    .afterAll(() =>
+      FinP2PTezos.taquito
+        .setSignerProvider(new InMemorySigner(Net.account.sk)))
+
+})
+
+describe('FA2 contract',  () => {
+
+  it("Send 10 XTZ to account[2]", async () => {
+    let op = await FinP2PTezos.taquito.transferXTZ(accountPkh(accounts[2]), 10)
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it("Set signer to account[2]", async () => {
+    FinP2PTezos.taquito
+      .setSignerProvider(new InMemorySigner(accountSk(accounts[2])))
+  })
+
+  it("Transfer tokens we don't have", async () => {
+    await assert.rejects(
+      async () => {
+        const fa2 = await FinP2PTezos.taquito.contract.at(FinP2PTezos.getFA2Address())
+        await fa2.methods.transfer([
+            {
+              from_: Net.account.pkh,
+              txs: [
+                {to_: Net.other_account.pkh, token_id: token_id1, amount: 1},
+              ],
+            }]
+        ).send()
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+
+  it("Unauthorized direct transfer", async () => {
+    await assert.rejects(
+      async () => {
+        const fa2 = await FinP2PTezos.taquito.contract.at(FinP2PTezos.getFA2Address())
+        await fa2.methods.transfer([
+            {
+              from_ : accountPkh(accounts[2]),
+              txs: [
+                {to_ : accountPkh(accounts[1]), token_id: token_id1, amount: 100},
+              ],
+            }]
+        ).send()
+      },
+      { message : "FINP2P_UNAUTHORIZED_ACTION"})
+  })
+
+  it("Authorize direct transfer for account[2]", async () => {
+    FinP2PTezos.taquito .setSignerProvider(new InMemorySigner(Net.account.sk))
+    let op = await FinP2PTezos.addAccredited(accountPkh(accounts[2]),
+                                       FinP2PTezos.ownerAccreditation)
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    FinP2PTezos.taquito
+      .setSignerProvider(new InMemorySigner(accountSk(accounts[2])))
+  })
+
+  it("Authorized direct transfer", async () => {
+    const fa2 = await FinP2PTezos.taquito.contract.at(FinP2PTezos.getFA2Address())
+    let op = await fa2.methods.transfer([
+      {
+        from_ : accountPkh(accounts[2]),
+        txs: [
+          {to_ : accountPkh(accounts[1]), token_id: token_id1, amount: 100},
+        ],
+      }]).send()
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+})
 
 })
   .beforeAll(Net.start_network)
