@@ -5,7 +5,7 @@ import {
   OriginationOperation} from "@taquito/taquito"
 import { BlockHeaderResponse, MichelsonV1Expression } from "@taquito/rpc";
 import { encodeKey, validateContractAddress } from '@taquito/utils';
-import { TaquitoWrapper, OperationResult } from "./taquito_wrapper";
+import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from "./taquito_wrapper";
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix } from '@taquito/utils';
@@ -403,23 +403,26 @@ export class FinP2PTezos {
     var accredit = false
     if (this.config.finp2p_auth_address === undefined) {
       let op = await this.deployFinp2pAuth()
-      await op.confirmation()
-      this.config.finp2p_auth_address = op.contractAddress
-      console.log('Auth', op.contractAddress)
+      await this.taquito.wait_inclusion(op)
+      let addr = contractAddressOfOpHash(op.hash)
+      this.config.finp2p_auth_address = addr
+      console.log('Auth', addr)
       accredit = true
     }
     if (this.config.finp2p_fa2_address === undefined) {
       if (typeof this.config.finp2p_auth_address === 'string') {
         let op = await this.deployFinp2pFA2(this.config.finp2p_auth_address, p.fa2_metadata)
-        await op.confirmation()
-        this.config.finp2p_fa2_address = op.contractAddress
-        console.log('FA2', op.contractAddress)
+        await this.taquito.wait_inclusion(op)
+        let addr = contractAddressOfOpHash(op.hash)
+        this.config.finp2p_fa2_address = addr
+        console.log('FA2', addr)
       }}
     if (this.config.finp2p_proxy_address === undefined) {
       let op = await this.deployFinp2pProxy(p.operation_ttl)
-      await op.confirmation()
-      this.config.finp2p_proxy_address = op.contractAddress
-      console.log('Proxy', op.contractAddress)
+      await this.taquito.wait_inclusion(op)
+      let addr = contractAddressOfOpHash(op.hash)
+      this.config.finp2p_proxy_address = addr
+      console.log('Proxy', addr)
       accredit = true
     }
     this.add_finp2p_contracts();
