@@ -97,7 +97,9 @@ type BatchEntryPoint =
   | 'issue_tokens'
   | 'redeem_tokens'
   | 'cleanup'
-  | 'update_admin'
+  | 'update_admins'
+  | 'add_admins'
+  | 'remove_admins'
   | 'update_operation_ttl'
   | 'update_fa2_token';
 
@@ -107,7 +109,9 @@ type ProxyBatchParam =
   | IssueTokensParam
   | RedeemTokensParam
   | CleanupParam
-  | Address
+  | Address[]
+  | Address[]
+  | Address[]
   | OperationTTL
   | [AssetId, FA2Token];
 
@@ -126,7 +130,7 @@ export interface ProxyStorage {
   operation_ttl: OperationTTL;
   live_operations: BigMapAbstraction;
   finp2p_assets: BigMapAbstraction;
-  admin: Address;
+  admins: Address[];
   next_token_ids: BigMapAbstraction;
 }
 
@@ -134,7 +138,7 @@ interface InitialStorage {
   operation_ttl: OperationTTL; /* in seconds */
   live_operations: MichelsonMap<Bytes, Timestamp>;
   finp2p_assets: MichelsonMap<AssetId, FA2Token>;
-  admin: Address;
+  admins: Address[];
   next_token_ids: MichelsonMap<Address, Nat>;
 }
 
@@ -330,9 +334,11 @@ export namespace Michelson {
     });
   }
 
-  export function updateAdminParam(addr : Address) : MichelsonV1Expression {
-    return { string: addr };
+  export function updateAdminsParam(addrs : Address[]) : MichelsonV1Expression {
+    return addrs.map(addr => { return { string: addr };});
   }
+  export const addAdminsParam = updateAdminsParam;
+  export const removeAdminsParam = updateAdminsParam;
 
   export function updateOperationTtlParam(
     { ttl, allowed_in_the_future } : OperationTTL,
@@ -372,7 +378,7 @@ export interface Explorer {
 
 export interface Config {
   url : string,
-  admin : Address;
+  admins : Address[];
   finp2pProxyAddress? : Address;
   finp2pFA2Address? : Address;
   finp2pAuthAddress? : Address;
@@ -494,12 +500,13 @@ export class FinP2PTezos {
 
   async deployFinp2pProxy(
     operation_ttl : OperationTTL,
-    admin = this.config.admin): Promise<OriginationOperation> {
+    admins = this.config.admins,
+  ): Promise<OriginationOperation> {
     let initialStorage: InitialStorage = {
       operation_ttl,
       live_operations: new MichelsonMap(),
       finp2p_assets: new MichelsonMap(),
-      admin,
+      admins,
       next_token_ids: new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P Proxy smart contract');
@@ -509,7 +516,9 @@ export class FinP2PTezos {
     });
   }
 
-  async deployFinp2pAuth(admin = this.config.admin): Promise<OriginationOperation> {
+  async deployFinp2pAuth(
+    admin = this.config.admins[0],
+  ): Promise<OriginationOperation> {
     let initialStorage = {
       storage: {
         admin,
@@ -693,16 +702,42 @@ export class FinP2PTezos {
   }
 
   /**
-   * @description Call the entry-point `update_admin` of the FinP2P proxy
-   * @param new_admin: the address of the new admin
+   * @description Call the entry-point `update_admins` of the FinP2P proxy
+   * @param newAdmins: the new set of administrators (addresses)
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async updateAdmin(
-    new_admin: Address,
+  async updateAdmins(
+    newAdmins: Address[],
     options : CallOptions = this.defaultCallOptions)
     : Promise<OperationResult> {
-    return this.cleanupAndCallProxy('update_admin', new_admin, options);
+    return this.cleanupAndCallProxy('update_admins', newAdmins, options);
+  }
+
+  /**
+   * @description Call the entry-point `add_admins` of the FinP2P proxy
+   * @param newAdmins: the new administrators to add
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async addAdmins(
+    newAdmins: Address[],
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('add_admins', newAdmins, options);
+  }
+
+  /**
+   * @description Call the entry-point `remove_admins` of the FinP2P proxy
+   * @param admins: the administrators to remove
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async removeAdmins(
+    newAdmins: Address[],
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('remove_admins', newAdmins, options);
   }
 
   /**
@@ -882,14 +917,29 @@ export class FinP2PTezos {
             parameter : { entrypoint: bp.kind,
               value: Michelson.cleanupParam(vCl) },
           };
-        case 'update_admin':
-          let newAdmin = <Address>bp.param;
-          let kt1Ua  = finp2p.getProxyAddress(bp.kt1);
+        case 'update_admins':
+          let newAdminsU = <Address[]>bp.param;
           return {
             amount : 0,
-            to : kt1Ua,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
-              value: Michelson.updateAdminParam(newAdmin) },
+              value: Michelson.updateAdminsParam(newAdminsU) },
+          };
+        case 'add_admins':
+          let newAdminsA = <Address[]>bp.param;
+          return {
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.addAdminsParam(newAdminsA) },
+          };
+        case 'remove_admins':
+          let adminsR = <Address[]>bp.param;
+          return {
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.removeAdminsParam(adminsR) },
           };
         case 'update_operation_ttl':
           let ttl = <OperationTTL>bp.param;
