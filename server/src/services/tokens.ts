@@ -2,7 +2,7 @@ import { InMemorySigner } from '@taquito/signer';
 import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
 import { logger } from '../helpers/logger';
-import { account, contracts, nodeAddr, explorers } from '../helpers/config';
+import { accounts, contracts, nodeAddr, explorers } from '../helpers/config';
 
 let service:TokenService;
 let utf8 = new TextEncoder();
@@ -65,14 +65,16 @@ export class TokenService {
     let config: FINP2PProxy.Config = {
       url : nodeAddr,
       explorers,
-      admin : account.pkh,
+      admins : accounts.map(a => a.pkh),
       finp2pAuthAddress : contracts.finp2pAuthAddress,
       finp2pFA2Address : contracts.finp2pFA2Address,
       finp2pProxyAddress : contracts.finp2pProxyAddress,
       debug: false,
     };
     this.tezosClient = new FINP2PProxy.FinP2PTezos(config);
-    this.tezosClient.taquito.setSignerProvider(new InMemorySigner(account.sk));
+    accounts.map(a =>
+      this.tezosClient.registerSigner(new InMemorySigner(a.sk)),
+    );
   }
 
   public static GetService(): TokenService {
