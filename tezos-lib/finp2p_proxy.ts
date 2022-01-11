@@ -1079,6 +1079,9 @@ export class FinP2PTezos {
         method: 'GET',
       },
     );
+    if (ops === undefined || ops.length == 0) {
+      throw new ReceiptError(op, [], `TzKT receipt not available yet for ${op.hash}`);
+    }
     const getPkBytes = (pk : any) => {
       if (pk === undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
@@ -1112,6 +1115,9 @@ export class FinP2PTezos {
         method: 'GET',
       },
     );
+    if (ops === undefined || ops.length == 0) {
+      throw new ReceiptError(op, [], `tzstats receipt not available yet for ${op.hash}`);
+    }
     const getPkBytes = (pk : any) => {
       if (pk === undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
@@ -1287,7 +1293,7 @@ export class FinP2PTezos {
         method: 'GET',
       },
     );
-    if (ops[0].block === undefined) {
+    if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
       throw new ReceiptError(op, [], 'Operation is not known by TzKT');
     }
     return ops[0].block;
@@ -1302,7 +1308,7 @@ export class FinP2PTezos {
         method: 'GET',
       },
     );
-    if (ops[0].block === undefined) {
+    if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
       throw new ReceiptError(op, [], 'Operation is not known by tzstats');
     }
     return ops[0].block;
