@@ -887,6 +887,38 @@ export class FinP2PTezos {
   }
 
   /**
+   * @description Top up XTZ accounts
+   * @param accounts : list of accounts to top-up
+   * @param topUpAmount : top up each account to this amount in XTZ
+   * @param sender : address of sender/source for this transaction
+   * @returns operation injection result
+   */
+  async topUpXTZ(accounts : Address[], topUpAmount: number, sender? : Address) : Promise<OperationResult | undefined> {
+    const balances = await Promise.all(accounts.map(async account => {
+      return {
+        account,
+        balance : await this.taquito.rpc.getBalance(account),
+      };
+    }));
+    let params : TransferParams[] = [];
+    balances.map(({ account, balance }) => {
+      let amountMutez = BigInt(topUpAmount) * BigInt(1e6) - BigInt(balance.toString());
+      let amountMutezNumber = Number(amountMutez);
+      if (BigInt(amountMutezNumber) != amountMutez) {
+        throw Error(`Precision loss ${amountMutezNumber} != ${amountMutez}`);
+      }
+      let amount = amountMutezNumber / 1e6;
+      if (amount > 0) {
+        params.push({ to : account, amount, source : sender });
+      }
+    });
+    if (params.length == 0) {
+      return;
+    }
+    return this.taquito.multiTransferXTZ(params);
+  }
+
+  /**
    * @description Make a batch call to the FinP2P proxy
    * @param p: the list of entry-points and parameters (anm optionally contract
    * addresses) with which to call the contract

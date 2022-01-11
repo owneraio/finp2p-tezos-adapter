@@ -379,6 +379,17 @@ export class TaquitoWrapper extends TezosToolkit {
   }
 
   /**
+   * @description Batch mutliple xtz transfers from a source to mutliple destinations.
+   * @param transfers : the list of transfers to emit
+   * @returns operation injection result
+   */
+  async multiTransferXTZ(
+    transfers : { to: string, amount: number, source? : string }[],
+  ): Promise<OperationResult> {
+    return this.batchTransactions(transfers);
+  }
+
+  /**
    * @description Instantiation of function `batchTransactions` to call an
    * entrypoint of a smart contract.
    * @param destinations : the transfers' destinations
