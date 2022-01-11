@@ -2,7 +2,10 @@ import {
   OpKind,
   BigMapAbstraction,
   MichelsonMap,
-  OriginationOperation } from '@taquito/taquito';
+  OriginationOperation,
+  Signer,
+  TransferParams,
+} from '@taquito/taquito';
 import { BlockHeaderResponse, MichelsonV1Expression } from '@taquito/rpc';
 import { encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
@@ -367,8 +370,9 @@ export namespace Michelson {
 
 export interface CallOptions {
   kt1? : Address,
-  cleanup : boolean,
-  minCleanup : number,
+  sender? : Address,
+  cleanup? : boolean,
+  minCleanup? : number,
 }
 
 export interface Explorer {
@@ -418,16 +422,21 @@ export class FinP2PTezos {
 
   contracts : ContractsLibrary;
 
+  default_sender : Address;
+
   defaultCallOptions : CallOptions = {
     cleanup : true,
     minCleanup : 8,
   };
 
+  // internal counter to choose source in a round robin manner
+  private counter : number;
+
   constructor(config : Config) {
-    this.taquito = new TaquitoWrapper(config.url, config.debug);
     this.checkConfig(config);
     this.config = config;
     this.contracts = new ContractsLibrary();
+    this.taquito = new TaquitoWrapper(config.url, config.debug);
     this.taquito.addExtension(this.contracts);
     if (this.config.minCleanup !== undefined) {
       this.defaultCallOptions.minCleanup = this.config.minCleanup;
@@ -435,6 +444,9 @@ export class FinP2PTezos {
     if (this.config.autoCleanup !== undefined) {
       this.defaultCallOptions.cleanup = this.config.autoCleanup;
     }
+    // this.defaultCallOptions.sender = config.admins[0];
+    this.default_sender = config.admins[0];
+    this.counter = 0;
   }
 
   checkConfig(c : Config) {
@@ -450,6 +462,17 @@ export class FinP2PTezos {
         validateContractAddress(c.finp2pProxyAddress) !== 3) {
       throw new Error('Invalid Proxy contract address');
     }
+  }
+
+  public registerSigner(signer : Signer, source? : string) {
+    this.taquito.registerSigner(signer, source);
+    let sourcePromise : Promise<string>;
+    if (source !== undefined) { sourcePromise = new Promise(resolve => {resolve(source);}); } else { sourcePromise = signer.publicKeyHash(); }
+    sourcePromise.then(s => {
+      if (s == this.default_sender) {
+        this.taquito.setSignerProvider(signer);
+      }
+    });
   }
 
   /**
@@ -622,8 +645,8 @@ export class FinP2PTezos {
   async cleanupAndCallProxy(
     entrypoint : BatchEntryPoint,
     param : ProxyBatchParam,
-    { kt1, cleanup, minCleanup } : CallOptions ) : Promise<OperationResult> {
-    let addr = this.getProxyAddress(kt1);
+    { sender, kt1, cleanup, minCleanup } : CallOptions = this.defaultCallOptions) : Promise<OperationResult> {
+    const addr = this.getProxyAddress(kt1);
     const callParam : BatchParam = {
       kind: entrypoint,
       param,
@@ -637,6 +660,9 @@ export class FinP2PTezos {
       } catch (e) {
         this.taquito.debug('Cannot retrieve expired ops, no cleanup');
       }
+      if (minCleanup === undefined) {
+        throw Error('minCleanup undefined');
+      }
       if (expiredOps.length >= minCleanup) {
         const cleanupParam : BatchParam = {
           kind: 'cleanup',
@@ -646,7 +672,7 @@ export class FinP2PTezos {
         batchParams = [cleanupParam, callParam];
       }
     }
-    return this.batch(batchParams);
+    return this.batch(batchParams, sender);
   }
   
   /**
@@ -657,7 +683,7 @@ export class FinP2PTezos {
    */
   async transferTokens(
     tt : TransferTokensParam,
-    options : CallOptions = this.defaultCallOptions)
+    options? : CallOptions)
     : Promise<OperationResult> {
     return this.cleanupAndCallProxy('transfer_tokens', tt, options);
   }
@@ -805,12 +831,14 @@ export class FinP2PTezos {
   ownerAccreditation = new Uint8Array([1]);
 
   async addAccredited(newAccredited : Address,
-    accreditatiaon : Uint8Array,
-    kt1?: Address)
+    accreditation : Uint8Array,
+    kt1?: Address,
+    sender = this.default_sender)
     : Promise<OperationResult> {
     let addr = this.getAuthAddress(kt1);
     return this.taquito.send(addr, 'add_accredited',
-      Michelson.addAccreditedParam(newAccredited, accreditatiaon));
+      Michelson.addAccreditedParam(newAccredited, accreditation),
+      sender);
   }
 
   async getOpsToCleanup(kt1?: Address) : Promise<string[]>{
@@ -846,15 +874,16 @@ export class FinP2PTezos {
    * @param ophs: the live operations hashes to cleanup. If this argument
    * is not provided, the 200 first live operations are retrieved from a
    * block explorer.
+   * @param sender : address of sender/source for this transaction
    * @returns operation injection result
    */
-  async cleanup(kt1?: Address, ophs? : string[]) : Promise<OperationResult> {
+  async cleanup({ kt1, ophs, sender } : { kt1?: Address, ophs? : string[], sender? : Address } = {}) : Promise<OperationResult> {
     let keys = ophs;
     if (keys === undefined) {
       keys = await this.getOpsToCleanup(kt1);
     }
     let addr = this.getProxyAddress(kt1);
-    return this.taquito.send(addr, 'cleanup', Michelson.cleanupParam(keys));
+    return this.taquito.send(addr, 'cleanup', Michelson.cleanupParam(keys), sender);
   }
 
   /**
@@ -864,62 +893,68 @@ export class FinP2PTezos {
    * @returns operation injection result
    */
   async batch(
-    p: BatchParam[])
-    : Promise<OperationResult> {
+    p: BatchParam[],
+    source? : Address,
+  ) : Promise<OperationResult> {
     let finp2p = this;
+    if (source === undefined) {
+      // Pick next source in the admins list in a round robin manner
+      source = this.config.admins[this.counter++ % this.config.admins.length];
+    }
     const params = await Promise.all(p.map(async function (bp) {
       switch (bp.kind) {
         case 'transfer_tokens':
           let vTt = <TransferTokensParam>bp.param;
-          let kt1Tt  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1Tt,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.transferTokensParam(vTt) },
           };
         case 'issue_tokens':
           let vIt = <IssueTokensParam>bp.param;
-          let kt1It  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1It,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.issueTokensParam(vIt) },
           };
         case 'create_asset':
           let vCa = <CreateAssetParam>bp.param;
-          let kt1Ca  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1Ca,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.createAssetParam(vCa) },
           };
         case 'redeem_tokens':
           let vRt = <RedeemTokensParam>bp.param;
-          let kt1Rt  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1Rt,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.redeemTokensParam(vRt) },
           };
         case 'cleanup':
           let vCl = <CleanupParam>bp.param;
-          let kt1Cl = finp2p.getProxyAddress(bp.kt1);
           if (vCl === undefined) {
             vCl = await finp2p.getOpsToCleanup();
           }
           return {
+            source,
             amount : 0,
-            to : kt1Cl,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.cleanupParam(vCl) },
           };
         case 'update_admins':
           let newAdminsU = <Address[]>bp.param;
           return {
+            source,
             amount : 0,
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
@@ -928,6 +963,7 @@ export class FinP2PTezos {
         case 'add_admins':
           let newAdminsA = <Address[]>bp.param;
           return {
+            source,
             amount : 0,
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
@@ -936,6 +972,7 @@ export class FinP2PTezos {
         case 'remove_admins':
           let adminsR = <Address[]>bp.param;
           return {
+            source,
             amount : 0,
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
@@ -943,19 +980,19 @@ export class FinP2PTezos {
           };
         case 'update_operation_ttl':
           let ttl = <OperationTTL>bp.param;
-          let kt1Uot  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1Uot,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.updateOperationTtlParam(ttl) },
           };
         case 'update_fa2_token':
           let fa2 = <[AssetId, FA2Token]>bp.param;
-          let kt1Uft  = finp2p.getProxyAddress(bp.kt1);
           return {
+            source,
             amount : 0,
-            to : kt1Uft,
+            to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.updateFa2TokenParam(fa2) },
           };
