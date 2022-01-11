@@ -6,7 +6,7 @@
 #include "finp2p_proxy_types.mligo"
 #include "finp2p_lib.mligo"
 let fail_not_admin (s : storage) =
-  if not (Tezos.sender = s.admin) then (failwith unauthorized : unit)
+  if not (Set.mem Tezos.sender s.admins) then (failwith unauthorized : unit)
 
 let is_operation_expired (op_timestamp : timestamp) (s : storage) : bool =
   Tezos.now > (op_timestamp + (int s.operation_ttl.ttl))
@@ -134,8 +134,24 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : (operation * storage
 let update_operation_ttl (operation_ttl : operation_ttl) (s : storage) =
   { s with operation_ttl = operation_ttl  }
 
-let update_admin (admin : address) (s : storage) =
-  { s with admin = admin  }
+let update_admins (admins : address set) (s : storage) =
+  if (Set.cardinal admins) = 0n
+  then (failwith "EMPTY_ADMIN_SET" : storage)
+  else { s with admins = admins  }
+
+let add_admins (admins : address list) (s : storage) =
+  let admins =
+    List.fold_left
+      (fun ((admins : address set), (a : address)) -> Set.add a admins)
+      s.admins admins in
+  update_admins admins s
+
+let remove_admins (admins : address list) (s : storage) =
+  let admins =
+    List.fold_left
+      (fun ((admins : address set), (a : address)) -> Set.remove a admins)
+      s.admins admins in
+  update_admins admins s
 
 let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
   let () = check_fa2_contract fa2.address in
@@ -185,7 +201,9 @@ let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) : (operation list 
   let s =
     match p with
     | Update_operation_ttl p -> update_operation_ttl p s
-    | Update_admin p -> update_admin p s
+    | Update_admins p -> update_admins p s
+    | Add_admins p -> add_admins p s
+    | Remove_admins p -> remove_admins p s
     | Update_fa2_token p -> update_fa2_token p s in
   (([] : operation list), s)
 

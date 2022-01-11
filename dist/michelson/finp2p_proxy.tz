@@ -1,8 +1,9 @@
 { parameter
     (or (or (list %cleanup bytes)
             (or %finp2p_admin
-               (or (address %update_admin)
-                   (pair %update_fa2_token bytes (pair (address %address) (nat %id))))
+               (or (or (list %add_admins address) (list %remove_admins address))
+                   (or (set %update_admins address)
+                       (pair %update_fa2_token bytes (pair (address %address) (nat %id)))))
                (pair %update_operation_ttl (nat %ttl) (nat %allowed_in_the_future))))
         (or (or %finp2p_asset
                (or (pair %create_asset
@@ -44,7 +45,7 @@
     (pair (pair %operation_ttl (nat %ttl) (nat %allowed_in_the_future))
           (pair (big_map %live_operations bytes timestamp)
                 (pair (big_map %finp2p_assets bytes (pair (address %address) (nat %id)))
-                      (pair (address %admin) (big_map %next_token_ids address nat))))) ;
+                      (pair (set %admins address) (big_map %next_token_ids address nat))))) ;
   code { PUSH string "FINP2P_PASSED_OR_EXPIRED_OPERATION" ;
          PUSH string "FINP2P_UNKNOWN_ASSET_ID" ;
          PUSH string "INVALID_FA2_CONTRACT" ;
@@ -896,19 +897,18 @@
          LAMBDA
            (pair (pair nat nat)
                  (pair (big_map bytes timestamp)
-                       (pair (big_map bytes (pair address nat)) (pair address (big_map address nat)))))
+                       (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat)))))
            unit
            { GET 7 ;
              SENDER ;
-             COMPARE ;
-             EQ ;
+             MEM ;
              NOT ;
              IF { PUSH string "FINP2P_UNAUTHORIZED_ACTION" ; FAILWITH } { UNIT } } ;
          LAMBDA
            (pair timestamp
                  (pair (pair nat nat)
                        (pair (big_map bytes timestamp)
-                             (pair (big_map bytes (pair address nat)) (pair address (big_map address nat))))))
+                             (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
            bool
            { UNPAIR ; SWAP ; CAR ; CAR ; INT ; ADD ; NOW ; COMPARE ; GT } ;
          DUP ;
@@ -917,12 +917,12 @@
                     (pair timestamp
                           (pair (pair nat nat)
                                 (pair (big_map bytes timestamp)
-                                      (pair (big_map bytes (pair address nat)) (pair address (big_map address nat))))))
+                                      (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
                     bool)
                  (pair timestamp
                        (pair (pair nat nat)
                              (pair (big_map bytes timestamp)
-                                   (pair (big_map bytes (pair address nat)) (pair address (big_map address nat)))))))
+                                   (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat)))))))
            bool
            { UNPAIR ;
              SWAP ;
@@ -948,20 +948,37 @@
          SWAP ;
          APPLY ;
          LAMBDA key address { HASH_KEY ; IMPLICIT_ACCOUNT ; ADDRESS } ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DUP 16 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 15 ;
-         DIG 13 ;
-         DIG 13 ;
+         LAMBDA
+           (pair (set address)
+                 (pair (pair nat nat)
+                       (pair (big_map bytes timestamp)
+                             (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
+           (pair (pair nat nat)
+                 (pair (big_map bytes timestamp)
+                       (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat)))))
+           { UNPAIR ;
+             PUSH nat 0 ;
+             SWAP ;
+             DUP ;
+             DUG 2 ;
+             SIZE ;
+             COMPARE ;
+             EQ ;
+             IF { DROP 2 ; PUSH string "EMPTY_ADMIN_SET" ; FAILWITH } { UPDATE 7 } } ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DUP 17 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 16 ;
+         DIG 14 ;
+         DIG 14 ;
          PAIR 14 ;
          LAMBDA
            (pair (pair (lambda key address)
@@ -969,7 +986,7 @@
                                 (pair timestamp
                                       (pair (pair nat nat)
                                             (pair (big_map bytes timestamp)
-                                                  (pair (big_map bytes (pair address nat)) (pair address (big_map address nat))))))
+                                                  (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
                                 bool)
                              (pair (lambda nat bytes)
                                    (pair (lambda key bytes)
@@ -990,11 +1007,11 @@
                                      (pair bytes (pair key (pair key (pair nat (pair bytes signature))))))))
                        (pair (pair nat nat)
                              (pair (big_map bytes timestamp)
-                                   (pair (big_map bytes (pair address nat)) (pair address (big_map address nat)))))))
+                                   (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat)))))))
            (pair operation
                  (pair (pair nat nat)
                        (pair (big_map bytes timestamp)
-                             (pair (big_map bytes (pair address nat)) (pair address (big_map address nat))))))
+                             (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
            { UNPAIR ;
              UNPAIR 14 ;
              DIG 14 ;
@@ -1547,15 +1564,16 @@
                      PAIR } } } ;
          SWAP ;
          APPLY ;
-         DIG 4 ;
+         DIG 5 ;
          UNPAIR ;
          IF_LEFT
            { DIG 2 ;
              DROP ;
              IF_LEFT
-               { DIG 3 ;
+               { DIG 2 ;
                  DIG 4 ;
-                 DROP 2 ;
+                 DIG 5 ;
+                 DROP 3 ;
                  SWAP ;
                  DUP ;
                  DUG 2 ;
@@ -1579,83 +1597,106 @@
                  UPDATE 3 ;
                  NIL operation ;
                  PAIR }
-               { DIG 2 ;
+               { DIG 3 ;
                  DROP ;
                  SWAP ;
                  DUP ;
                  DUG 2 ;
-                 DIG 3 ;
+                 DIG 4 ;
                  SWAP ;
                  EXEC ;
                  DROP ;
                  IF_LEFT
                    { IF_LEFT
-                       { DIG 2 ; DROP ; UPDATE 7 }
-                       { UNPAIR ;
-                         DIG 3 ;
-                         DUG 2 ;
-                         PAIR 3 ;
-                         LAMBDA
-                           (pair (pair bytes
-                                       (pair (pair address nat)
-                                             (lambda address (contract (list (pair address (list (pair address (pair nat nat)))))))))
-                                 (pair (pair nat nat)
-                                       (pair (big_map bytes timestamp)
-                                             (pair (big_map bytes (pair address nat)) (pair address (big_map address nat))))))
-                           (pair (pair nat nat)
-                                 (pair (big_map bytes timestamp)
-                                       (pair (big_map bytes (pair address nat)) (pair address (big_map address nat)))))
-                           { UNPAIR ;
-                             UNPAIR 3 ;
-                             DIG 3 ;
-                             DUP 3 ;
-                             CAR ;
-                             DIG 4 ;
+                       { DIG 3 ;
+                         DROP ;
+                         IF_LEFT
+                           { SWAP ;
+                             DUP ;
+                             DUG 2 ;
+                             GET 7 ;
                              SWAP ;
-                             EXEC ;
+                             ITER { PUSH bool True ; SWAP ; UPDATE } ;
+                             PAIR ;
+                             EXEC }
+                           { SWAP ;
+                             DUP ;
+                             DUG 2 ;
+                             GET 7 ;
+                             SWAP ;
+                             ITER { PUSH bool False ; SWAP ; UPDATE } ;
+                             PAIR ;
+                             EXEC } }
+                       { IF_LEFT
+                           { DIG 3 ; DROP ; PAIR ; EXEC }
+                           { DIG 2 ;
                              DROP ;
-                             DUP ;
-                             GET 8 ;
-                             PUSH nat 1 ;
-                             DUP 5 ;
-                             CDR ;
-                             ADD ;
-                             SOME ;
-                             DUP 5 ;
-                             CAR ;
-                             GET_AND_UPDATE ;
-                             DIG 2 ;
-                             DUP ;
-                             DUP ;
-                             DUG 4 ;
-                             GET 5 ;
-                             DUP 7 ;
-                             DIG 6 ;
-                             SWAP ;
-                             SOME ;
-                             SWAP ;
-                             UPDATE ;
-                             UPDATE 5 ;
-                             SWAP ;
-                             IF_NONE
-                               { DIG 2 ; DIG 3 ; DROP 2 ; SWAP }
-                               { DIG 4 ;
-                                 CDR ;
+                             UNPAIR ;
+                             DIG 3 ;
+                             DUG 2 ;
+                             PAIR 3 ;
+                             LAMBDA
+                               (pair (pair bytes
+                                           (pair (pair address nat)
+                                                 (lambda address (contract (list (pair address (list (pair address (pair nat nat)))))))))
+                                     (pair (pair nat nat)
+                                           (pair (big_map bytes timestamp)
+                                                 (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
+                               (pair (pair nat nat)
+                                     (pair (big_map bytes timestamp)
+                                           (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat)))))
+                               { UNPAIR ;
+                                 UNPAIR 3 ;
+                                 DIG 3 ;
+                                 DUP 3 ;
+                                 CAR ;
+                                 DIG 4 ;
                                  SWAP ;
-                                 COMPARE ;
-                                 GT ;
-                                 IF { SWAP ; DROP ; SWAP ; GET 8 } { DIG 2 ; DROP ; SWAP } } ;
-                             UPDATE 8 } ;
-                         SWAP ;
-                         APPLY ;
-                         SWAP ;
-                         EXEC } }
-                   { DIG 2 ; DROP ; UPDATE 1 } ;
+                                 EXEC ;
+                                 DROP ;
+                                 DUP ;
+                                 GET 8 ;
+                                 PUSH nat 1 ;
+                                 DUP 5 ;
+                                 CDR ;
+                                 ADD ;
+                                 SOME ;
+                                 DUP 5 ;
+                                 CAR ;
+                                 GET_AND_UPDATE ;
+                                 DIG 2 ;
+                                 DUP ;
+                                 DUP ;
+                                 DUG 4 ;
+                                 GET 5 ;
+                                 DUP 7 ;
+                                 DIG 6 ;
+                                 SWAP ;
+                                 SOME ;
+                                 SWAP ;
+                                 UPDATE ;
+                                 UPDATE 5 ;
+                                 SWAP ;
+                                 IF_NONE
+                                   { DIG 2 ; DIG 3 ; DROP 2 ; SWAP }
+                                   { DIG 4 ;
+                                     CDR ;
+                                     SWAP ;
+                                     COMPARE ;
+                                     GT ;
+                                     IF { SWAP ; DROP ; SWAP ; GET 8 } { DIG 2 ; DROP ; SWAP } } ;
+                                 UPDATE 8 } ;
+                             SWAP ;
+                             APPLY ;
+                             SWAP ;
+                             EXEC } } }
+                   { DIG 2 ; DIG 3 ; DROP 2 ; UPDATE 1 } ;
                  NIL operation ;
                  PAIR } }
            { DIG 3 ;
-             DIG 5 ;
-             DROP 2 ;
+             DIG 4 ;
+             DIG 6 ;
+             DROP 3 ;
              IF_LEFT
                { SWAP ;
                  DUP ;

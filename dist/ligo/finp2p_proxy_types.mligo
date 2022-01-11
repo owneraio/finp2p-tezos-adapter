@@ -66,7 +66,9 @@ type operation_ttl = [@layout:comb]  {
 
 type finp2p_proxy_admin_param =
   | Update_operation_ttl of operation_ttl 
-  | Update_admin of address 
+  | Update_admins of address set 
+  | Add_admins of address list 
+  | Remove_admins of address list 
   | Update_fa2_token of update_fa2_token_param 
 
 type finp2p_proxy_param =
@@ -79,7 +81,7 @@ type storage = [@layout:comb]  {
     operation_ttl: operation_ttl ;
     live_operations: (operation_hash, timestamp) big_map ;
     finp2p_assets: (asset_id, fa2_token) big_map ;
-    admin: address ;
+    admins: address set ;
     next_token_ids: (address, nat) big_map }
 
 
