@@ -96,14 +96,20 @@ type BatchEntryPoint =
   | 'create_asset'
   | 'issue_tokens'
   | 'redeem_tokens'
-  | 'cleanup';
+  | 'cleanup'
+  | 'update_admin'
+  | 'update_operation_ttl'
+  | 'update_fa2_token';
 
 type ProxyBatchParam =
   | TransferTokensParam
   | CreateAssetParam
   | IssueTokensParam
   | RedeemTokensParam
-  | CleanupParam;
+  | CleanupParam
+  | Address
+  | OperationTTL
+  | [AssetId, FA2Token];
 
 export interface BatchParam {
   kind: BatchEntryPoint;
@@ -323,6 +329,34 @@ export namespace Michelson {
       return { bytes };
     });
   }
+
+  export function updateAdminParam(addr : Address) : MichelsonV1Expression {
+    return { string: addr };
+  }
+
+  export function updateOperationTtlParam(
+    { ttl, allowed_in_the_future } : OperationTTL,
+  ) : MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        { /* ttl */ int: ttl.toString() },
+        { /* allowed_in_the_future */ int: allowed_in_the_future.toString() },
+      ],
+    };
+  }
+
+  export function updateFa2TokenParam([assetId, token] : [AssetId, FA2Token])
+    : MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        { bytes: bytesToHex(assetId) },
+        fa2Token(token),
+      ],
+    };
+  }
+
 }
 
 export interface CallOptions {
@@ -659,6 +693,47 @@ export class FinP2PTezos {
   }
 
   /**
+   * @description Call the entry-point `update_admin` of the FinP2P proxy
+   * @param new_admin: the address of the new admin
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async updateAdmin(
+    new_admin: Address,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('update_admin', new_admin, options);
+  }
+
+  /**
+   * @description Call the entry-point `update_operation_ttl` of the FinP2P proxy
+   * @param op_ttl: the new ttl parameters of the contract
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async updateOperationTTL(
+    op_ttl: OperationTTL,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('update_operation_ttl', op_ttl, options);
+  }
+
+  /**
+   * @description Call the entry-point `update_fa2_token` of the FinP2P proxy
+   * @param assetId: the asset id for which to update the FA2 token
+   * @param token: the token id and address of the new FA2 contract
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async updateFA2Token(
+    assetId: AssetId,
+    token: FA2Token,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('update_fa2_token', [assetId, token], options);
+  }
+
+  /**
    * Retrieve the FinP2P proxy contract current storage
    * @param kt1 : optional address of the proxy contract
    * @returns a promise with the current storage
@@ -669,6 +744,9 @@ export class FinP2PTezos {
     let addr = this.getProxyAddress(kt1);
     const contract = await this.taquito.contract.at(addr);
     let storage = await contract.storage() as ProxyStorage;
+    storage.operation_ttl.ttl = BigInt(storage.operation_ttl.ttl); // BigNumber
+    storage.operation_ttl.allowed_in_the_future =
+      BigInt(storage.operation_ttl.allowed_in_the_future); // BigNumber
     return storage;
   }
 
@@ -803,6 +881,33 @@ export class FinP2PTezos {
             to : kt1Cl,
             parameter : { entrypoint: bp.kind,
               value: Michelson.cleanupParam(vCl) },
+          };
+        case 'update_admin':
+          let newAdmin = <Address>bp.param;
+          let kt1Ua  = finp2p.getProxyAddress(bp.kt1);
+          return {
+            amount : 0,
+            to : kt1Ua,
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.updateAdminParam(newAdmin) },
+          };
+        case 'update_operation_ttl':
+          let ttl = <OperationTTL>bp.param;
+          let kt1Uot  = finp2p.getProxyAddress(bp.kt1);
+          return {
+            amount : 0,
+            to : kt1Uot,
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.updateOperationTtlParam(ttl) },
+          };
+        case 'update_fa2_token':
+          let fa2 = <[AssetId, FA2Token]>bp.param;
+          let kt1Uft  = finp2p.getProxyAddress(bp.kt1);
+          return {
+            amount : 0,
+            to : kt1Uft,
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.updateFa2TokenParam(fa2) },
           };
         default:
           throw Error(`batch: switch not exhaustive. Case ${bp.kind} not covered`);
