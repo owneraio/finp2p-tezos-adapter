@@ -2,584 +2,608 @@ import {
   OpKind,
   BigMapAbstraction,
   MichelsonMap,
-  OriginationOperation} from "@taquito/taquito"
-import { BlockHeaderResponse, MichelsonV1Expression } from "@taquito/rpc";
+  OriginationOperation } from '@taquito/taquito';
+import { BlockHeaderResponse, MichelsonV1Expression } from '@taquito/rpc';
 import { encodeKey, validateContractAddress } from '@taquito/utils';
-import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from "./taquito_wrapper";
+import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix } from '@taquito/utils';
-import { ParameterSchema } from "@taquito/michelson-encoder";
+import { ParameterSchema } from '@taquito/michelson-encoder';
 const PromiseAny = require('promise-any');
 
-import * as finp2p_proxy_code from '../dist/michelson/finp2p_proxy.json';
-import * as fa2_code from '../dist/michelson/fa2.json';
-import * as authorization_code from '../dist/michelson/authorization.json';
-import * as auth_init from '../dist/michelson/auth_init.json';
+import * as finp2pProxyCode from '../dist/michelson/finp2p_proxy.json';
+import * as fa2Code from '../dist/michelson/fa2.json';
+import * as authorizationCode from '../dist/michelson/authorization.json';
+import * as authInit from '../dist/michelson/auth_init.json';
 
 /** Interfaces/types for smart contract's entrypoints parameters and storage */
 
-export type address = string
-export type nat = bigint
-export type key = string
-export type bytes = Uint8Array
-export type token_amount = bigint
-export type asset_id = bytes
-export type operation_hash = Uint8Array
-export type nonce = Uint8Array
-export type timestamp = Date
-export type signature = string
+export type Address = string;
+export type Nat = bigint;
+export type Key = string;
+export type Bytes = Uint8Array;
+export type TokenAmount = bigint;
+export type AssetId = Bytes;
+export type Operationhash = Uint8Array;
+export type Nonce = Uint8Array;
+export type Timestamp = Date;
+export type Signature = string;
 
-let utf8 = new TextEncoder()
-let utf8dec = new TextDecoder()
+let utf8 = new TextEncoder();
+let utf8dec = new TextDecoder();
 
-function to_str(x : any) : string {
-  if (typeof x === 'string') { return x }
-  return JSON.stringify(x)
+function toStr(x : any) : string {
+  if (typeof x === 'string') { return x; }
+  return JSON.stringify(x);
 }
 
-function hasOwnProperty<X extends {}, Y extends PropertyKey>
-  (obj: X, prop: Y): obj is X & Record<Y, unknown> {
-    return obj.hasOwnProperty(prop)
-  }
-
-export interface fa2_token {
-  address: address;
-  id: nat;
+function hasOwnProperty<X extends {}, Y extends PropertyKey>(obj: X, prop: Y): obj is X & Record<Y, unknown> {
+  return obj.hasOwnProperty(prop);
 }
 
-export interface create_fa2_token {
-  address: address;
-  id?: nat;
+export interface FA2Token {
+  address: Address;
+  id: Nat;
 }
 
-export interface finp2p_nonce {
-  nonce: nonce;
-  timestamp: timestamp;
+export interface CreateFA2Token {
+  address: Address;
+  id?: Nat;
 }
 
-export interface transfer_tokens_param {
-  nonce: finp2p_nonce;
-  asset_id: asset_id;
-  src_account: key;
-  dst_account: key;
-  amount: token_amount;
-  shg: bytes;
-  signature: signature;
+export interface Finp2pNonce {
+  nonce: Nonce;
+  timestamp: Timestamp;
 }
 
-export interface create_asset_param {
-  asset_id: asset_id;
-  new_token_info: [create_fa2_token, MichelsonMap<string, bytes>];
+export interface TransferTokensParam {
+  nonce: Finp2pNonce;
+  asset_id: AssetId;
+  src_account: Key;
+  dst_account: Key;
+  amount: TokenAmount;
+  shg: Bytes;
+  signature: Signature;
 }
 
-export interface issue_tokens_param {
-  nonce: finp2p_nonce;
-  asset_id: asset_id;
-  dst_account: key;
-  amount: token_amount;
-  shg: bytes;
-  signature?: signature;
+export interface CreateAssetParam {
+  asset_id: AssetId;
+  new_token_info: [CreateFA2Token, MichelsonMap<string, Bytes>];
 }
 
-export interface redeem_tokens_param {
-  nonce: finp2p_nonce;
-  asset_id: asset_id;
-  src_account: key;
-  amount: token_amount;
-  signature: signature;
+export interface IssueTokensParam {
+  nonce: Finp2pNonce;
+  asset_id: AssetId;
+  dst_account: Key;
+  amount: TokenAmount;
+  shg: Bytes;
+  signature?: Signature;
 }
 
-type cleanup_param = string[] | undefined
+export interface RedeemTokensParam {
+  nonce: Finp2pNonce;
+  asset_id: AssetId;
+  src_account: Key;
+  amount: TokenAmount;
+  signature: Signature;
+}
 
-type batch_ep =
+type CleanupParam = string[] | undefined;
+
+type BatchEntryPoint =
   | 'transfer_tokens'
   | 'create_asset'
   | 'issue_tokens'
   | 'redeem_tokens'
-  | 'cleanup'
+  | 'cleanup';
 
-type batch_param =
-  | transfer_tokens_param
-  | create_asset_param
-  | issue_tokens_param
-  | redeem_tokens_param
-  | cleanup_param
+type ProxyBatchParam =
+  | TransferTokensParam
+  | CreateAssetParam
+  | IssueTokensParam
+  | RedeemTokensParam
+  | CleanupParam;
 
 export interface BatchParam {
-  kind: batch_ep;
-  param: batch_param;
-  kt1? : address;
+  kind: BatchEntryPoint;
+  param: ProxyBatchParam;
+  kt1? : Address;
 }
 
-export interface operation_ttl  {
+export interface OperationTTL  {
   ttl : bigint, /* in seconds */
   allowed_in_the_future : bigint /* in seconds */
 }
 
-export interface proxy_storage {
-  operation_ttl: operation_ttl;
+export interface ProxyStorage {
+  operation_ttl: OperationTTL;
   live_operations: BigMapAbstraction;
   finp2p_assets: BigMapAbstraction;
-  admin: address;
+  admin: Address;
   next_token_ids: BigMapAbstraction;
 }
 
-interface initial_storage {
-  operation_ttl: operation_ttl; /* in seconds */
-  live_operations: MichelsonMap<bytes, timestamp>;
-  finp2p_assets: MichelsonMap<asset_id, fa2_token>;
-  admin: address;
-  next_token_ids: MichelsonMap<address, nat>;
+interface InitialStorage {
+  operation_ttl: OperationTTL; /* in seconds */
+  live_operations: MichelsonMap<Bytes, Timestamp>;
+  finp2p_assets: MichelsonMap<AssetId, FA2Token>;
+  admin: Address;
+  next_token_ids: MichelsonMap<Address, Nat>;
 }
 
-export interface fa2_storage {
-  auth_contract : address,
+export interface FA2Storage {
+  auth_contract : Address,
   paused : boolean,
   ledger : BigMapAbstraction,
   operators : BigMapAbstraction,
   token_metadata : BigMapAbstraction,
   total_supply : BigMapAbstraction,
   max_token_id : bigint,
-  metadata: MichelsonMap<string, bytes>
+  metadata: MichelsonMap<string, Bytes>
 }
 
-type op_status =
-  'applied' | 'failed' | 'backtracked' | 'skipped'
+type OpStatus =
+  'applied' | 'failed' | 'backtracked' | 'skipped';
 
-export interface op_receipt {
+export interface OpReceipt {
   kind: string,
-  asset_id: string,
+  assetId: string,
   amount?: bigint;
-  src_account? : Buffer,
-  dst_account? : Buffer,
-  status?: op_status,
+  srcAccount? : Buffer,
+  dstAccount? : Buffer,
+  status?: OpStatus,
   errors?: any,
   block?: string,
   level?: number,
   confirmations?: number,
   confirmed: boolean,
-  node_agree?: boolean,
+  nodeAgree?: boolean,
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
 
 export namespace Michelson {
 
-  export function bytes_to_hex(b: Uint8Array): string {
-    return Buffer.from(b.buffer, b.byteOffset, b.length).toString("hex");
+  export function bytesToHex(b: Uint8Array): string {
+    return Buffer.from(b.buffer, b.byteOffset, b.length).toString('hex');
   }
 
-  export function maybe_bytes(k : key) : MichelsonV1Expression {
-    if (k.substring(0,2) == '0x') {
-      return { bytes : k.substring(2) }
+  export function maybeBytes(k : Key) : MichelsonV1Expression {
+    if (k.substring(0, 2) == '0x') {
+      return { bytes : k.substring(2) };
     } else {
-      return { string : k }
+      return { string : k };
     }
   }
 
-  export function fa2_token(token: fa2_token): MichelsonV1Expression {
+  function mkOpt<T>(v: T | undefined, conv: ((_: T) => MichelsonV1Expression)): MichelsonV1Expression {
+    return (v === undefined) ? { prim: 'None' } : { prim: 'Some', args : [conv(v)] };
+  }
+
+  // function mkMap<K, V>(
+  //   m: Map<K, V>,
+  //   mkKey: ((_: K) => MichelsonV1Expression),
+  //   mkValue: ((_: V) => MichelsonV1Expression)): MichelsonV1Expression {
+  //   let arr = [...m.entries()];
+  //   let res = arr.map(([k, v]) => { return { prim: 'Elt', args: [mkKey(k), mkValue(v)] }; });
+  //   return res;
+  // }
+
+  export function fa2Token(token: FA2Token): MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
         { /* address */ string: token.address },
-        { /* id */ int: token.id.toString() }
-      ]
-    }
+        { /* id */ int: token.id.toString() },
+      ],
+    };
   }
 
-  export function create_fa2_token(token: create_fa2_token): MichelsonV1Expression {
+  export function createFa2Token(token: CreateFA2Token): MichelsonV1Expression {
     let id =
-      mk_opt(token.id,
-             ((id) => { return { int: id.toString() }}))
+      mkOpt(token.id,
+        (tid => { return { int: tid.toString() };}));
     return {
       prim: 'Pair',
       args: [
         { /* address */ string: token.address },
-        /* id */ id
-      ]
-    }
+        /* id */ id,
+      ],
+    };
   }
 
-  export function finp2p_nonce(n: finp2p_nonce): MichelsonV1Expression {
+  export function finp2pNonce(n: Finp2pNonce): MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
-        { /* nonce */ bytes: bytes_to_hex(n.nonce) },
-        { /* timestamp */ string: n.timestamp.toISOString() }
-      ]
-    }
+        { /* nonce */ bytes: bytesToHex(n.nonce) },
+        { /* timestamp */ string: n.timestamp.toISOString() },
+      ],
+    };
   }
 
-  export function transfer_tokens_param(tt: transfer_tokens_param): MichelsonV1Expression {
+  export function transferTokensParam(tt: TransferTokensParam): MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
-        /* nonce */ finp2p_nonce(tt.nonce),
-        { /* asset_id */ bytes: bytes_to_hex(tt.asset_id) },
-        /* src_account */ maybe_bytes(tt.src_account),
-        /* dst_account */ maybe_bytes(tt.dst_account),
+        /* nonce */ finp2pNonce(tt.nonce),
+        { /* asset_id */ bytes: bytesToHex(tt.asset_id) },
+        /* src_account */ maybeBytes(tt.src_account),
+        /* dst_account */ maybeBytes(tt.dst_account),
         { /* amount */ int: tt.amount.toString() },
-        { /* shg */ bytes: bytes_to_hex(tt.shg) },
-        /* signature */ maybe_bytes(tt.signature)
-      ]
-    }
+        { /* shg */ bytes: bytesToHex(tt.shg) },
+        /* signature */ maybeBytes(tt.signature),
+      ],
+    };
   }
 
-  function mk_opt<T>(v: T | undefined, conv: ((_: T) => MichelsonV1Expression)): MichelsonV1Expression {
-    return (v === undefined) ? { prim: 'None' } : { prim: 'Some', args : [conv(v)] }
-  }
-
-  function mk_map<K, V>(
-    m: Map<K, V>,
-    mk_key: ((_: K) => MichelsonV1Expression),
-    mk_value: ((_: V) => MichelsonV1Expression)): MichelsonV1Expression {
-    let arr = [...m.entries()]
-    let res = arr.map(([k, v]) => { return { prim: 'Elt', args: [mk_key(k), mk_value(v)] } })
-    return res
-  }
-
-  export function create_asset_param(ca : create_asset_param) : MichelsonV1Expression {
-    let [fa2t, info] = ca.new_token_info
-    let mich_info =
+  export function createAssetParam(ca : CreateAssetParam) : MichelsonV1Expression {
+    let [fa2t, info] = ca.new_token_info;
+    let michInfo =
       [...info.entries()]
-        .sort(([k1, _v1], [k2, _v2]) => {
-          return (new String(k1)).localeCompare(k2)
+        .sort(([k1], [k2]) => {
+          return (new String(k1)).localeCompare(k2);
         })
         .map(([k, b]) => {
           return { prim: 'Elt',
-                   args: [
-                     { string: k }, { bytes: bytes_to_hex(b) }
-                   ] }
+            args: [
+              { string: k }, { bytes: bytesToHex(b) },
+            ] };
         });
-    let mich_new_token_info =
+    let michNewTokenInfo =
       {
         prim: 'Pair',
         args: [
-          create_fa2_token(fa2t),
-          mich_info
-        ]
-      }
+          createFa2Token(fa2t),
+          michInfo,
+        ],
+      };
     return {
       prim: 'Pair',
       args: [
-        { /* asset_id */ bytes: bytes_to_hex(ca.asset_id) },
-        /* new_token_info */ mich_new_token_info
-      ]
-    }
+        { /* asset_id */ bytes: bytesToHex(ca.asset_id) },
+        /* new_token_info */ michNewTokenInfo,
+      ],
+    };
   }
 
-  export function issue_tokens_param(it: issue_tokens_param): MichelsonV1Expression {
-    let mich_signature =
-      mk_opt(it.signature,
-             ((s) => { return maybe_bytes(s) }))
+  export function issueTokensParam(it: IssueTokensParam): MichelsonV1Expression {
+    let michSignature =
+      mkOpt(it.signature,
+        (s => { return maybeBytes(s); }));
     return {
       prim: 'Pair',
       args: [
-        /* nonce */ finp2p_nonce(it.nonce),
-        { /* asset_id */ bytes: bytes_to_hex(it.asset_id) },
-        /* dst_account */ maybe_bytes(it.dst_account),
+        /* nonce */ finp2pNonce(it.nonce),
+        { /* asset_id */ bytes: bytesToHex(it.asset_id) },
+        /* dst_account */ maybeBytes(it.dst_account),
         { /* amount */ int: it.amount.toString() },
-        { /* shg */ bytes: bytes_to_hex(it.shg) },
-        /* signature */ mich_signature
-      ]
-    }
+        { /* shg */ bytes: bytesToHex(it.shg) },
+        /* signature */ michSignature,
+      ],
+    };
   }
 
-  export function redeem_tokens_param(rt: redeem_tokens_param): MichelsonV1Expression {
+  export function redeemTokensParam(rt: RedeemTokensParam): MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
-        /* nonce */ finp2p_nonce(rt.nonce),
-        { /* asset_id */ bytes: bytes_to_hex(rt.asset_id) },
-        /* src_account */ maybe_bytes(rt.src_account),
+        /* nonce */ finp2pNonce(rt.nonce),
+        { /* asset_id */ bytes: bytesToHex(rt.asset_id) },
+        /* src_account */ maybeBytes(rt.src_account),
         { /* amount */ int: rt.amount.toString() },
-        /* signature */ maybe_bytes(rt.signature)
-      ]
-    }
+        /* signature */ maybeBytes(rt.signature),
+      ],
+    };
   }
 
-  export function add_accredited_param(addr : address, data : bytes) : MichelsonV1Expression {
+  export function addAccreditedParam(addr : Address, data : Bytes) : MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
         { string: addr },
-        { bytes: bytes_to_hex(data) }
-      ]
-    }
+        { bytes: bytesToHex(data) },
+      ],
+    };
   }
 
-  export function get_asset_balance_param(public_key : key, asset_id : asset_id) : MichelsonV1Expression {
+  export function getAssetBalanceParam(publicKey : Key, assetId : AssetId) : MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
-        maybe_bytes(public_key),
-        { bytes: bytes_to_hex(asset_id) }
-      ]
-    }
+        maybeBytes(publicKey),
+        { bytes: bytesToHex(assetId) },
+      ],
+    };
   }
 
-  export function cleanup_param(ophs : string[]) : MichelsonV1Expression {
+  export function cleanupParam(ophs : string[]) : MichelsonV1Expression {
     return ophs.map(bytes => {
-      return { bytes }
-    })
+      return { bytes };
+    });
   }
 }
 
-export interface call_options {
-  kt1? : address,
+export interface CallOptions {
+  kt1? : Address,
   cleanup : boolean,
-  min_cleanup : number,
+  minCleanup : number,
 }
 
-export interface explorer_url {
-  kind : 'TzKT' | 'tzstats' ,
+export interface Explorer {
+  kind : 'TzKT' | 'tzstats',
   url : string,
 }
 
-export interface config {
+export interface Config {
   url : string,
-  admin : address;
-  finp2p_proxy_address? : address;
-  finp2p_fa2_address? : address;
-  finp2p_auth_address? : address;
+  admin : Address;
+  finp2pProxyAddress? : Address;
+  finp2pFA2Address? : Address;
+  finp2pAuthAddress? : Address;
   debug? : boolean;
   confirmations? : number;
-  explorers? : explorer_url[];
-  auto_cleanup? : boolean;
-  min_cleanup? : number;
+  explorers? : Explorer[];
+  autoCleanup? : boolean;
+  minCleanup? : number;
 }
+
+
+export class ReceiptError extends Error {
+
+  op : OperationResult;
+
+  receipts : OpReceipt[];
+
+  constructor(op : OperationResult, receipts : OpReceipt[], ...params: any[]) {
+    super(...params);
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ReceiptError);
+    }
+
+    this.name = 'ReceiptError';
+    this.op = op;
+    this.receipts = receipts;
+  }
+
+}
+
 
 export class FinP2PTezos {
 
-  taquito : TaquitoWrapper
-  config : config
-  contracts : ContractsLibrary
-  default_call_options : call_options = {
-    cleanup : true,
-    min_cleanup : 8
-  }
+  taquito : TaquitoWrapper;
 
-  constructor(config : config) {
+  config : Config;
+
+  contracts : ContractsLibrary;
+
+  defaultCallOptions : CallOptions = {
+    cleanup : true,
+    minCleanup : 8,
+  };
+
+  constructor(config : Config) {
     this.taquito = new TaquitoWrapper(config.url, config.debug);
-    this.check_config(config);
+    this.checkConfig(config);
     this.config = config;
     this.contracts = new ContractsLibrary();
     this.taquito.addExtension(this.contracts);
-    if (this.config.min_cleanup !== undefined) {
-      this.default_call_options.min_cleanup = this.config.min_cleanup
+    if (this.config.minCleanup !== undefined) {
+      this.defaultCallOptions.minCleanup = this.config.minCleanup;
     }
-    if (this.config.auto_cleanup !== undefined) {
-      this.default_call_options.cleanup = this.config.auto_cleanup
+    if (this.config.autoCleanup !== undefined) {
+      this.defaultCallOptions.cleanup = this.config.autoCleanup;
     }
   }
 
-  check_config (c : config) {
-    if (c.finp2p_auth_address !== undefined &&
-        validateContractAddress(c.finp2p_auth_address) !== 3) {
-        throw new Error("Invalid Auth contract address")
+  checkConfig(c : Config) {
+    if (c.finp2pAuthAddress !== undefined &&
+        validateContractAddress(c.finp2pAuthAddress) !== 3) {
+      throw new Error('Invalid Auth contract address');
     }
-    if (c.finp2p_fa2_address !== undefined &&
-        validateContractAddress(c.finp2p_fa2_address) !== 3) {
-        throw new Error("Invalid FA2 contract address")
+    if (c.finp2pFA2Address !== undefined &&
+        validateContractAddress(c.finp2pFA2Address) !== 3) {
+      throw new Error('Invalid FA2 contract address');
     }
-    if (c.finp2p_proxy_address !== undefined &&
-        validateContractAddress(c.finp2p_proxy_address) !== 3) {
-        throw new Error("Invalid Proxy contract address")
+    if (c.finp2pProxyAddress !== undefined &&
+        validateContractAddress(c.finp2pProxyAddress) !== 3) {
+      throw new Error('Invalid Proxy contract address');
     }
   }
 
   /**
-   * @description Re-export `wait_inclusion` for ease of use.
+   * @description Re-export `waitInclusion` for ease of use.
    * By default, waits for the number of confirmations in the `config`.
-   * @see TaquitoWrapper.wait_inclusion for details
+   * @see TaquitoWrapper.waitInclusion for details
   */
-  wait_inclusion(op : OperationResult, confirmations = this.config.confirmations) {
-    return this.taquito.wait_inclusion(op, confirmations)
+  waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
+    return this.taquito.waitInclusion(op, confirmations);
   }
 
-  async init (p : { operation_ttl : operation_ttl,
-                    fa2_metadata : Map<string,bytes> }) {
-    var accredit = false
-    if (this.config.finp2p_auth_address === undefined) {
-      let op = await this.deployFinp2pAuth()
-      await this.taquito.wait_inclusion(op)
-      let addr = contractAddressOfOpHash(op.hash)
-      this.config.finp2p_auth_address = addr
-      console.log('Auth', addr)
-      accredit = true
+  async init(p : { operationTTL : OperationTTL,
+    fa2Metadata : Map<string, Bytes> }) {
+    var accredit = false;
+    if (this.config.finp2pAuthAddress === undefined) {
+      let op = await this.deployFinp2pAuth();
+      await this.taquito.waitInclusion(op);
+      let addr = contractAddressOfOpHash(op.hash);
+      this.config.finp2pAuthAddress = addr;
+      console.log('Auth', addr);
+      accredit = true;
     }
-    if (this.config.finp2p_fa2_address === undefined) {
-      if (typeof this.config.finp2p_auth_address === 'string') {
-        let op = await this.deployFinp2pFA2(this.config.finp2p_auth_address, p.fa2_metadata)
-        await this.taquito.wait_inclusion(op)
-        let addr = contractAddressOfOpHash(op.hash)
-        this.config.finp2p_fa2_address = addr
-        console.log('FA2', addr)
-      }}
-    if (this.config.finp2p_proxy_address === undefined) {
-      let op = await this.deployFinp2pProxy(p.operation_ttl)
-      await this.taquito.wait_inclusion(op)
-      let addr = contractAddressOfOpHash(op.hash)
-      this.config.finp2p_proxy_address = addr
-      console.log('Proxy', addr)
-      accredit = true
+    if (this.config.finp2pFA2Address === undefined) {
+      if (typeof this.config.finp2pAuthAddress === 'string') {
+        let op = await this.deployFinp2pFA2(p.fa2Metadata, this.config.finp2pAuthAddress);
+        await this.taquito.waitInclusion(op);
+        let addr = contractAddressOfOpHash(op.hash);
+        this.config.finp2pFA2Address = addr;
+        console.log('FA2', addr);
+      }
     }
-    this.add_finp2p_contracts();
-    if (accredit && typeof this.config.finp2p_proxy_address === 'string') {
-      console.log('Adding Proxy to accredited contracts')
-      let op = await this.add_accredited(this.config.finp2p_proxy_address,
-                                         this.proxy_accreditation)
-      await this.taquito.wait_inclusion(op)
+    if (this.config.finp2pProxyAddress === undefined) {
+      let op = await this.deployFinp2pProxy(p.operationTTL);
+      await this.taquito.waitInclusion(op);
+      let addr = contractAddressOfOpHash(op.hash);
+      this.config.finp2pProxyAddress = addr;
+      console.log('Proxy', addr);
+      accredit = true;
+    }
+    this.addFinp2pContracts();
+    if (accredit && typeof this.config.finp2pProxyAddress === 'string') {
+      console.log('Adding Proxy to accredited contracts');
+      let op = await this.addAccredited(this.config.finp2pProxyAddress,
+        this.proxyAccreditation);
+      await this.taquito.waitInclusion(op);
     }
   }
 
   async deployFinp2pProxy(
-    operation_ttl : operation_ttl,
+    operation_ttl : OperationTTL,
     admin = this.config.admin): Promise<OriginationOperation> {
-    let initial_storage: initial_storage = {
+    let initialStorage: InitialStorage = {
       operation_ttl,
       live_operations: new MichelsonMap(),
       finp2p_assets: new MichelsonMap(),
       admin,
       next_token_ids: new MichelsonMap(),
-    }
-    this.taquito.debug("Deploying new FinP2P Proxy smart contract")
+    };
+    this.taquito.debug('Deploying new FinP2P Proxy smart contract');
     return this.taquito.contract.originate({
-      code: finp2p_proxy_code,
-      storage: initial_storage
+      code: finp2pProxyCode,
+      storage: initialStorage,
     });
   }
 
   async deployFinp2pAuth(admin = this.config.admin): Promise<OriginationOperation> {
-    let initial_storage = {
+    let initialStorage = {
       storage: {
         admin,
-        accredited : new MichelsonMap()
+        accredited : new MichelsonMap(),
       },
-      authorize : auth_init[2].args[0] // code
-    }
-    this.taquito.debug("Deploying new FinP2P Authorization smart contract")
+      authorize : authInit[2].args[0], // code
+    };
+    this.taquito.debug('Deploying new FinP2P Authorization smart contract');
     return this.taquito.contract.originate({
-      code: authorization_code,
-      storage: initial_storage
+      code: authorizationCode,
+      storage: initialStorage,
     });
   }
 
   async deployFinp2pFA2(
-    auth_contract = this.config.finp2p_auth_address,
-    metadata : Map<string, bytes>
+    metadata : Map<string, Bytes>,
+    auth_contract = this.config.finp2pAuthAddress,
   ): Promise<OriginationOperation> {
-    let mich_metadata = new MichelsonMap<string, bytes>()
+    let michMetadata = new MichelsonMap<string, Bytes>();
     metadata.forEach((b, k) => {
-      mich_metadata.set(k, b)
-    })
-    let initial_storage = {
+      michMetadata.set(k, b);
+    });
+    let initialStorage = {
       auth_contract,
       paused : false,
-      ledger : new MichelsonMap<[nat, address], nat>(),
-      operators : new MichelsonMap<[address, [address, nat]], void>(),
-      token_metadata : new MichelsonMap<nat, [nat, Map<string, bytes>]>(),
-      total_supply : new MichelsonMap<nat, nat>(),
+      ledger : new MichelsonMap<[Nat, Address], Nat>(),
+      operators : new MichelsonMap<[Address, [Address, Nat]], void>(),
+      token_metadata : new MichelsonMap<Nat, [Nat, Map<string, Bytes>]>(),
+      total_supply : new MichelsonMap<Nat, Nat>(),
       max_token_id : BigInt(0),
-      metadata: mich_metadata
-    }
-    this.taquito.debug("Deploying new FinP2P FA2 asset smart contract")
+      metadata: michMetadata,
+    };
+    this.taquito.debug('Deploying new FinP2P FA2 asset smart contract');
     return this.taquito.contract.originate({
-      code: fa2_code,
-      storage: initial_storage
+      code: fa2Code,
+      storage: initialStorage,
     });
   }
 
-  async add_to_contracts(kt1 : address | undefined) {
+  async addToContracts(kt1 : Address | undefined) {
     if (kt1 !== undefined) {
       const [script, entrypoints] = await Promise.all([
         this.taquito.rpc.getNormalizedScript(kt1),
-        this.taquito.rpc.getEntrypoints(kt1)
-      ])
+        this.taquito.rpc.getEntrypoints(kt1),
+      ]);
       this.contracts.addContract({
-        kt1: { script, entrypoints }
-      })
+        kt1: { script, entrypoints },
+      });
     }
   }
 
-  add_finp2p_contracts () {
+  addFinp2pContracts() {
     // Don't wait for promises to resolve
-    this.add_to_contracts(this.config.finp2p_auth_address)
-    this.add_to_contracts(this.config.finp2p_fa2_address)
-    this.add_to_contracts(this.config.finp2p_proxy_address)
+    this.addToContracts(this.config.finp2pAuthAddress);
+    this.addToContracts(this.config.finp2pFA2Address);
+    this.addToContracts(this.config.finp2pProxyAddress);
   }
 
 
-  get_contract_address(kind : 'Proxy' | 'FA2' |'Auth',
-                       addr : address | undefined,
-                       kt1? : address
-                      ) : address {
+  getContractAddress(kind : 'Proxy' | 'FA2' | 'Auth',
+    addr : Address | undefined,
+    kt1? : Address,
+  ) : Address {
     if (kt1 !== undefined) {
-      return kt1
+      return kt1;
     } else if (addr !== undefined) {
-      return addr
+      return addr;
     } else {
-      throw (new Error(`FinP2P ${kind} contract undefined`))
+      throw (new Error(`FinP2P ${kind} contract undefined`));
     }
   }
 
-  get_proxy_address(kt1? : address) : address {
-    return this.get_contract_address('Proxy', this.config.finp2p_proxy_address, kt1)
+  getProxyAddress(kt1? : Address) : Address {
+    return this.getContractAddress('Proxy', this.config.finp2pProxyAddress, kt1);
   }
 
-  get_auth_address(kt1? : address) {
-    return this.get_contract_address('Auth', this.config.finp2p_auth_address, kt1)
+  getAuthAddress(kt1? : Address) {
+    return this.getContractAddress('Auth', this.config.finp2pAuthAddress, kt1);
   }
 
-  get_fa2_address(kt1? : address) {
-    return this.get_contract_address('FA2', this.config.finp2p_fa2_address, kt1)
+  getFA2Address(kt1? : Address) {
+    return this.getContractAddress('FA2', this.config.finp2pFA2Address, kt1);
   }
 
-  gen_new_token(symbol: string, asset_id: string, token_id?: number): [create_fa2_token, MichelsonMap<string, bytes>]{
-    const m: Object = { symbol : symbol, name : asset_id, decimals : '0' };
+  genNewToken(symbol: string, assetId: string, tokenId?: number): [CreateFA2Token, MichelsonMap<string, Bytes>]{
+    const m: Object = { symbol : symbol, name : assetId, decimals : '0' };
 
-    let fa2_token = {
-      address : this.get_fa2_address(),
-      id : (token_id === undefined) ? undefined : BigInt(token_id)
-    }
-    let metadata = new MichelsonMap<string, Uint8Array>()
+    let fa2Token = {
+      address : this.getFA2Address(),
+      id : (tokenId === undefined) ? undefined : BigInt(tokenId),
+    };
+    let metadata = new MichelsonMap<string, Uint8Array>();
     Object.entries(m).forEach(
-        ([k, v]) => metadata.set (k, utf8.encode(to_str(v)))
-    )
-    return [fa2_token, metadata]
+      ([k, v]) => metadata.set(k, utf8.encode(toStr(v))),
+    );
+    return [fa2Token, metadata];
   }
 
   // Call the proxy with the given entry-point / parameter, and insert a cleanup
   // operation before if there are expired operations to cleanup
-  async cleanup_and_call_proxy(
-    entrypoint : batch_ep,
-    param : batch_param,
-    { kt1, cleanup, min_cleanup } : call_options ) : Promise<OperationResult> {
-    let addr = this.get_proxy_address(kt1)
-    const call_param : BatchParam = {
+  async cleanupAndCallProxy(
+    entrypoint : BatchEntryPoint,
+    param : ProxyBatchParam,
+    { kt1, cleanup, minCleanup } : CallOptions ) : Promise<OperationResult> {
+    let addr = this.getProxyAddress(kt1);
+    const callParam : BatchParam = {
       kind: entrypoint,
       param,
       kt1: addr,
-    }
-    let batch_params = [call_param]
+    };
+    let batchParams = [callParam];
     if (cleanup) {
-      let expired_ops : string[] = []
+      let expiredOps : string[] = [];
       try {
-        expired_ops = await this.get_ops_to_cleanup(addr)
+        expiredOps = await this.getOpsToCleanup(addr);
       } catch (e) {
-        this.taquito.debug("Cannot retrieve expired ops, no cleanup")
+        this.taquito.debug('Cannot retrieve expired ops, no cleanup');
       }
-      if (expired_ops.length >= min_cleanup) {
-        const cleanup_param : BatchParam = {
+      if (expiredOps.length >= minCleanup) {
+        const cleanupParam : BatchParam = {
           kind: 'cleanup',
-          param : expired_ops,
+          param : expiredOps,
           kt1: addr,
-        }
-        batch_params = [cleanup_param, call_param]
+        };
+        batchParams = [cleanupParam, callParam];
       }
     }
-    return await this.batch(batch_params)
+    return this.batch(batchParams);
   }
   
   /**
@@ -588,11 +612,11 @@ export class FinP2PTezos {
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async transfer_tokens(
-    tt : transfer_tokens_param,
-    options : call_options = this.default_call_options)
-  : Promise<OperationResult> {
-    return this.cleanup_and_call_proxy('transfer_tokens', tt, options)
+  async transferTokens(
+    tt : TransferTokensParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('transfer_tokens', tt, options);
   }
 
   /**
@@ -601,11 +625,11 @@ export class FinP2PTezos {
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async create_asset(
-    ca: create_asset_param,
-    options : call_options = this.default_call_options)
-  : Promise<OperationResult> {
-    return this.cleanup_and_call_proxy('create_asset', ca, options)
+  async createAsset(
+    ca: CreateAssetParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('create_asset', ca, options);
   }
 
   /**
@@ -614,11 +638,11 @@ export class FinP2PTezos {
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async issue_tokens(
-    it: issue_tokens_param,
-    options : call_options = this.default_call_options)
-  : Promise<OperationResult> {
-    return this.cleanup_and_call_proxy('issue_tokens', it, options)
+  async issueTokens(
+    it: IssueTokensParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('issue_tokens', it, options);
   }
 
   /**
@@ -627,11 +651,11 @@ export class FinP2PTezos {
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async redeem_tokens(
-    rt: redeem_tokens_param,
-    options : call_options = this.default_call_options)
-  : Promise<OperationResult> {
-    return this.cleanup_and_call_proxy('redeem_tokens', rt, options)
+  async redeemTokens(
+    rt: RedeemTokensParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('redeem_tokens', rt, options);
   }
 
   /**
@@ -639,13 +663,13 @@ export class FinP2PTezos {
    * @param kt1 : optional address of the proxy contract
    * @returns a promise with the current storage
    */
-  async get_proxy_storage(
-    kt1?: address)
-  : Promise<proxy_storage> {
-    let addr = this.get_proxy_address(kt1)
-    const contract = await this.taquito.contract.at(addr)
-    let storage = await contract.storage() as proxy_storage
-    return storage
+  async getProxyStorage(
+    kt1?: Address)
+    : Promise<ProxyStorage> {
+    let addr = this.getProxyAddress(kt1);
+    const contract = await this.taquito.contract.at(addr);
+    let storage = await contract.storage() as ProxyStorage;
+    return storage;
   }
 
   /**
@@ -653,54 +677,54 @@ export class FinP2PTezos {
    * @param kt1 : optional address of the FA2 contract
    * @returns a promise with the current storage
    */
-  async get_fa2_storage(
-    kt1?: address)
-  : Promise<fa2_storage> {
-    let addr = this.get_fa2_address(kt1)
-    const contract = await this.taquito.contract.at(addr)
-    let storage = await contract.storage() as fa2_storage
-    return storage
+  async getFA2Storage(
+    kt1?: Address)
+    : Promise<FA2Storage> {
+    let addr = this.getFA2Address(kt1);
+    const contract = await this.taquito.contract.at(addr);
+    let storage = await contract.storage() as FA2Storage;
+    return storage;
   }
 
 
-  proxy_accreditation = new Uint8Array([0])
-  owner_accreditation = new Uint8Array([1])
+  proxyAccreditation = new Uint8Array([0]);
 
-  async add_accredited(new_accredited : address,
-                       accreditatiaon : Uint8Array,
-                       kt1?:address)
-  : Promise<OperationResult> {
-    let addr = this.get_auth_address(kt1)
+  ownerAccreditation = new Uint8Array([1]);
+
+  async addAccredited(newAccredited : Address,
+    accreditatiaon : Uint8Array,
+    kt1?: Address)
+    : Promise<OperationResult> {
+    let addr = this.getAuthAddress(kt1);
     return this.taquito.send(addr, 'add_accredited',
-                     Michelson.add_accredited_param(new_accredited,
-                                                    accreditatiaon))
+      Michelson.addAccreditedParam(newAccredited, accreditatiaon));
   }
 
-  async get_ops_to_cleanup(kt1?: address) : Promise<string[]>{
-    let proxy_storage = await this.get_proxy_storage(kt1)
-    let ttl = Number(proxy_storage.operation_ttl.ttl)
-    let live_ops_big_map_id = parseInt(proxy_storage.live_operations.toString())
+  async getOpsToCleanup(kt1?: Address) : Promise<string[]>{
+    let proxyStorage = await this.getProxyStorage(kt1);
+    let ttl = Number(proxyStorage.operation_ttl.ttl);
+    let liveOpsBigMapId = parseInt(proxyStorage.live_operations.toString());
     let explorer = this.config.explorers?.find(e => {
-      return (e.kind === 'TzKT')
-    })
-    if(!explorer) {
-      throw "No TzKT explorer set, cannot get live operations for cleanup"
+      return (e.kind === 'TzKT');
+    });
+    if (!explorer) {
+      throw Error('No TzKT explorer set, cannot get live operations for cleanup');
     }
-    let now_s = Math.floor((new Date()).getTime() / 1000)
+    let nowSecs = Math.floor((new Date()).getTime() / 1000);
     // Only get expired operations
-    let max_date = new Date((now_s - ttl) * 1000)
+    let maxDate = new Date((nowSecs - ttl) * 1000);
     let keys = await (new HttpBackend()).createRequest<any>(
       {
-        url: `${explorer.url}/v1/bigmaps/${live_ops_big_map_id}/keys`,
+        url: `${explorer.url}/v1/bigmaps/${liveOpsBigMapId}/keys`,
         method: 'GET',
         query: {
           active : true,
           limit : 200,
-          'value.lt' : max_date.toISOString()
-        }
-      }
-    )
-    return keys.map((k : any) => { return k.key }) as string[]
+          'value.lt' : maxDate.toISOString(),
+        },
+      },
+    );
+    return keys.map((k : any) => { return k.key; }) as string[];
   }
 
   /**
@@ -711,13 +735,13 @@ export class FinP2PTezos {
    * block explorer.
    * @returns operation injection result
    */
-  async cleanup(kt1?:address, ophs? : string[]) : Promise<OperationResult> {
-    let keys = ophs
+  async cleanup(kt1?: Address, ophs? : string[]) : Promise<OperationResult> {
+    let keys = ophs;
     if (keys === undefined) {
-      keys = await this.get_ops_to_cleanup(kt1)
+      keys = await this.getOpsToCleanup(kt1);
     }
-    let addr = this.get_proxy_address(kt1)
-    return this.taquito.send(addr, 'cleanup', Michelson.cleanup_param(keys))
+    let addr = this.getProxyAddress(kt1);
+    return this.taquito.send(addr, 'cleanup', Michelson.cleanupParam(keys));
   }
 
   /**
@@ -728,241 +752,244 @@ export class FinP2PTezos {
    */
   async batch(
     p: BatchParam[])
-  : Promise<OperationResult> {
-    let _this = this
+    : Promise<OperationResult> {
+    let finp2p = this;
     const params = await Promise.all(p.map(async function (bp) {
       switch (bp.kind) {
         case 'transfer_tokens':
-          let v_tt = <transfer_tokens_param>bp.param
-          let kt1_tt  = _this.get_proxy_address(bp.kt1)
+          let vTt = <TransferTokensParam>bp.param;
+          let kt1Tt  = finp2p.getProxyAddress(bp.kt1);
           return {
             amount : 0,
-            to : kt1_tt,
+            to : kt1Tt,
             parameter : { entrypoint: bp.kind,
-                          value: Michelson.transfer_tokens_param(v_tt) }
-          }
+              value: Michelson.transferTokensParam(vTt) },
+          };
         case 'issue_tokens':
-          let v_it = <issue_tokens_param>bp.param
-          let kt1_it  = _this.get_proxy_address(bp.kt1)
+          let vIt = <IssueTokensParam>bp.param;
+          let kt1It  = finp2p.getProxyAddress(bp.kt1);
           return {
             amount : 0,
-            to : kt1_it,
+            to : kt1It,
             parameter : { entrypoint: bp.kind,
-                          value: Michelson.issue_tokens_param(v_it) }
-          }
+              value: Michelson.issueTokensParam(vIt) },
+          };
         case 'create_asset':
-          let v_ca = <create_asset_param>bp.param
-          let kt1_ca  = _this.get_proxy_address(bp.kt1)
+          let vCa = <CreateAssetParam>bp.param;
+          let kt1Ca  = finp2p.getProxyAddress(bp.kt1);
           return {
             amount : 0,
-            to : kt1_ca,
+            to : kt1Ca,
             parameter : { entrypoint: bp.kind,
-                          value: Michelson.create_asset_param(v_ca) }
-          }
+              value: Michelson.createAssetParam(vCa) },
+          };
         case 'redeem_tokens':
-          let v_rt = <redeem_tokens_param>bp.param
-          let kt1_rt  = _this.get_proxy_address(bp.kt1)
+          let vRt = <RedeemTokensParam>bp.param;
+          let kt1Rt  = finp2p.getProxyAddress(bp.kt1);
           return {
             amount : 0,
-            to : kt1_rt,
+            to : kt1Rt,
             parameter : { entrypoint: bp.kind,
-                          value: Michelson.redeem_tokens_param(v_rt) }
-          }
+              value: Michelson.redeemTokensParam(vRt) },
+          };
         case 'cleanup':
-          let v_cl = <cleanup_param>bp.param
-          let kt1_cl = _this.get_proxy_address(bp.kt1)
-          if (v_cl === undefined) {
-            v_cl = await _this.get_ops_to_cleanup()
+          let vCl = <CleanupParam>bp.param;
+          let kt1Cl = finp2p.getProxyAddress(bp.kt1);
+          if (vCl === undefined) {
+            vCl = await finp2p.getOpsToCleanup();
           }
           return {
             amount : 0,
-            to : kt1_cl,
+            to : kt1Cl,
             parameter : { entrypoint: bp.kind,
-                          value: Michelson.cleanup_param(v_cl) }
-          }
+              value: Michelson.cleanupParam(vCl) },
+          };
         default:
-          throw `batch: switch not exhaustive. Case ${bp.kind} not covered`
+          throw Error(`batch: switch not exhaustive. Case ${bp.kind} not covered`);
       }
-    }))
-    return await this.taquito.batch_transactions(params);
+    }));
+    return this.taquito.batchTransactions(params);
   }
 
 
   /**
    * @description Retrieve balance of account in a given asset
-   * @param public_key: the public key of the account for which to lookup the balance
+   * @param publicKey: the public key of the account for which to lookup the balance
    * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
    * representation of the key with the curve prefix and starting with `0x`)
-   * @param asset_id: the finId of the asset (encoded)
+   * @param assetId: the finId of the asset (encoded)
    * @returns a bigint representing the balance
    * @throws `Error` if the asset id is not known by the contract or if the
    * FA2 is an external FA2 (this last case needs to be implemented)
    */
-  async get_asset_balance(
-    public_key : key,
-    asset_id : asset_id,
-    kt1?: address) : Promise<BigInt> {
-    let addr = this.get_proxy_address(kt1)
-    const contract = await this.taquito.contract.at(addr)
-    let pk = public_key
-    if (public_key.substring(0,2) == '0x') {
-      pk = encodeKey(public_key.substring(2))
+  async getAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<BigInt> {
+    let addr = this.getProxyAddress(kt1);
+    const contract = await this.taquito.contract.at(addr);
+    let pk = publicKey;
+    if (publicKey.substring(0, 2) == '0x') {
+      pk = encodeKey(publicKey.substring(2));
     }
     try {
       let balance =
         await contract.contractViews.get_asset_balance(
-          [pk, asset_id]
-        ).executeView({ viewCaller : addr }) as bigint | undefined
-      return (balance || BigInt(0))
+          [pk, assetId],
+        ).executeView({ viewCaller : addr }) as bigint | undefined;
+      return (balance || BigInt(0));
     } catch (e : any) {
       const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
       if (matches) {
-        throw Error (matches[1])
-      } else { throw e }
+        throw Error(matches[1]);
+      } else { throw e; }
     }
   }
 
-  async get_tzkt_receipt(op : OperationResult,
-                         explorer_url : { kind : 'TzKT', url : string }) :
-  Promise<op_receipt> {
+  async getTzktReceipt(op : OperationResult,
+    explorer : { kind : 'TzKT', url : string }) :
+    Promise<OpReceipt> {
     const ops = await (new HttpBackend()).createRequest<any>(
       {
-        url: explorer_url.url + '/v1/operations/' + op.hash,
-        method: 'GET'
-      }
-    )
-    const get_pk_bytes = (pk : any) => {
-      if (pk === undefined) { return undefined }
-      return Buffer.from(b58cdecode(pk, prefix['sppk']))
-    }
-    const op0 = ops[0]
+        url: explorer.url + '/v1/operations/' + op.hash,
+        method: 'GET',
+      },
+    );
+    const getPkBytes = (pk : any) => {
+      if (pk === undefined) { return undefined; }
+      return Buffer.from(b58cdecode(pk, prefix.sppk));
+    };
+    const op0 = ops[0];
     try {
-      const v = op0.parameter.value
+      const v = op0.parameter.value;
       return {
         kind : ops[0].parameter.entrypoint as string,
-        asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+        assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
         amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-        src_account : get_pk_bytes(v.src_account),
-        dst_account : get_pk_bytes(v.dst_account),
-        status: op0.status ? op0.status as op_status : undefined,
+        srcAccount : getPkBytes(v.src_account),
+        dstAccount : getPkBytes(v.dst_account),
+        status: op0.status ? op0.status as OpStatus : undefined,
         block: op0.block ? op0.block as string : undefined,
         level: op0.level ? op0.level as number : undefined,
         errors: op0.errors ? op0.errors : undefined,
         confirmed: false, // placeholder
-      }
-    } catch(e) {
-      throw new ReceiptError(op, [], `Cannot parse TzKT receipt (${e}): ${op0}`)
+      };
+    } catch (e) {
+      throw new ReceiptError(op, [], `Cannot parse TzKT receipt (${e}): ${op0}`);
     }
   }
 
-  async get_tzstats_receipt(op : OperationResult,
-                         explorer_url : { kind : 'tzstats', url : string }) :
-  Promise<op_receipt> {
+  async getTzstatsReceipt(op : OperationResult,
+    explorer : { kind : 'tzstats', url : string }) :
+    Promise<OpReceipt> {
     const ops = await (new HttpBackend()).createRequest<any>(
       {
-        url: explorer_url.url + '/explorer/op/' + op.hash,
-        method: 'GET'
-      }
-    )
-    const get_pk_bytes = (pk : any) => {
-      if (pk === undefined) { return undefined }
-      return Buffer.from(b58cdecode(pk, prefix['sppk']))
-    }
-    const op0 = ops[0]
+        url: explorer.url + '/explorer/op/' + op.hash,
+        method: 'GET',
+      },
+    );
+    const getPkBytes = (pk : any) => {
+      if (pk === undefined) { return undefined; }
+      return Buffer.from(b58cdecode(pk, prefix.sppk));
+    };
+    const op0 = ops[0];
     try {
-      const kind = op0.parameters.entrypoint as string
-      const v = op0.parameters.value[kind]
+      const kind = op0.parameters.entrypoint as string;
+      const v = op0.parameters.value[kind];
       return {
         kind,
-        asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+        assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
         amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-        src_account : get_pk_bytes(v.src_account),
-        dst_account : get_pk_bytes(v.dst_account),
-        status: op0.status ? op0.status as op_status : undefined,
+        srcAccount : getPkBytes(v.src_account),
+        dstAccount : getPkBytes(v.dst_account),
+        status: op0.status ? op0.status as OpStatus : undefined,
         block: op0.block ? op0.block as string : undefined,
         level: op0.height ? op0.height as number : undefined,
         errors: op0.errors ? op0.errors : undefined,
         // confirmations: op0.confirmations ? op0.confirmations : undefined,
         confirmed: false, // placeholder
-      }
-    } catch(e) {
-      throw new ReceiptError(op, [], `Cannot parse tzstats receipt (${e}): ${op0}`)
+      };
+    } catch (e) {
+      throw new ReceiptError(op, [], `Cannot parse tzstats receipt (${e}): ${op0}`);
     }
   }
 
-  async get_explorer_receipt(op : OperationResult, explorer : explorer_url, head_p : Promise<BlockHeaderResponse>) :
-  Promise<op_receipt> {
-    let receipt: op_receipt
+  async getExplorerReceipt(
+    op : OperationResult,
+    explorer : Explorer,
+    headPromise : Promise<BlockHeaderResponse>,
+  ) : Promise<OpReceipt> {
+    let receipt: OpReceipt;
     switch (explorer.kind) {
       case 'TzKT':
-        receipt = await this.get_tzkt_receipt(
-          op, explorer as { kind : 'TzKT', url : string }
-        )
-        break
+        receipt = await this.getTzktReceipt(
+          op, explorer as { kind : 'TzKT', url : string },
+        );
+        break;
       case 'tzstats':
-        receipt = await this.get_tzstats_receipt(
-          op, explorer as { kind : 'tzstats', url : string }
-        )
-        break
+        receipt = await this.getTzstatsReceipt(
+          op, explorer as { kind : 'tzstats', url : string },
+        );
+        break;
     }
     if (receipt.level && receipt.confirmations === undefined) {
-      let head = await head_p
-      receipt.confirmations = head.level - receipt.level
+      let head = await headPromise;
+      receipt.confirmations = head.level - receipt.level;
     }
     if (receipt.confirmations !== undefined) {
       receipt.confirmed = (this.config.confirmations === undefined) ||
-        (receipt.confirmations >= this.config.confirmations)
+        (receipt.confirmations >= this.config.confirmations);
     }
-    return receipt
+    return receipt;
   }
 
 
-  receipt_proj_eq<T>(name : string,
-                     proj : ((_ :op_receipt) => T),
-                     eq : ((p1 : T, p2 : T) => boolean),
-                     r0 : op_receipt,
-                     r2 : op_receipt,
-                     r2_index : number,
-                     op : OperationResult) {
+  receiptProjEq<T>(name : string,
+    proj : ((_ :OpReceipt) => T),
+    eq : ((p1 : T, p2 : T) => boolean),
+    r0 : OpReceipt,
+    r2 : OpReceipt,
+    r2_index : number,
+    op : OperationResult) {
     if (!eq(proj(r0), proj(r2))) {
       throw new ReceiptError(op, [r0, r2],
-                             `receipts 0 and ${r2_index} disagree on ${name}`)
+        `receipts 0 and ${r2_index} disagree on ${name}`);
     }
   }
 
-  merge_receipts(receipts : op_receipt[], op : OperationResult, { throw_on_diff = true } = {} )
-  : op_receipt {
-    let receipt = receipts[0]
-    let others = receipts.slice(1)
-    let receiptj = receipt as any
-    let poly_eq = (x : any, y : any) => { return (x == y) }
-    let buf_eq = (x? : Buffer, y? : Buffer) => {
+  mergeReceipts(receipts : OpReceipt[], op : OperationResult, { throwOnDiff = true } = {} )
+    : OpReceipt {
+    let receipt = receipts[0];
+    let others = receipts.slice(1);
+    let receiptj = receipt as any;
+    let polyEq = (x : any, y : any) => { return (x == y); };
+    let bufEq = (x? : Buffer, y? : Buffer) => {
       return ((x === undefined && y === undefined) ||
-        (x !== undefined && y !== undefined && x.equals(y)))
-    }
+        (x !== undefined && y !== undefined && x.equals(y)));
+    };
     others.forEach((r, i) => {
-      if (throw_on_diff) {
-        this.receipt_proj_eq('kind', ((r : op_receipt) => r.kind), poly_eq,
-                             receipt, r, i+1, op)
-        this.receipt_proj_eq('assetId', ((r : op_receipt) => r.asset_id),
-                             poly_eq, receipt, r, i+1, op)
-        this.receipt_proj_eq('amount', ((r : op_receipt) => r.amount),
-                             poly_eq, receipt, r, i+1, op)
-        this.receipt_proj_eq('src_account', ((r : op_receipt) => r.src_account),
-                             buf_eq, receipt, r, i+1, op)
-        this.receipt_proj_eq('dst_account', ((r : op_receipt) => r.dst_account),
-                             buf_eq, receipt, r, i+1, op)
-        this.receipt_proj_eq('status', ((r : op_receipt) => r.status),
-                             poly_eq, receipt, r, i+1, op)
+      if (throwOnDiff) {
+        this.receiptProjEq('kind', (opr => opr.kind), polyEq,
+          receipt, r, i + 1, op);
+        this.receiptProjEq('assetId', (opr => opr.assetId),
+          polyEq, receipt, r, i + 1, op);
+        this.receiptProjEq('amount', (opr => opr.amount),
+          polyEq, receipt, r, i + 1, op);
+        this.receiptProjEq('srcAccount', (opr => opr.srcAccount),
+          bufEq, receipt, r, i + 1, op);
+        this.receiptProjEq('dstAccount', (opr => opr.dstAccount),
+          bufEq, receipt, r, i + 1, op);
+        this.receiptProjEq('status', (opr => opr.status),
+          polyEq, receipt, r, i + 1, op);
       }
-      let rj = r as any
+      let rj = r as any;
       Object.keys(r).forEach(k => {
         if (rj[k] != undefined && receiptj[k] == undefined) {
-          receiptj[k] = rj[k]
+          receiptj[k] = rj[k];
         }
-      })
-    })
-    return receipt
+      });
+    });
+    return receipt;
   }
 
 
@@ -970,215 +997,195 @@ export class FinP2PTezos {
    * @description Get a receipt from a transaction hash (with block explorers)
    * and confirm with node
    * @param op: the operation hash
-   * @param throw_on_fail: throws an exception if the operation is not included
+   * @param throwOnFail: throws an exception if the operation is not included
    * as "applied" (true by default)
-   * @param throw_on_unconfirmed: throws an exception if the operation is not
+   * @param throwOnUnconfirmed: throws an exception if the operation is not
    * does not have enough confirmations w.r.t the `config` (false by default)
-   * @param throw_on_node_error: throws an exception if the node does not have
+   * @param throwOnNodeError: throws an exception if the node does not have
    * the block in its storage (can happen if the block is too old and the node
    * is not in archive mode) or can't be reached (false by default)
-   * @param throw_on_diff: throws an exception if block explorers disagree on
+   * @param throwOnDiff: throws an exception if block explorers disagree on
    * the value of the receipt (true by default)
    * @returns a receipt
    * @throws `ReceiptError`
    */
-  async get_receipt_explorers(op : OperationResult,
-                    { throw_on_fail = true,
-                      throw_on_unconfirmed = false,
-                      check_with_node = true,
-                      throw_on_node_error = false,
-                      throw_on_diff = true } = {}) :
-  Promise<op_receipt> {
+  async getReceiptExplorers(op : OperationResult,
+    { throwOnFail = true,
+      throwOnUnconfirmed = false,
+      checkWithNode = true,
+      throwOnNodeError = false,
+      throwOnDiff = true } = {}) :
+    Promise<OpReceipt> {
     if (this.config.explorers === undefined || this.config.explorers.length == 0) {
-      throw Error('Cannot get receipt, no explorers configured')
+      throw Error('Cannot get receipt, no explorers configured');
     }
-    let head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
+    let headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
     let receipts = await Promise.all(this.config.explorers.map((explorer) => {
-      return this.get_explorer_receipt(op, explorer, head_p)
-    }))
-    let receipt = this.merge_receipts(receipts, op, {throw_on_diff})
-    if (check_with_node && receipt.block) {
+      return this.getExplorerReceipt(op, explorer, headPromise);
+    }));
+    let receipt = this.mergeReceipts(receipts, op, { throwOnDiff });
+    if (checkWithNode && receipt.block) {
       try {
-        const block = await this.taquito.rpc.getBlock({ block: receipt.block })
+        const block = await this.taquito.rpc.getBlock({ block: receipt.block });
         const found =
           block.operations.find((l) => {
-            return l.find((block_op) => {
-              return (block_op.hash === op.hash)
-            })
-          })
-        if (found) { receipt.node_agree = true }
-        else { receipt.node_agree = false }
+            return l.find((blockOp) => {
+              return (blockOp.hash === op.hash);
+            });
+          });
+        if (found) { receipt.nodeAgree = true; } else { receipt.nodeAgree = false; }
       } catch (e) {
-        if (throw_on_node_error) {
-          throw new ReceiptError(op, receipts, "Node could not find block")
+        if (throwOnNodeError) {
+          throw new ReceiptError(op, receipts, 'Node could not find block');
         }
       }
-      if (receipt.node_agree === false) {
-        throw new ReceiptError(op, receipts, "Node says operation is not in block")
+      if (receipt.nodeAgree === false) {
+        throw new ReceiptError(op, receipts, 'Node says operation is not in block');
       }
     }
-    if (throw_on_fail && receipt.status !== 'applied') {
+    if (throwOnFail && receipt.status !== 'applied') {
       throw new ReceiptError(op, receipts,
-                             `Operation is included with status ${receipt.status}`)
+        `Operation is included with status ${receipt.status}`);
     }
-    if (throw_on_unconfirmed && !receipt.confirmed) {
+    if (throwOnUnconfirmed && !receipt.confirmed) {
       throw new ReceiptError(op, receipts,
-                             `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`)
+        `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`);
     }
-    return receipt
+    return receipt;
   }
 
-  async get_tzkt_inclusion_block(op : OperationResult,
-                         explorer_url : { kind : 'TzKT', url : string }) :
-  Promise<string> {
+  async getTzktInclusionBlock(op : OperationResult,
+    explorer : { kind : 'TzKT', url : string }) :
+    Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
       {
-        url: explorer_url.url + '/v1/operations/' + op.hash,
-        method: 'GET'
-      }
-    )
+        url: explorer.url + '/v1/operations/' + op.hash,
+        method: 'GET',
+      },
+    );
     if (ops[0].block === undefined) {
-      throw new ReceiptError(op, [], `Operation is not known by TzKT`)
+      throw new ReceiptError(op, [], 'Operation is not known by TzKT');
     }
-    return ops[0].block
+    return ops[0].block;
   }
 
-  async get_tzstats_inclusion_block(op : OperationResult,
-                         explorer_url : { kind : 'tzstats', url : string }) :
-  Promise<string> {
+  async getTzstatsInclusionBlock(op : OperationResult,
+    explorer : { kind : 'tzstats', url : string }) :
+    Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
       {
-        url: explorer_url.url + '/explorer/op/' + op.hash,
-        method: 'GET'
-      }
-    )
+        url: explorer.url + '/explorer/op/' + op.hash,
+        method: 'GET',
+      },
+    );
     if (ops[0].block === undefined) {
-      throw new ReceiptError(op, [], `Operation is not known by tzstats`)
+      throw new ReceiptError(op, [], 'Operation is not known by tzstats');
     }
-    return ops[0].block
+    return ops[0].block;
   }
 
-  async get_explorer_inclusion_block(op : OperationResult, explorer : explorer_url) :
+  async getExplorerInclusionBlock(op : OperationResult, explorer : Explorer) :
   Promise<string> {
     switch (explorer.kind) {
       case 'TzKT':
-        return await this.get_tzkt_inclusion_block(
-          op, explorer as { kind : 'TzKT', url : string }
-        )
+        return this.getTzktInclusionBlock(
+          op, explorer as { kind : 'TzKT', url : string },
+        );
       case 'tzstats':
-        return await this.get_tzstats_inclusion_block(
-          op, explorer as { kind : 'tzstats', url : string }
-        )
+        return this.getTzstatsInclusionBlock(
+          op, explorer as { kind : 'tzstats', url : string },
+        );
     }
   }
 
   /**
    * @description Get a receipt from a transaction hash and confirm with node.
-   * Same as `get_receipt_explorers` but only use the explorer to find out the
+   * Same as `getReceiptExplorers` but only use the explorer to find out the
    * inclusion block. The receipt is extracted from the node, with confidence.
    * Note that you need a Tezos node in mode **archive** to retrieve old
    * receipts.
    * @param op: the operation hash
-   * @param throw_on_fail: throws an exception if the operation is not included
+   * @param throwOnFail: throws an exception if the operation is not included
    * as "applied" (true by default)
-   * @param throw_on_unconfirmed: throws an exception if the operation is not
+   * @param throwOnUnconfirmed: throws an exception if the operation is not
    * does not have enough confirmations w.r.t the `config` (false by default)
    * @returns a receipt
    * @throws `ReceiptError`
    */
-  async get_receipt(op : OperationResult,
-                    { throw_on_fail = true,
-                      throw_on_unconfirmed = false } = {}) :
-  Promise<op_receipt> {
+  async getReceipt(op : OperationResult,
+    { throwOnFail = true,
+      throwOnUnconfirmed = false } = {}) :
+    Promise<OpReceipt> {
     if (this.config.explorers === undefined || this.config.explorers.length == 0) {
-      throw Error('Cannot get receipt, no explorers configured')
+      throw Error('Cannot get receipt, no explorers configured');
     }
-    let block_hash = await PromiseAny(this.config.explorers.map((explorer) => {
-      return this.get_explorer_inclusion_block(op, explorer)
-    }))
-    const block_p = this.taquito.rpc.getBlock({ block: block_hash })
-    const head_p = this.taquito.rpc.getBlockHeader({ block: 'head' })
-    const [block, head] = await Promise.all([block_p, head_p])
-    let confirmations = head.level - block.header.level
+    let blockHash = await PromiseAny(this.config.explorers.map((explorer) => {
+      return this.getExplorerInclusionBlock(op, explorer);
+    }));
+    const blockPromise = this.taquito.rpc.getBlock({ block: blockHash });
+    const headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
+    const [block, head] = await Promise.all([blockPromise, headPromise]);
+    let confirmations = head.level - block.header.level;
     // check if the inclusion block is reachable back from head
-    const block_hash_at_incl_level =
-      await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}`})
-    if (block_hash_at_incl_level != block_hash) {
-      throw new ReceiptError(op, [], 'Operation is not included in the main chain')
+    const blockHashAtInclLevel =
+      await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}` });
+    if (blockHashAtInclLevel != blockHash) {
+      throw new ReceiptError(op, [], 'Operation is not included in the main chain');
     }
-    const op_content =
+    const opContent =
       // manager operations in [3]
-      block.operations[3].find(block_op => {
-        return (block_op.hash === op.hash)
-      })
-    if (op_content === undefined) {
-      throw new ReceiptError(op, [], "Node could not find operation")
+      block.operations[3].find(blockOp => {
+        return (blockOp.hash === op.hash);
+      });
+    if (opContent === undefined) {
+      throw new ReceiptError(op, [], 'Node could not find operation');
     }
-    let op0 = op_content.contents[0]
+    let op0 = opContent.contents[0];
     if (op0.kind !== OpKind.TRANSACTION) {
-      throw "Operation is not a transaction"
+      throw Error('Operation is not a transaction');
     }
-    if(!hasOwnProperty(op0, 'metadata')) {
-      throw new ReceiptError(op, [], "Metadata not known for operation")
+    if (!hasOwnProperty(op0, 'metadata')) {
+      throw new ReceiptError(op, [], 'Metadata not known for operation');
     }
-    if (throw_on_fail && op0.metadata.operation_result.status !== 'applied') {
+    if (throwOnFail && op0.metadata.operation_result.status !== 'applied') {
       throw new
       ReceiptError(op, [],
-                   `Operation is included with status ${op0.metadata.operation_result.status}`)
+        `Operation is included with status ${op0.metadata.operation_result.status}`);
     }
-    const contract = await this.taquito.contract.at(op0.destination)
+    const contract = await this.taquito.contract.at(op0.destination);
     // if ( op0 === undefined ) { throw new ReceiptError(op, [],"No operation") }
-    if ( op0.parameters === undefined ) { throw new ReceiptError(op, [],"No parameters in operation") }
+    if ( op0.parameters === undefined ) { throw new ReceiptError(op, [], 'No parameters in operation'); }
     let schema = new ParameterSchema(contract.entrypoints.entrypoints[op0.parameters.entrypoint]);
-    let v = schema.Execute(op0.parameters.value)
-    const get_pk_bytes = (pk : any) => {
-      if (pk === undefined) { return undefined }
-      return Buffer.from(b58cdecode(pk, prefix['sppk']))
-    }
-    const kind = op0.parameters.entrypoint as string
+    let v = schema.Execute(op0.parameters.value);
+    const getPkBytes = (pk : any) => {
+      if (pk === undefined) { return undefined; }
+      return Buffer.from(b58cdecode(pk, prefix.sppk));
+    };
+    const kind = op0.parameters.entrypoint as string;
     let receipt = {
       kind,
-      asset_id : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
+      assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
       amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-      src_account : get_pk_bytes(v.src_account),
-      dst_account : get_pk_bytes(v.dst_account),
+      srcAccount : getPkBytes(v.src_account),
+      dstAccount : getPkBytes(v.dst_account),
       status: op0.metadata.operation_result.status,
       block: block.hash,
       level: block.header.level,
       errors: op0.metadata.operation_result.errors,
       confirmations,
       confirmed: (this.config.confirmations === undefined) ||
-        (confirmations >= this.config.confirmations)
-    }
-    if (throw_on_fail && receipt.status !== 'applied') {
+        (confirmations >= this.config.confirmations),
+    };
+    if (throwOnFail && receipt.status !== 'applied') {
       throw new ReceiptError(op, [receipt],
-                             `Operation is included with status ${receipt.status}`)
+        `Operation is included with status ${receipt.status}`);
     }
-    if (throw_on_unconfirmed && !receipt.confirmed) {
+    if (throwOnUnconfirmed && !receipt.confirmed) {
       throw new ReceiptError(op, [receipt],
-                             `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`)
+        `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`);
     }
-    return receipt
+    return receipt;
 
-  }
-
-}
-
-
-export class ReceiptError extends Error {
-
-  op : OperationResult
-  receipts : op_receipt[]
-
-  constructor(op : OperationResult, receipts : op_receipt[], ...params: any[]) {
-    super(...params)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ReceiptError)
-    }
-
-    this.name = 'ReceiptError'
-    this.op = op
-    this.receipts = receipts
   }
 
 }

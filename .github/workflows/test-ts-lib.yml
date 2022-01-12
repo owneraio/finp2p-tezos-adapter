@@ -21,10 +21,13 @@ jobs:
         cache: 'npm'
         cache-dependency-path: '**/package-lock.json'
     - name: Install dependencies
-      run: make ts-dev-deps server-dev-deps
+      run: make ts-deps server-deps
       
     - name: Build
       run: make lib server
+
+    - name: Install dev dependencies
+      run: make ts-dev-deps server-dev-deps
       
     - name: Test
       run: make test

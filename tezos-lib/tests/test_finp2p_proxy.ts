@@ -39,16 +39,16 @@ module Hangzhounet {
   export async function start_network() { }
   export async function stop_network() { }
 
-  export const config: Finp2pProxy.config = {
+  export const config: Finp2pProxy.Config = {
     url : "https://rpc.hangzhounet.teztnets.xyz",
     explorers : [
       { kind : 'TzKT', url : 'https://api.hangzhou2net.tzkt.io' },
       { kind : 'tzstats', url : 'https://api.hangzhou.tzstats.com' },
     ],
     admin : account.pkh,
-    finp2p_auth_address : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
-    finp2p_fa2_address : 'KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL',
-    finp2p_proxy_address : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
+    finp2pAuthAddress : 'KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC',
+    finp2pFA2Address : 'KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL',
+    finp2pProxyAddress : 'KT1BN9jjeog53f3QL9w6MvqSTmuYnJDrG5JD',
     debug
   }
 
@@ -115,7 +115,7 @@ module Flextesa {
     await exec ('docker stop finp2p-sandbox')
   }
 
-  export const config: Finp2pProxy.config = {
+  export const config: Finp2pProxy.Config = {
     url : "http://localhost:20000",
     explorers : [],
     admin : account.pkh,
@@ -154,7 +154,7 @@ function log (message?: any, ...optionalParams: any[]) {
 // Only get receipts if network has explorers associated
 function get_receipt (op : OperationResult) : Promise<any>{
   if (Net.config.explorers.length > 0) {
-    return FinP2PTezos.get_receipt(op)
+    return FinP2PTezos.getReceipt(op)
   }
   else {
     return new Promise(resolve => {resolve({})})
@@ -190,14 +190,14 @@ function to_str(x : any) : string {
   return JSON.stringify(x)
 }
 
-function generateNonce(): Finp2pProxy.finp2p_nonce {
+function generateNonce(): Finp2pProxy.Finp2pNonce {
   return {
     nonce : crypto.randomBytes(24) ,
     timestamp : new Date()
   }
 }
 
-function nonce_to_bytes(n: Finp2pProxy.finp2p_nonce) : Buffer {
+function nonce_to_bytes(n: Finp2pProxy.Finp2pNonce) : Buffer {
   const buffer = Buffer.alloc(32)
   buffer.fill(n.nonce, 0, 24);
   const t_sec = Math.floor(n.timestamp.getTime() / 1000);
@@ -207,7 +207,7 @@ function nonce_to_bytes(n: Finp2pProxy.finp2p_nonce) : Buffer {
 }
 
 function log_hashgroup (hg : any[]) {
-  let to_hex = Finp2pProxy.Michelson.bytes_to_hex
+  let to_hex = Finp2pProxy.Michelson.bytesToHex
   log("Hash group:")
   hg.forEach((h) => {
     if (h instanceof Buffer) {
@@ -243,7 +243,7 @@ async function mk_issue_tokens(i : {
   let digest = await hashValues([assetHashGroup, shg])
   log('digest:', digest.toString('hex'))
   let signature = secp256k1.ecdsaSign(digest, i.dest.privKey).signature;
-  let param: Finp2pProxy.issue_tokens_param = {
+  let param: Finp2pProxy.IssueTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
     dst_account : '0x01' /* secp256k1 */ + i.dest.pubKey.toString('hex'),
@@ -261,23 +261,23 @@ async function issue_tokens (i : {
   amount : number}) {
   let param = await mk_issue_tokens(i)
   log("Issue parameters:", param)
-  return await FinP2PTezos.issue_tokens(param)
+  return await FinP2PTezos.issueTokens(param)
 }
 
 function mk_create_asset (i : {
   asset_id : string,
   metadata: any,
   token_id?: number,
-}): Finp2pProxy.create_asset_param {
+}): Finp2pProxy.CreateAssetParam {
   let fa2_token  = {
-    address : FinP2PTezos.get_fa2_address(),
+    address : FinP2PTezos.getFA2Address(),
     id : (i.token_id === undefined) ? undefined : BigInt(i.token_id)
   }
   let metadata = new MichelsonMap<string, Uint8Array>()
   Object.entries(i.metadata).forEach(
     ([k, v]) => metadata.set (k, utf8.encode(to_str(v)))
   )
-  let new_token_info : [Finp2pProxy.create_fa2_token, MichelsonMap<string, Uint8Array>] =
+  let new_token_info : [Finp2pProxy.CreateFA2Token, MichelsonMap<string, Uint8Array>] =
     [fa2_token, metadata]
   return {
     asset_id : utf8.encode(i.asset_id),
@@ -292,7 +292,7 @@ async function create_asset (i : {
 }) {
   let param = mk_create_asset(i)
   log("Create parameters:", param)
-  return await FinP2PTezos.create_asset(param)
+  return await FinP2PTezos.createAsset(param)
 }
 
 async function mk_transfer_tokens(i : {
@@ -323,7 +323,7 @@ async function mk_transfer_tokens(i : {
   let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
   let signature = secp256k1.ecdsaSign(digest, privKey).signature;
 
-  let param: Finp2pProxy.transfer_tokens_param = {
+  let param: Finp2pProxy.TransferTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
     src_account : '0x01' /* secp256k1 */ + i.src.pubKey.toString('hex'),
@@ -345,7 +345,7 @@ async function transfer_tokens(i : {
 }) {
   let param = await mk_transfer_tokens(i)
   log("Transfer parameters:", param)
-  return await FinP2PTezos.transfer_tokens(param)
+  return await FinP2PTezos.transferTokens(param)
 }
 
 async function mk_redeem_tokens(i : {
@@ -367,7 +367,7 @@ async function mk_redeem_tokens(i : {
   let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
   let signature = secp256k1.ecdsaSign(assetHashGroup, privKey).signature;
 
-  let param: Finp2pProxy.redeem_tokens_param = {
+  let param: Finp2pProxy.RedeemTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
     src_account : '0x01' /* secp256k1 */ + i.src.pubKey.toString('hex'),
@@ -385,13 +385,13 @@ async function redeem_tokens(i : {
   signer? : finp2p_account}) {
   let param = await mk_redeem_tokens(i)
   log("Redeem parameters:", param)
-  return await FinP2PTezos.redeem_tokens(param)
+  return await FinP2PTezos.redeemTokens(param)
 }
 
 async function get_balance(i : {
   owner : Buffer,
   asset_id : string}) {
-  let balance = await FinP2PTezos.get_asset_balance(
+  let balance = await FinP2PTezos.getAssetBalance(
     '0x01' /* secp256k1 */ + i.owner.toString('hex'),
     utf8.encode(i.asset_id)
   )
@@ -407,18 +407,18 @@ describe('FinP2P proxy contract',  () => {
     // Deploy the smart contracts (this is not necessary if the smart contract are
     // already deplopyed on the network we want to use)
     await FinP2PTezos.init({
-      operation_ttl : {
+      operationTTL : {
         ttl : BigInt(900), // 15 minutes
         allowed_in_the_future : BigInt(120) // 2 minutes
       },
-      fa2_metadata : new Map([['symbol', utf8.encode("FP2P")]])
+      fa2Metadata : new Map([['symbol', utf8.encode("FP2P")]])
     })
 
     // This is in case we want to redeploy and change the config
     log('================')
-    log(`finp2p_auth_address : '${FinP2PTezos.config.finp2p_auth_address}',`)
-    log(`finp2p_fa2_address : '${FinP2PTezos.config.finp2p_fa2_address}',`)
-    log(`finp2p_proxy_address : '${FinP2PTezos.config.finp2p_proxy_address}',`)
+    log(`finp2pAuthAddress : '${FinP2PTezos.config.finp2pAuthAddress}',`)
+    log(`finp2pFa2Address : '${FinP2PTezos.config.finp2pFA2Address}',`)
+    log(`finp2pProxyAddress : '${FinP2PTezos.config.finp2pProxyAddress}',`)
     log('================')
 
   })
@@ -455,7 +455,7 @@ describe('FinP2P proxy contract',  () => {
         metadata : { symbol : "FP2P1", name : asset_id1, decimals : '0' }
         })
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
     await get_receipt(op)
   })
 
@@ -471,7 +471,7 @@ describe('FinP2P proxy contract',  () => {
         asset_id : asset_id1,
         amount : 150})
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
     await get_receipt(op)
   })
 
@@ -498,7 +498,7 @@ describe('FinP2P proxy contract',  () => {
         asset_id : asset_id1,
         amount : 220 })
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Balance of account[1] should be 220 in ' + asset_id1, async () => {
@@ -531,7 +531,7 @@ describe('FinP2P proxy contract',  () => {
     }
     let op = await FinP2PTezos.batch(ops)
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Balance of account[2] should be 99999 in ' + asset_id2, async () => {
@@ -559,7 +559,7 @@ describe('FinP2P proxy contract',  () => {
         metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
         })
     log("waiting inclusion")
-      await FinP2PTezos.wait_inclusion(op)
+      await FinP2PTezos.waitInclusion(op)
     } catch (e) {
       console.error(e)
     }
@@ -571,7 +571,7 @@ describe('FinP2P proxy contract',  () => {
         dest : accounts[3],
         amount : 2 })
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Balance of account[3] should be 2 in ' + asset_id3_utf8, async () => {
@@ -587,7 +587,7 @@ describe('FinP2P proxy contract',  () => {
         asset_id : asset_id1,
         amount : 1})
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
     await get_receipt(op)
   })
 
@@ -627,7 +627,7 @@ describe('FinP2P proxy contract',  () => {
         asset_id : asset_id1,
         amount : 49})
     log("waiting inclusion")
-    await FinP2PTezos.wait_inclusion(op)
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Balance of account[0] should be 100 in ' + asset_id1, async () => {

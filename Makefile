@@ -47,7 +47,7 @@ build-tests:
 	@npm --prefix tezos-lib run build-test
 
 test:
-	@cd tezos-lib && npm test
+	@npm --prefix tezos-lib test
 
 server-deps:
 	@npm --prefix server install
