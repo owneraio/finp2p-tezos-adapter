@@ -5,10 +5,11 @@ import {
   TransferParams,
   RPCOperation,
   createRevealOperation,
+  Signer,
 } from '@taquito/taquito';
 import { BlockResponse, MichelsonV1Expression, RpcClientInterface } from '@taquito/rpc';
 import { localForger, LocalForger } from '@taquito/local-forging';
-import { encodeOpHash, b58cdecode, b58cencode, prefix } from '@taquito/utils';
+import { encodeOpHash, b58cdecode, b58cencode, prefix, getPkhfromPk } from '@taquito/utils';
 import { XMLHttpRequest } from 'xhr2-cookies';
 import * as Blake2b from '@stablelib/blake2b';
 
@@ -55,6 +56,9 @@ export class InjectionError extends Error {
     // Failed operation
     this.op = op;
     this.error = error;
+    if (error.message !== undefined) {
+      this.message = `${this.message}: ${error.message}`;
+    }
   }
 
 }
@@ -79,6 +83,8 @@ export class TaquitoWrapper extends TezosToolkit {
 
   activatedDebug : boolean;
 
+  signers : Record<string, Signer>;
+
   constructor(rpc : string | RpcClientInterface, debug = false) {
     super(rpc);
     // Forge operations locally (instead of using RPCs to the node)
@@ -86,10 +92,30 @@ export class TaquitoWrapper extends TezosToolkit {
     this.forger = new LocalForger();
     this.setProvider({ config : { streamerPollingIntervalMilliseconds : 3000 } });
     this.activatedDebug = debug;
+    this.signers = {};
   }
 
   public debug(message?: any, ...optionalParams: any[]) {
     if (this.activatedDebug) { console.log(message, ...optionalParams); }
+  }
+
+  public registerSigner(signer : Signer, source? : string) {
+    if (source !== undefined) {
+      this.signers[source] = signer;
+    } else {
+      // register asynchronously
+      signer.publicKeyHash().then(s => {
+        this.signers[s] = signer;
+      });
+    }
+  }
+
+  protected getSigner(source : string) : Signer{
+    let signer = this.signers[source];
+    if (signer === undefined) {
+      throw Error(`Unregistered signer for ${source}`);
+    }
+    return signer;
   }
 
   protected async signAndInject(
@@ -98,7 +124,21 @@ export class TaquitoWrapper extends TezosToolkit {
     let branch = await this.rpc.getBlockHash({ block: 'head~2' });
     let strop = toStrRec({ branch, contents });
     let forgedOp = await this.forger.forge(strop);
-    let signOp = await this.signer.sign(forgedOp, new Uint8Array([3]));
+    let signer : Signer;
+    if ( contents[0].kind === OpKind.ORIGINATION
+      || contents[0].kind === OpKind.TRANSACTION
+      || contents[0].kind === OpKind.REVEAL
+      || contents[0].kind === OpKind.DELEGATION
+      || contents[0].kind === OpKind.REGISTER_GLOBAL_CONSTANT ) {
+      // All manager operations in a batch must have the same source
+      let source = contents[0].source;
+      // Use the signer for the specified source
+      signer = (source === undefined) ? this.signer : this.getSigner(source);
+    } else {
+      // Use default signer for non manager operations
+      signer = this.signer;
+    }
+    let signOp = await signer.sign(forgedOp, new Uint8Array([3]));
     let hash = encodeOpHash(signOp.sbytes);
     try {
       let injectedOpHash = await this.rpc.injectOperation(signOp.sbytes);
@@ -254,34 +294,41 @@ export class TaquitoWrapper extends TezosToolkit {
    * revealed.
    * @returns injection result
    */
-  async revealWallet(): Promise<OperationResult> {
-    let estimate = await this.estimate.reveal();
-    if (estimate == undefined) {
-      throw Error('WalletAlreadyRevealed');
+  async revealWallet(publicKey? : string): Promise<OperationResult> {
+    let source : string;
+    if (publicKey === undefined) {
+      publicKey = await this.signer.publicKey();
+      source = await this.signer.publicKeyHash();
+    } else {
+      source = getPkhfromPk(publicKey);
     }
-    let publicKey = await this.signer.publicKey();
-    let source = await this.signer.publicKeyHash();
     let revealParams = {
-      fee: estimate.suggestedFeeMutez,
-      gasLimit: estimate.gasLimit,
-      storageLimit: estimate.storageLimit,
+      fee: 1000,
+      gasLimit: 1000,
+      storageLimit: 0,
     };
-    let rpcRevealOperation = await createRevealOperation(revealParams, source, publicKey);
-    let contract = await this.rpc.getContract(source);
-    let counter = parseInt(contract.counter || '0', 10);
-    let contents = [{
-      ...rpcRevealOperation,
-      source,
-      counter: counter + 1,
-    }];
-    return this.signAndInject('revelation', contents);
+    try {
+      let rpcRevealOperation = await createRevealOperation(revealParams, source, publicKey);
+      let contract = await this.rpc.getContract(source);
+      let counter = parseInt(contract.counter || '0', 10);
+      let contents = [{
+        ...rpcRevealOperation,
+        source,
+        counter: counter + 1,
+      }];
+      return await this.signAndInject('revelation', contents);
+    } catch (e : any) {
+      if (e.message.match(/Previously revealed/)) {
+        throw Error('WalletAlreadyRevealed');
+      } else { throw e; }
+    }
   }
 
 
   /**
    * @description Generic auxiliary function for batched (and non batched)
    * transfers and contracts calls
-   * @param transferParams : the transactions parameters
+   * @param transfersParams : the transactions parameters
    * @returns injection result
    */
   async batchTransactions(transfersParams: Array<TransferParams>): Promise<OperationResult> {
@@ -291,7 +338,12 @@ export class TaquitoWrapper extends TezosToolkit {
           kind : OpKind.TRANSACTION,
         };
       }));
-    let source = await this.signer.publicKeyHash();
+    let source : string;
+    if (transfersParams[0].source === undefined) {
+      source = await this.signer.publicKeyHash();
+    } else {
+      source = transfersParams[0].source;
+    }
     let contract = await this.rpc.getContract(source);
     let counter = parseInt(contract.counter || '0', 10);
     let contents =
@@ -321,9 +373,20 @@ export class TaquitoWrapper extends TezosToolkit {
    * to muTez)
    * @returns operation injection result
    */
-  async transferXTZ(destination: string, amount: number): Promise<OperationResult> {
+  async transferXTZ(destination: string, amount: number, source? : string): Promise<OperationResult> {
     this.debug(`Transfering ${amount} tz to ${destination}`);
-    return this.batchTransactions([{ to : destination, amount }]);
+    return this.batchTransactions([{ to : destination, amount, source }]);
+  }
+
+  /**
+   * @description Batch mutliple xtz transfers from a source to mutliple destinations.
+   * @param transfers : the list of transfers to emit
+   * @returns operation injection result
+   */
+  async multiTransferXTZ(
+    transfers : { to: string, amount: number, source? : string }[],
+  ): Promise<OperationResult> {
+    return this.batchTransactions(transfers);
   }
 
   /**
@@ -331,16 +394,19 @@ export class TaquitoWrapper extends TezosToolkit {
    * entrypoint of a smart contract.
    * @param destinations : the transfers' destinations
    * @param amount: the amount to transfer in Tez (will be converted internally to muTez)
+   * @param source: address of sender of the transaction
    * @returns operation injection result
    */
   async send(
     kt1: string,
     entrypoint: string,
     value: MichelsonV1Expression,
+    source? : string,
     amount = 0): Promise<OperationResult> {
     this.debug('Calling', entrypoint, 'with', value);
     return this.batchTransactions([{
       amount,
+      source,
       to: kt1,
       parameter: { entrypoint, value },
     }]);
