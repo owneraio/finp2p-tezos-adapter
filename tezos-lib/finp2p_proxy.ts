@@ -485,7 +485,7 @@ export class FinP2PTezos {
   }
 
   async init(p : { operationTTL : OperationTTL,
-    fa2Metadata : Map<string, Bytes> }) {
+    fa2Metadata : Object }) {
     var accredit = false;
     if (this.config.finp2pAuthAddress === undefined) {
       let op = await this.deployFinp2pAuth();

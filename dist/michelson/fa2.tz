@@ -38,7 +38,23 @@
                  DIG 2 ;
                  SWAP ;
                  IF_LEFT
-                   { DIG 3 ; DROP ; IF_LEFT { UPDATE 3 } { UPDATE 1 } }
+                   { DIG 3 ;
+                     DROP ;
+                     IF_LEFT
+                       { UPDATE 3 }
+                       { SWAP ;
+                         DUP ;
+                         DUG 2 ;
+                         SWAP ;
+                         UPDATE 1 ;
+                         SWAP ;
+                         GET 14 ;
+                         PUSH bytes
+                              0x7b226f70657261746f72223a226f776e65722d6f722d6f70657261746f72222c227265636569766572223a226f776e65722d6e6f2d686f6f6b222c2273656e646572223a226f776e65722d6e6f2d686f6f6b222c22637573746f6d223a7b22746167223a2266696e703270325f617574686f72697a6174696f6e222c22636f6e6669672d617069223a22227d7d ;
+                         SOME ;
+                         PUSH string "permissions" ;
+                         UPDATE ;
+                         UPDATE 14 } }
                    { UNPAIR ;
                      DUP 3 ;
                      GET 9 ;
