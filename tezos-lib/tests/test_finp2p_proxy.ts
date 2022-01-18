@@ -657,9 +657,10 @@ describe('FinP2P Contracts',  () => {
     await Promise.all(ops.map(op => { return FinP2PTezos.waitInclusion(op)}))
   })
 
-  var asset_id1 = "ORG:102:asset-id1-" + (new Date()).toISOString()
-  var asset_id2 = "ORG:102:asset-id2-" + (new Date()).toISOString()
-  var asset_id3_utf8 = "ORG:102:asset-طزوس-" + (new Date()).toISOString()
+  var asset_id1 = "ORG:102:asset-id1-" + (new Date()).toISOString() + "-test"
+  var asset_id2 = "ORG:102:asset-id2-" + (new Date()).toISOString() + "-test"
+  var asset_id3_utf8 = "ORG:102:asset-طزوس-" + (new Date()).toISOString() + "-test"
+  var asset_id_mainnet = "ORG:102:asset-12390123-2139128-1203125897142"
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
 
@@ -721,6 +722,17 @@ describe('FinP2P proxy contract',  () => {
           })
       },
       { message : "FINP2P_ASSET_ALREADY_EXISTS"})
+  })
+
+  it('Try to create mainnet asset on testnet', async () => {
+    await assert.rejects(
+      async () => {
+        await create_asset(
+          { asset_id : asset_id_mainnet,
+            metadata : { symbol : "Fmain", name : asset_id_mainnet, decimals : '0' }
+          })
+      },
+      { message : "FINP2P_ASSET_ID_CHAIN_MISMATCH"})
   })
 
   it('Issue 220 more of same token ', async () => {
