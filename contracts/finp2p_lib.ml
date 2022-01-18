@@ -167,6 +167,24 @@ let public_key_to_hex_string_bytes (k : key) : bytes =
 let amount_to_bytes (a : token_amount) : bytes =
   match a with Amount a -> string_to_bytes (nat_to_0x_hex_int64_big_endian a)
 
+let check_asset_id_on_correct_chain (a : asset_id) : unit =
+  let a = match a with Asset_id a -> a in
+  (* UTF8 encoding of string "-test" *)
+  let utf8_test_suffix = 0x2d74657374h in
+  (* Hardcoded chain id of Tezos mainnet (computed from genesis block) *)
+  let mainnet_chain_id = ("NetXdQprcVkpaWU" : chain_id) in
+  let asset_id_has_test_suffix =
+    let len_a = String.length a in
+    match is_nat (len_a - 5n) with
+    | None -> false (* len < 5 *)
+    | Some start_pos ->
+        let suffix = String.sub start_pos 5n a in
+        suffix = utf8_test_suffix
+  in
+  let is_mainnet = Tezos.chain_id None = mainnet_chain_id in
+  if is_mainnet = asset_id_has_test_suffix then
+    (failwith "FINP2P_ASSET_ID_CHAIN_MISMATCH" : unit)
+
 let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
   let {
     tt_nonce;

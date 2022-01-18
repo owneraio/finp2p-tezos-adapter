@@ -71,6 +71,7 @@ let create_asset (p : create_asset_param) (s : storage) : operation * storage =
             | Some id -> id + 1n))
   in
   let fa2_token = {address = ca_address; id = token_id} in
+  let () = check_asset_id_on_correct_chain p.ca_asset_id in
   (* Create new asset *)
   let (old_asset, finp2p_assets) =
     Big_map.get_and_update p.ca_asset_id (Some fa2_token) s.finp2p_assets
@@ -196,6 +197,7 @@ let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
           s.next_token_ids
         else next_token_ids
   in
+  let () = check_asset_id_on_correct_chain asset_id in
   {
     s with
     finp2p_assets = Big_map.add asset_id fa2 s.finp2p_assets;
