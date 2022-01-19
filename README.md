@@ -2,6 +2,11 @@
 
 # Tezos FinP2P adapter
 
+## Documentation
+
+- [Design choices and specifications for the smart contracts](specs/design.md)
+- [Analysis of costs of smart contract calls](specs/cost_analysis.md)
+
 ## Typescript Tezos Library
 
 ### Installation and compilation
