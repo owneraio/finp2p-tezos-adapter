@@ -614,7 +614,8 @@ describe('FinP2P Contracts',  () => {
         ttl : BigInt(15 * Net.block_time), // 15 blocks
         allowed_in_the_future : BigInt(2 * Net.block_time) // 2 block
       },
-      fa2Metadata : new Map([['symbol', utf8.encode("FP2P")]])
+      fa2Metadata : { name : "FinP2P FA2 assets",
+                      description : "FinP2P assets for ORG" }
     })
 
     // This is in case we want to redeploy and change the config

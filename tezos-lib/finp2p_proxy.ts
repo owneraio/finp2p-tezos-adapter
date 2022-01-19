@@ -485,7 +485,7 @@ export class FinP2PTezos {
   }
 
   async init(p : { operationTTL : OperationTTL,
-    fa2Metadata : Map<string, Bytes> }) {
+    fa2Metadata : Object }) {
     var accredit = false;
     if (this.config.finp2pAuthAddress === undefined) {
       let op = await this.deployFinp2pAuth();
@@ -557,13 +557,30 @@ export class FinP2PTezos {
   }
 
   async deployFinp2pFA2(
-    metadata : Map<string, Bytes>,
+    metadata : Object,
     auth_contract = this.config.finp2pAuthAddress,
   ): Promise<OriginationOperation> {
+    if (!metadata.hasOwnProperty('permissions')) {
+      (metadata as any).permissions =
+        {
+          operator: "owner-or-operator",
+          receiver: "owner-no-hook",
+          sender: "owner-no-hook",
+          custom: {
+            tag: "finp2p2_authorization",
+            'config-api': auth_contract }
+        }
+    }
+    if (!metadata.hasOwnProperty('interfaces')) {
+      (metadata as any).interfaces = [ 'TZIP-012' ]
+    }
+    if (!metadata.hasOwnProperty('version')) {
+      (metadata as any).version = "0.1"
+    }
     let michMetadata = new MichelsonMap<string, Bytes>();
-    metadata.forEach((b, k) => {
-      michMetadata.set(k, b);
-    });
+    Object.entries(metadata).forEach(
+      ([k, v]) => michMetadata.set(k, utf8.encode(toStr(v)))
+    );
     let initialStorage = {
       auth_contract,
       paused : false,
