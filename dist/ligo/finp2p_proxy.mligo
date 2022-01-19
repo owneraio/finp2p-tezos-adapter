@@ -33,7 +33,6 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) : (operation * sto
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token in
   let tr_amount = match p.amount with | Amount a -> a in
-  let _x = nat_to_int64_big_endian tr_amount in
   let fa2_transfer =
     {
       from_ = (address_of_key p.src_account);
