@@ -414,7 +414,7 @@ function log_hashgroup (hg : any[]) {
 async function mk_issue_tokens(i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number}) {
+  amount : number | bigint}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
   let assetGroup = [
@@ -447,7 +447,7 @@ async function mk_issue_tokens(i : {
 async function issue_tokens (i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   options? : Finp2pProxy.CallOptions,
 }) {
   let param = await mk_issue_tokens(i)
@@ -491,7 +491,7 @@ async function mk_transfer_tokens(i : {
   src : finp2p_account,
   dest : Buffer,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account
 }) {
   let nonce = generateNonce()
@@ -532,7 +532,7 @@ async function transfer_tokens(i : {
   src : finp2p_account,
   dest : Buffer,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
 }) {
@@ -544,7 +544,7 @@ async function transfer_tokens(i : {
 async function mk_redeem_tokens(i : {
   src : finp2p_account,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
@@ -574,7 +574,7 @@ async function mk_redeem_tokens(i : {
 async function redeem_tokens(i : {
   src : finp2p_account,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
 }) {
