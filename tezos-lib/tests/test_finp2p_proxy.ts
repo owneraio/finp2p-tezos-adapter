@@ -583,13 +583,19 @@ async function redeem_tokens(i : {
   return await FinP2PTezos.redeemTokens(param, i.options)
 }
 
-async function get_balance(i : {
+async function get_balance_big_int(i : {
   owner : Buffer,
   asset_id : string}) {
-  let balance = await FinP2PTezos.getAssetBalance(
+  return await FinP2PTezos.getAssetBalance(
     '0x01' /* secp256k1 */ + i.owner.toString('hex'),
     utf8.encode(i.asset_id)
   )
+}
+
+async function get_balance(i : {
+  owner : Buffer,
+  asset_id : string}) {
+  let balance = await get_balance_big_int(i)
   return Number(balance)
 }
 
@@ -661,6 +667,9 @@ describe('FinP2P Contracts',  () => {
   var asset_id1 = "ORG:102:asset-id1-" + (new Date()).toISOString()
   var asset_id2 = "ORG:102:asset-id2-" + (new Date()).toISOString()
   var asset_id3_utf8 = "ORG:102:asset-طزوس-" + (new Date()).toISOString()
+  var asset_id4 = "ORG:102:asset-id4-" + (new Date()).toISOString()
+  var asset_id5 = "ORG:102:asset-id4-" + (new Date()).toISOString()
+  var asset_id6 = "ORG:102:asset-id4-" + (new Date()).toISOString()
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
 
@@ -803,17 +812,108 @@ describe('FinP2P proxy contract',  () => {
       { message : "FA2_TOKEN_ALREADY_EXISTS"})
   })
 
+  it('Create asset with 6 decimals', async () => {
+    let op = await create_asset(
+      { asset_id : asset_id4,
+        metadata : { symbol : "0", name : "", decimals : '6' }
+        })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 0 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[1],
+        amount : 0 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 1.000000 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[1],
+        amount : 1000000 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 1000000.000000 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[2],
+        amount : 1000000000000 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it(`Issue ${Number.MAX_SAFE_INTEGER}`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : Number.MAX_SAFE_INTEGER })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Check big balance of account[3]', async () => {
+    let b = await get_balance({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id4 })
+    assert.equal(b, Number.MAX_SAFE_INTEGER)
+  })
+
+  it(`Issue max signed int64 ${2n ** 63n - 1n}`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : 2n ** 63n - 1n })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Check very big balance of account[3]', async () => {
+    let b = await get_balance_big_int({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id4 })
+    assert.equal(b, BigInt(Number.MAX_SAFE_INTEGER) + 2n ** 63n - 1n)
+  })
+
+  // TODO we should probably allow larger integers in smart contract
+  it(`Issue ${2n ** 64n - 1n}`, async () => {
+    await assert.rejects(
+      async () => {
+        await issue_tokens(
+          { asset_id : asset_id4,
+            dest : accounts[3],
+            amount : 2n ** 64n - 1n })
+      },
+      { message : "BAD_INT64_NAT"})
+  })
+
+  it(`Issue -1 tokens`, async () => {
+    await assert.rejects(
+      async () => {
+        await issue_tokens(
+          { asset_id : asset_id4,
+            dest : accounts[3],
+            amount : -1 })
+      },
+      (err : any) => {
+        assert.match(err.message, /invalid_syntactic_constant/)
+        return true
+      }
+    )
+  })
+
   it('Create new asset with UTF8 asset_id ' + asset_id3_utf8, async () => {
-    try {
     let op = await create_asset(
       { asset_id : asset_id3_utf8,
         metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
         })
     log("waiting inclusion")
-      await FinP2PTezos.waitInclusion(op)
-    } catch (e) {
-      console.error(e)
-    }
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Issue 2 tokens of ' + asset_id3_utf8, async () => {
