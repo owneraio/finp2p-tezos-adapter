@@ -942,6 +942,22 @@ describe('FinP2P proxy contract',  () => {
     await get_receipt(op)
   })
 
+  it(`Transfer -1 tokens`, async () => {
+    await assert.rejects(
+      async () => {
+        await transfer_tokens(
+          { src : accounts[0],
+            dest : accounts[3].pubKey,
+            asset_id : asset_id1,
+            amount : -1})
+      },
+      (err : any) => {
+        assert.match(err.message, /invalid_syntactic_constant/)
+        return true
+      }
+    )
+  })
+
   it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
     let b = await get_balance({ owner : accounts[3].pubKey,
                                 asset_id : asset_id1 })
