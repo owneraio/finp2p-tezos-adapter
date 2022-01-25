@@ -1001,6 +1001,61 @@ describe('FinP2P proxy contract',  () => {
     assert.equal(b, 0)
   })
 
+  it('Transfer 0 to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : 0})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
+  it('Transfer 1 to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : 1})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
+  it('Transfer whole to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : b0})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
   it('Try to transfer more than balance ' + asset_id1, async () => {
     await assert.rejects(
       async () => {
@@ -1009,6 +1064,33 @@ describe('FinP2P proxy contract',  () => {
         dest : accounts[3].pubKey,
         asset_id : asset_id1,
         amount : 99999999999999})
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Try to transfer more than balance to self', async () => {
+    await assert.rejects(
+      async () => {
+    let b : bigint = await get_balance_big_int({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id1,
+        amount : b + 1n})
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Try to transfer non existing tokens to self', async () => {
+    await assert.rejects(
+      async () => {
+    await transfer_tokens(
+      { src : accounts[5],
+        dest : accounts[5].pubKey,
+        asset_id : asset_id1,
+        amount : 1})
       },
       { message : "FA2_INSUFFICIENT_BALANCE"})
   })
