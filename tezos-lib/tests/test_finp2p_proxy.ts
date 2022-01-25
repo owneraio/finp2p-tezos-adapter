@@ -878,23 +878,29 @@ describe('FinP2P proxy contract',  () => {
     await FinP2PTezos.waitInclusion(op2)
   })
 
+  it(`Issue ${2n ** 64n - 1n}`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : 2n ** 64n - 1n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
   it('Check very big balance of account[3]', async () => {
     let b = await get_balance_big_int({
       owner : accounts[3].pubKey,
       asset_id : asset_id4 })
-    assert.equal(b, BigInt(Number.MAX_SAFE_INTEGER) + 2n ** 63n - 1n)
+    assert.equal(b, BigInt(Number.MAX_SAFE_INTEGER) + 2n ** 63n - 1n + 2n ** 64n - 1n)
   })
 
-  // TODO we should probably allow larger integers in smart contract
-  it(`Issue ${2n ** 64n - 1n}`, async () => {
-    await assert.rejects(
-      async () => {
-        await issue_tokens(
-          { asset_id : asset_id4,
-            dest : accounts[3],
-            amount : 2n ** 64n - 1n })
-      },
-      { message : "BAD_INT64_NAT"})
+  it(`Issue 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999n`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[4],
+        amount : 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it(`Issue -1 tokens`, async () => {
@@ -977,10 +983,10 @@ describe('FinP2P proxy contract',  () => {
 
   it('Transfer whole very large balance of ' + asset_id4, async () => {
     let b : bigint = await get_balance_big_int({
-      owner : accounts[4].pubKey,
+      owner : accounts[3].pubKey,
       asset_id : asset_id4 })
     let op = await transfer_tokens(
-      { src : accounts[4],
+      { src : accounts[3],
         dest : accounts[0].pubKey,
         asset_id : asset_id4,
         amount : b})
@@ -989,8 +995,8 @@ describe('FinP2P proxy contract',  () => {
     await get_receipt(op)
   })
 
-  it('Balance of account[4] should be 0 in ' + asset_id4, async () => {
-    let b = await get_balance({ owner : accounts[4].pubKey,
+  it('Balance of account[3] should be 0 in ' + asset_id4, async () => {
+    let b = await get_balance({ owner : accounts[3].pubKey,
                                 asset_id : asset_id4 })
     assert.equal(b, 0)
   })
