@@ -259,7 +259,26 @@ module Flextesa {
   export const accounts = [account].concat(gen_tz_accounts(30))
 
   let flextesa_image = 'oxheadalpha/flextesa:20211221'
-  let flexteas_script = 'hangzbox'
+  let flexteas_script : string
+  switch (process.env.FINP2P_SANDBOX_NETWORK) {
+    case 'hangzhou':
+    case 'hangzbox':
+      flexteas_script = 'hangzbox'
+      break
+    case 'ithaca':
+    case 'ithacabox':
+      flexteas_script = 'ithacabox'
+      break
+    case 'alpha':
+    case 'alphabox':
+      flexteas_script = 'alphabox'
+      break
+    case undefined:
+      flexteas_script = 'hangzbox';
+      break
+    default:
+      flexteas_script = process.env.FINP2P_SANDBOX_NETWORK
+  }
 
   export var block_time = 1
 
