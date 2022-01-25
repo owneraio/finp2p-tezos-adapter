@@ -864,13 +864,18 @@ describe('FinP2P proxy contract',  () => {
     assert.equal(b, Number.MAX_SAFE_INTEGER)
   })
 
-  it(`Issue max signed int64 ${2n ** 63n - 1n}`, async () => {
-    let op = await issue_tokens(
+  it(`Issue (twice) max signed int64 ${2n ** 63n - 1n}`, async () => {
+    let op1 = await issue_tokens(
       { asset_id : asset_id4,
         dest : accounts[3],
         amount : 2n ** 63n - 1n })
-    log("waiting inclusion")
-    await FinP2PTezos.waitInclusion(op)
+    let op2 = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[4],
+        amount : 2n ** 63n - 1n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op1)
+    await FinP2PTezos.waitInclusion(op2)
   })
 
   it('Check very big balance of account[3]', async () => {
@@ -942,6 +947,18 @@ describe('FinP2P proxy contract',  () => {
     await get_receipt(op)
   })
 
+  it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[3].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 1)
+  })
+
+  it('Balance of account[0] should be 149 in ' + asset_id1, async () => {
+    let b = await get_balance({ owner : accounts[0].pubKey,
+                                asset_id : asset_id1 })
+    assert.equal(b, 149)
+  })
+
   it(`Transfer -1 tokens`, async () => {
     await assert.rejects(
       async () => {
@@ -958,16 +975,24 @@ describe('FinP2P proxy contract',  () => {
     )
   })
 
-  it('Balance of account[3] should be 1 in ' + asset_id1, async () => {
-    let b = await get_balance({ owner : accounts[3].pubKey,
-                                asset_id : asset_id1 })
-    assert.equal(b, 1)
+  it('Transfer whole very large balance of ' + asset_id4, async () => {
+    let b : bigint = await get_balance_big_int({
+      owner : accounts[4].pubKey,
+      asset_id : asset_id4 })
+    let op = await transfer_tokens(
+      { src : accounts[4],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : b})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    await get_receipt(op)
   })
 
-  it('Balance of account[0] should be 149 in ' + asset_id1, async () => {
-    let b = await get_balance({ owner : accounts[0].pubKey,
-                                asset_id : asset_id1 })
-    assert.equal(b, 149)
+  it('Balance of account[4] should be 0 in ' + asset_id4, async () => {
+    let b = await get_balance({ owner : accounts[4].pubKey,
+                                asset_id : asset_id4 })
+    assert.equal(b, 0)
   })
 
   it('Try to transfer more than balance ' + asset_id1, async () => {
