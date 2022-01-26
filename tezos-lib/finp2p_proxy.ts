@@ -14,6 +14,7 @@ import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix } from '@taquito/utils';
 import { ParameterSchema } from '@taquito/michelson-encoder';
 const PromiseAny = require('promise-any');
+import { BigNumber } from 'bignumber.js';
 
 import * as finp2pProxyCode from '../dist/michelson/finp2p_proxy.json';
 import * as fa2Code from '../dist/michelson/fa2.json';
@@ -563,23 +564,23 @@ export class FinP2PTezos {
     if (!metadata.hasOwnProperty('permissions')) {
       (metadata as any).permissions =
         {
-          operator: "owner-or-operator",
-          receiver: "owner-no-hook",
-          sender: "owner-no-hook",
+          operator: 'owner-or-operator',
+          receiver: 'owner-no-hook',
+          sender: 'owner-no-hook',
           custom: {
-            tag: "finp2p2_authorization",
-            'config-api': auth_contract }
-        }
+            tag: 'finp2p2_authorization',
+            'config-api': auth_contract },
+        };
     }
     if (!metadata.hasOwnProperty('interfaces')) {
-      (metadata as any).interfaces = [ 'TZIP-012' ]
+      (metadata as any).interfaces = [ 'TZIP-012' ];
     }
     if (!metadata.hasOwnProperty('version')) {
-      (metadata as any).version = "0.1"
+      (metadata as any).version = '0.1';
     }
     let michMetadata = new MichelsonMap<string, Bytes>();
     Object.entries(metadata).forEach(
-      ([k, v]) => michMetadata.set(k, utf8.encode(toStr(v)))
+      ([k, v]) => michMetadata.set(k, utf8.encode(toStr(v))),
     );
     let initialStorage = {
       auth_contract,
@@ -1066,7 +1067,7 @@ export class FinP2PTezos {
   async getAssetBalance(
     publicKey : Key,
     assetId : AssetId,
-    kt1?: Address) : Promise<BigInt> {
+    kt1?: Address) : Promise<bigint> {
     let addr = this.getProxyAddress(kt1);
     const contract = await this.taquito.contract.at(addr);
     let pk = publicKey;
@@ -1077,8 +1078,8 @@ export class FinP2PTezos {
       let balance =
         await contract.contractViews.get_asset_balance(
           [pk, assetId],
-        ).executeView({ viewCaller : addr }) as bigint | undefined;
-      return (balance || BigInt(0));
+        ).executeView({ viewCaller : addr }) as BigNumber | undefined;
+      return (BigInt((balance || new BigNumber(0)).toString()));
     } catch (e : any) {
       const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
       if (matches) {
