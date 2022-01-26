@@ -830,65 +830,42 @@
            { UNPAIR ;
              UNPAIR ;
              DIG 2 ;
-             PUSH nat 9223372036854775807 ;
+             PUSH nat 0 ;
              SWAP ;
              DUP ;
              DUG 2 ;
              COMPARE ;
-             GT ;
-             IF { DIG 2 ; DROP 2 ; PUSH string "BAD_INT64_NAT" ; FAILWITH }
-                { PUSH nat 0 ;
+             EQ ;
+             IF { DIG 2 ; DROP 2 ; PUSH string "0x0" }
+                { PUSH string "" ;
                   SWAP ;
-                  DUP ;
-                  DUG 2 ;
-                  COMPARE ;
-                  EQ ;
-                  IF { DIG 2 ; DROP 2 ; PUSH string "0x0" }
-                     { NIL string ;
-                       PUSH nat 15 ;
-                       DIG 2 ;
-                       PAIR ;
-                       PAIR ;
-                       LEFT string ;
-                       LOOP_LEFT
-                         { UNPAIR ;
-                           UNPAIR ;
+                  PAIR ;
+                  LEFT string ;
+                  LOOP_LEFT
+                    { UNPAIR ;
+                      PUSH nat 0 ;
+                      SWAP ;
+                      DUP ;
+                      DUG 2 ;
+                      COMPARE ;
+                      EQ ;
+                      IF { DROP ; PUSH string "0x" ; CONCAT ; RIGHT (pair nat string) }
+                         { DUP 4 ;
                            PUSH nat 15 ;
-                           PUSH nat 4 ;
-                           DUP 4 ;
-                           MUL ;
                            DUP 3 ;
-                           LSR ;
                            AND ;
-                           DUP 6 ;
-                           SWAP ;
                            GET ;
                            IF_NONE { PUSH string "" ; FAILWITH } {} ;
-                           PUSH string "0" ;
-                           SWAP ;
-                           DUP ;
+                           PUSH nat 4 ;
+                           DIG 2 ;
+                           LSR ;
                            DUG 2 ;
-                           COMPARE ;
-                           EQ ;
-                           IF { DUP 4 ; IF_CONS { DROP 2 ; DIG 3 ; SWAP ; CONS } { DROP ; DIG 2 } }
-                              { DIG 3 ; SWAP ; CONS } ;
-                           PUSH nat 1 ;
-                           DIG 3 ;
-                           SUB ;
-                           ISNAT ;
-                           IF_NONE
-                             { SWAP ;
-                               DROP ;
-                               NIL string ;
-                               SWAP ;
-                               ITER { CONS } ;
-                               PUSH string "0x" ;
-                               CONS ;
-                               CONCAT ;
-                               RIGHT (pair (pair nat nat) (list string)) }
-                             { DIG 2 ; PAIR ; PAIR ; LEFT string } } ;
-                       DIG 2 ;
-                       DROP } } ;
+                           CONCAT ;
+                           SWAP ;
+                           PAIR ;
+                           LEFT string } } ;
+                  DIG 2 ;
+                  DROP } ;
              EXEC } ;
          SWAP ;
          APPLY ;

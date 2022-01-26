@@ -22,11 +22,6 @@ let nth_nat_byte (number : nat) (n : nat) : nat =
 
 
 [@inline]
-let nth_nat_hex_digit (number : nat) (n : nat) : nat =
-  (number lsr (n * 4n)) land 15n
-
-
-[@inline]
 let uint8_to_byte (n : nat) =
   match Map.find_opt n bytes_conv_map with
   | None -> (failwith "" : bytes)
@@ -51,11 +46,6 @@ let nth_byte (number : nat) (n : nat) : bytes =
 
 
 [@inline]
-let nth_hex_digit (number : nat) (n : nat) : string =
-  uint4_to_hex_digit (nth_nat_hex_digit number n)
-
-
-[@inline]
 let nat_to_int64_big_endian (number : nat) : bytes =
   if number > (max_int64 ())
   then (failwith "BAD_INT64_NAT" : bytes)
@@ -70,27 +60,17 @@ let nat_to_int64_big_endian (number : nat) : bytes =
        nth_byte number 1n;
        nth_byte number 0n]
 
-let rec nat_to_0x_hex_int64_big_endian_rec ((number : nat), (n : nat), (acc : string list)) : string =
-  let hex_digit = nth_hex_digit number n in
-  let acc =
-    if hex_digit = "0"
-    then match acc with | [] -> acc | _ -> hex_digit :: acc
-    else hex_digit :: acc in
-  match is_nat (n - 1n) with
-  | None ->
-    let digits =
-      List.fold_left (fun ((acc : string list), (h : string)) -> h :: acc)
-        ([] : string list) acc in
-    concat_string ("0x" :: digits)
-  | Some n -> nat_to_0x_hex_int64_big_endian_rec (number, n, acc)
-
-let nat_to_0x_hex_int64_big_endian (number : nat) : string =
-  if number > (max_int64 ())
-  then (failwith "BAD_INT64_NAT" : string)
-  else
+let rec nat_to_0x_hex_big_endian_rec ((number : nat), (acc : string)) : string =
   if number = 0n
-  then "0x0"
-  else nat_to_0x_hex_int64_big_endian_rec (number, 15n, ([] : string list))
+  then String.concat "0x" acc
+  else
+    (let last_uint4 = number land 15n in
+     let hex_digit = uint4_to_hex_digit last_uint4 in
+     let acc = String.concat hex_digit acc in
+     let number = number lsr 4n in nat_to_0x_hex_big_endian_rec (number, acc))
+
+let nat_to_0x_hex_big_endian (number : nat) : string =
+  if number = 0n then "0x0" else nat_to_0x_hex_big_endian_rec (number, "")
 
 let timestamp_to_int64_big_endian (timestamp : timestamp) : bytes =
   let seconds_since_epoch =
@@ -128,7 +108,7 @@ let public_key_to_hex_string_bytes (k : key) : bytes =
   let k_hex = bytes_to_hex k_bytes in string_to_bytes k_hex
 
 let amount_to_bytes (a : token_amount) : bytes =
-  match a with | Amount a -> string_to_bytes (nat_to_0x_hex_int64_big_endian a)
+  match a with | Amount a -> string_to_bytes (nat_to_0x_hex_big_endian a)
 
 let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
   let { nonce = tt_nonce; asset_id = tt_asset_id; src_account = tt_src_account;
