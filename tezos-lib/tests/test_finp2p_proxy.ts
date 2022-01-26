@@ -259,7 +259,26 @@ module Flextesa {
   export const accounts = [account].concat(gen_tz_accounts(30))
 
   let flextesa_image = 'oxheadalpha/flextesa:20211221'
-  let flexteas_script = 'hangzbox'
+  let flexteas_script : string
+  switch (process.env.FINP2P_SANDBOX_NETWORK) {
+    case 'hangzhou':
+    case 'hangzbox':
+      flexteas_script = 'hangzbox'
+      break
+    case 'ithaca':
+    case 'ithacabox':
+      flexteas_script = 'ithacabox'
+      break
+    case 'alpha':
+    case 'alphabox':
+      flexteas_script = 'alphabox'
+      break
+    case undefined:
+      flexteas_script = 'hangzbox';
+      break
+    default:
+      flexteas_script = process.env.FINP2P_SANDBOX_NETWORK
+  }
 
   export var block_time = 1
 
@@ -414,7 +433,7 @@ function log_hashgroup (hg : any[]) {
 async function mk_issue_tokens(i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number}) {
+  amount : number | bigint}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
   let assetGroup = [
@@ -447,7 +466,7 @@ async function mk_issue_tokens(i : {
 async function issue_tokens (i : {
   dest : finp2p_account;
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   options? : Finp2pProxy.CallOptions,
 }) {
   let param = await mk_issue_tokens(i)
@@ -491,7 +510,7 @@ async function mk_transfer_tokens(i : {
   src : finp2p_account,
   dest : Buffer,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account
 }) {
   let nonce = generateNonce()
@@ -532,7 +551,7 @@ async function transfer_tokens(i : {
   src : finp2p_account,
   dest : Buffer,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
 }) {
@@ -544,7 +563,7 @@ async function transfer_tokens(i : {
 async function mk_redeem_tokens(i : {
   src : finp2p_account,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
@@ -574,7 +593,7 @@ async function mk_redeem_tokens(i : {
 async function redeem_tokens(i : {
   src : finp2p_account,
   asset_id : string,
-  amount : number,
+  amount : number | bigint,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
 }) {
@@ -583,13 +602,19 @@ async function redeem_tokens(i : {
   return await FinP2PTezos.redeemTokens(param, i.options)
 }
 
-async function get_balance(i : {
+async function get_balance_big_int(i : {
   owner : Buffer,
   asset_id : string}) {
-  let balance = await FinP2PTezos.getAssetBalance(
+  return await FinP2PTezos.getAssetBalance(
     '0x01' /* secp256k1 */ + i.owner.toString('hex'),
     utf8.encode(i.asset_id)
   )
+}
+
+async function get_balance(i : {
+  owner : Buffer,
+  asset_id : string}) {
+  let balance = await get_balance_big_int(i)
   return Number(balance)
 }
 
@@ -661,6 +686,9 @@ describe('FinP2P Contracts',  () => {
   var asset_id1 = "ORG:102:asset-id1-" + (new Date()).toISOString()
   var asset_id2 = "ORG:102:asset-id2-" + (new Date()).toISOString()
   var asset_id3_utf8 = "ORG:102:asset-طزوس-" + (new Date()).toISOString()
+  var asset_id4 = "ORG:102:asset-id4-" + (new Date()).toISOString()
+  var asset_id5 = "ORG:102:asset-id4-" + (new Date()).toISOString()
+  var asset_id6 = "ORG:102:asset-id4-" + (new Date()).toISOString()
 
   var token_id1 =  Math.floor((new Date()).getTime() / 1000)
 
@@ -803,17 +831,119 @@ describe('FinP2P proxy contract',  () => {
       { message : "FA2_TOKEN_ALREADY_EXISTS"})
   })
 
+  it('Create asset with 6 decimals', async () => {
+    let op = await create_asset(
+      { asset_id : asset_id4,
+        metadata : { symbol : "0", name : "", decimals : '6' }
+        })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 0 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[1],
+        amount : 0 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 1.000000 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[1],
+        amount : 1000000 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Issue 1000000.000000 of token with 6 decimals', async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[2],
+        amount : 1000000000000 })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it(`Issue ${Number.MAX_SAFE_INTEGER}`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : Number.MAX_SAFE_INTEGER })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Check big balance of account[3]', async () => {
+    let b = await get_balance({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id4 })
+    assert.equal(b, Number.MAX_SAFE_INTEGER)
+  })
+
+  it(`Issue (twice) max signed int64 ${2n ** 63n - 1n}`, async () => {
+    let op1 = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : 2n ** 63n - 1n })
+    let op2 = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[4],
+        amount : 2n ** 63n - 1n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op1)
+    await FinP2PTezos.waitInclusion(op2)
+  })
+
+  it(`Issue ${2n ** 64n - 1n}`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[3],
+        amount : 2n ** 64n - 1n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Check very big balance of account[3]', async () => {
+    let b = await get_balance_big_int({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id4 })
+    assert.equal(b, BigInt(Number.MAX_SAFE_INTEGER) + 2n ** 63n - 1n + 2n ** 64n - 1n)
+  })
+
+  it(`Issue 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999n`, async () => {
+    let op = await issue_tokens(
+      { asset_id : asset_id4,
+        dest : accounts[4],
+        amount : 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999n })
+    log("waiting inclusions")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it(`Issue -1 tokens`, async () => {
+    await assert.rejects(
+      async () => {
+        await issue_tokens(
+          { asset_id : asset_id4,
+            dest : accounts[3],
+            amount : -1 })
+      },
+      (err : any) => {
+        assert.match(err.message, /invalid_syntactic_constant/)
+        return true
+      }
+    )
+  })
+
   it('Create new asset with UTF8 asset_id ' + asset_id3_utf8, async () => {
-    try {
     let op = await create_asset(
       { asset_id : asset_id3_utf8,
         metadata : { symbol : "FP2P3", name : asset_id3_utf8, decimals : '0' }
         })
     log("waiting inclusion")
-      await FinP2PTezos.waitInclusion(op)
-    } catch (e) {
-      console.error(e)
-    }
+    await FinP2PTezos.waitInclusion(op)
   })
 
   it('Issue 2 tokens of ' + asset_id3_utf8, async () => {
@@ -854,6 +984,97 @@ describe('FinP2P proxy contract',  () => {
     assert.equal(b, 149)
   })
 
+  it(`Transfer -1 tokens`, async () => {
+    await assert.rejects(
+      async () => {
+        await transfer_tokens(
+          { src : accounts[0],
+            dest : accounts[3].pubKey,
+            asset_id : asset_id1,
+            amount : -1})
+      },
+      (err : any) => {
+        assert.match(err.message, /invalid_syntactic_constant/)
+        return true
+      }
+    )
+  })
+
+  it('Transfer whole very large balance of ' + asset_id4, async () => {
+    let b : bigint = await get_balance_big_int({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id4 })
+    let op = await transfer_tokens(
+      { src : accounts[3],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : b})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    await get_receipt(op)
+  })
+
+  it('Balance of account[3] should be 0 in ' + asset_id4, async () => {
+    let b = await get_balance({ owner : accounts[3].pubKey,
+                                asset_id : asset_id4 })
+    assert.equal(b, 0)
+  })
+
+  it('Transfer 0 to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : 0})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
+  it('Transfer 1 to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : 1})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
+  it('Transfer whole to self', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id4,
+        amount : b0})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let b1 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, b1)
+    await get_receipt(op)
+  })
+
   it('Try to transfer more than balance ' + asset_id1, async () => {
     await assert.rejects(
       async () => {
@@ -862,6 +1083,33 @@ describe('FinP2P proxy contract',  () => {
         dest : accounts[3].pubKey,
         asset_id : asset_id1,
         amount : 99999999999999})
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Try to transfer more than balance to self', async () => {
+    await assert.rejects(
+      async () => {
+    let b : bigint = await get_balance_big_int({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[0].pubKey,
+        asset_id : asset_id1,
+        amount : b + 1n})
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it('Try to transfer non existing tokens to self', async () => {
+    await assert.rejects(
+      async () => {
+    await transfer_tokens(
+      { src : accounts[5],
+        dest : accounts[5].pubKey,
+        asset_id : asset_id1,
+        amount : 1})
       },
       { message : "FA2_INSUFFICIENT_BALANCE"})
   })
