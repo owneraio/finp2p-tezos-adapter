@@ -821,54 +821,6 @@
              EXEC } ;
          SWAP ;
          APPLY ;
-         DIG 4 ;
-         DUP 3 ;
-         PAIR ;
-         LAMBDA
-           (pair (pair (lambda string bytes) (map nat string)) nat)
-           bytes
-           { UNPAIR ;
-             UNPAIR ;
-             DIG 2 ;
-             PUSH nat 0 ;
-             SWAP ;
-             DUP ;
-             DUG 2 ;
-             COMPARE ;
-             EQ ;
-             IF { DIG 2 ; DROP 2 ; PUSH string "0x0" }
-                { PUSH string "" ;
-                  SWAP ;
-                  PAIR ;
-                  LEFT string ;
-                  LOOP_LEFT
-                    { UNPAIR ;
-                      PUSH nat 0 ;
-                      SWAP ;
-                      DUP ;
-                      DUG 2 ;
-                      COMPARE ;
-                      EQ ;
-                      IF { DROP ; PUSH string "0x" ; CONCAT ; RIGHT (pair nat string) }
-                         { DUP 4 ;
-                           PUSH nat 15 ;
-                           DUP 3 ;
-                           AND ;
-                           GET ;
-                           IF_NONE { PUSH string "" ; FAILWITH } {} ;
-                           PUSH nat 4 ;
-                           DIG 2 ;
-                           LSR ;
-                           DUG 2 ;
-                           CONCAT ;
-                           SWAP ;
-                           PAIR ;
-                           LEFT string } } ;
-                  DIG 2 ;
-                  DROP } ;
-             EXEC } ;
-         SWAP ;
-         APPLY ;
          LAMBDA
            (pair (pair nat nat)
                  (pair (big_map bytes timestamp)
@@ -962,11 +914,11 @@
                                             (pair (big_map bytes timestamp)
                                                   (pair (big_map bytes (pair address nat)) (pair (set address) (big_map address nat))))))
                                 bool)
-                             (pair (lambda nat bytes)
-                                   (pair (lambda key bytes)
-                                         (pair (lambda string bytes)
-                                               (pair (lambda timestamp bytes)
-                                                     (pair (lambda (list bytes) bytes)
+                             (pair (lambda key bytes)
+                                   (pair (lambda string bytes)
+                                         (pair (lambda timestamp bytes)
+                                               (pair (lambda (list bytes) bytes)
+                                                     (pair (map nat string)
                                                            (pair (lambda
                                                                     address
                                                                     (contract (pair nat (pair (option (map string bytes)) (list (pair address nat))))))
@@ -1100,29 +1052,62 @@
                      DROP ;
                      DUP ;
                      CDR ;
-                     DIG 12 ;
+                     DIG 11 ;
                      SWAP ;
                      EXEC ;
                      SWAP ;
                      CAR ;
                      CONCAT ;
                      PUSH string "issue" ;
-                     DUP 12 ;
+                     DUP 11 ;
                      SWAP ;
                      EXEC ;
                      PUSH string "finp2p" ;
-                     DUP 13 ;
+                     DUP 12 ;
                      SWAP ;
                      EXEC ;
                      PUSH string "finId" ;
-                     DIG 13 ;
+                     DUP 13 ;
                      SWAP ;
                      EXEC ;
                      DIG 5 ;
-                     DIG 12 ;
+                     DIG 11 ;
                      SWAP ;
                      EXEC ;
-                     DIG 6 ;
+                     PUSH nat 0 ;
+                     DUP 8 ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DIG 6 ; DIG 13 ; DROP 2 ; PUSH string "0x0" }
+                        { PUSH string "" ;
+                          DIG 7 ;
+                          PAIR ;
+                          LEFT string ;
+                          LOOP_LEFT
+                            { UNPAIR ;
+                              PUSH nat 0 ;
+                              SWAP ;
+                              DUP ;
+                              DUG 2 ;
+                              COMPARE ;
+                              EQ ;
+                              IF { DROP ; PUSH string "0x" ; CONCAT ; RIGHT (pair nat string) }
+                                 { DUP 15 ;
+                                   PUSH nat 15 ;
+                                   DUP 3 ;
+                                   AND ;
+                                   GET ;
+                                   IF_NONE { PUSH string "" ; FAILWITH } {} ;
+                                   PUSH nat 4 ;
+                                   DIG 2 ;
+                                   LSR ;
+                                   DUG 2 ;
+                                   CONCAT ;
+                                   SWAP ;
+                                   PAIR ;
+                                   LEFT string } } ;
+                          DIG 13 ;
+                          DROP } ;
                      DIG 11 ;
                      SWAP ;
                      EXEC ;
@@ -1211,7 +1196,7 @@
                { DIG 9 ;
                  DROP ;
                  IF_LEFT
-                   { DIG 5 ;
+                   { DIG 4 ;
                      DIG 9 ;
                      DROP 2 ;
                      DUP ;
@@ -1232,17 +1217,50 @@
                      DROP 2 ;
                      DUP ;
                      CDR ;
-                     DIG 9 ;
+                     DIG 8 ;
                      SWAP ;
                      EXEC ;
                      SWAP ;
                      CAR ;
                      CONCAT ;
                      PUSH string "redeem" ;
-                     DIG 8 ;
+                     DUP 8 ;
                      SWAP ;
                      EXEC ;
-                     DIG 3 ;
+                     PUSH nat 0 ;
+                     DUP 5 ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DIG 3 ; DIG 9 ; DROP 2 ; PUSH string "0x0" }
+                        { PUSH string "" ;
+                          DIG 4 ;
+                          PAIR ;
+                          LEFT string ;
+                          LOOP_LEFT
+                            { UNPAIR ;
+                              PUSH nat 0 ;
+                              SWAP ;
+                              DUP ;
+                              DUG 2 ;
+                              COMPARE ;
+                              EQ ;
+                              IF { DROP ; PUSH string "0x" ; CONCAT ; RIGHT (pair nat string) }
+                                 { DUP 11 ;
+                                   PUSH nat 15 ;
+                                   DUP 3 ;
+                                   AND ;
+                                   GET ;
+                                   IF_NONE { PUSH string "" ; FAILWITH } {} ;
+                                   PUSH nat 4 ;
+                                   DIG 2 ;
+                                   LSR ;
+                                   DUG 2 ;
+                                   CONCAT ;
+                                   SWAP ;
+                                   PAIR ;
+                                   LEFT string } } ;
+                          DIG 9 ;
+                          DROP } ;
                      DIG 7 ;
                      SWAP ;
                      EXEC ;
@@ -1325,33 +1343,66 @@
                      DROP ;
                      DUP ;
                      CDR ;
-                     DIG 13 ;
+                     DIG 12 ;
                      SWAP ;
                      EXEC ;
                      SWAP ;
                      CAR ;
                      CONCAT ;
                      PUSH string "transfer" ;
-                     DUP 13 ;
+                     DUP 12 ;
                      SWAP ;
                      EXEC ;
                      PUSH string "finp2p" ;
-                     DUP 14 ;
+                     DUP 13 ;
                      SWAP ;
                      EXEC ;
                      PUSH string "finId" ;
-                     DIG 14 ;
-                     SWAP ;
-                     EXEC ;
-                     DIG 5 ;
                      DUP 14 ;
                      SWAP ;
                      EXEC ;
-                     DIG 6 ;
-                     DIG 13 ;
+                     DIG 5 ;
+                     DUP 13 ;
                      SWAP ;
                      EXEC ;
-                     DIG 7 ;
+                     DIG 6 ;
+                     DIG 12 ;
+                     SWAP ;
+                     EXEC ;
+                     PUSH nat 0 ;
+                     DUP 9 ;
+                     COMPARE ;
+                     EQ ;
+                     IF { DIG 7 ; DIG 14 ; DROP 2 ; PUSH string "0x0" }
+                        { PUSH string "" ;
+                          DIG 8 ;
+                          PAIR ;
+                          LEFT string ;
+                          LOOP_LEFT
+                            { UNPAIR ;
+                              PUSH nat 0 ;
+                              SWAP ;
+                              DUP ;
+                              DUG 2 ;
+                              COMPARE ;
+                              EQ ;
+                              IF { DROP ; PUSH string "0x" ; CONCAT ; RIGHT (pair nat string) }
+                                 { DUP 16 ;
+                                   PUSH nat 15 ;
+                                   DUP 3 ;
+                                   AND ;
+                                   GET ;
+                                   IF_NONE { PUSH string "" ; FAILWITH } {} ;
+                                   PUSH nat 4 ;
+                                   DIG 2 ;
+                                   LSR ;
+                                   DUG 2 ;
+                                   CONCAT ;
+                                   SWAP ;
+                                   PAIR ;
+                                   LEFT string } } ;
+                          DIG 14 ;
+                          DROP } ;
                      DIG 12 ;
                      SWAP ;
                      EXEC ;

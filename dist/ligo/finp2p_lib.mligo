@@ -107,8 +107,10 @@ let public_key_to_hex_string_bytes (k : key) : bytes =
   let k_bytes = drop_n_first_bytes (Bytes.pack k) 7n in
   let k_hex = bytes_to_hex k_bytes in string_to_bytes k_hex
 
+
+[@inline]
 let amount_to_bytes (a : token_amount) : bytes =
-  match a with | Amount a -> string_to_bytes (nat_to_0x_hex_big_endian a)
+  string_to_bytes (nat_to_0x_hex_big_endian (nat_amount a))
 
 let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
   let { nonce = tt_nonce; asset_id = tt_asset_id; src_account = tt_src_account;

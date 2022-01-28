@@ -2,15 +2,18 @@ include Errors
 include Admin
 include Fa2_params
 
+let[@inline] check_token_exists (id : token_id) (s : storage) : unit =
+  if not (Big_map.mem id s.token_metadata) then
+    (failwith fa2_token_undefined : unit)
+
 let mint (p : mint_param) (s : storage) : storage =
   let token_id = p.mi_token_id in
   let token_metadata =
     match p.mi_token_info with
     | None ->
         (* Existing token *)
-        if not (Big_map.mem token_id s.token_metadata) then
-          (failwith fa2_token_undefined : token_metadata_storage)
-        else s.token_metadata
+        let () = check_token_exists token_id s in
+        s.token_metadata
     | Some info -> (
         (* New token *)
         let (old_metadata, token_metadata) =
@@ -51,6 +54,7 @@ let mint (p : mint_param) (s : storage) : storage =
 
 let burn (p : burn_param) (s : storage) : storage =
   let id = p.bu_token_id in
+  let () = check_token_exists id s in
   let (ledger, burnt) =
     List.fold_left
       (fun (((ledger, burnt), (owner, burn_amount)) :
