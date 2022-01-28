@@ -642,13 +642,13 @@
              SUB ;
              ISNAT ;
              IF_NONE { PUSH string "" ; FAILWITH } {} ;
-             PUSH nat 9223372036854775807 ;
+             PUSH nat 18446744073709551615 ;
              SWAP ;
              DUP ;
              DUG 2 ;
              COMPARE ;
              GT ;
-             IF { DROP 3 ; PUSH string "BAD_INT64_NAT" ; FAILWITH }
+             IF { DROP 3 ; PUSH string "BAD_UINT64_NAT" ; FAILWITH }
                 { NIL bytes ;
                   SWAP ;
                   DUP ;

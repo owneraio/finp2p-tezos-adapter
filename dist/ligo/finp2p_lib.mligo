@@ -5,8 +5,8 @@
 #include "finp2p_proxy_types.mligo"
 #include "finp2p_conv_maps.mligo"
 [@inline]
-let max_int64 () : nat =
-  ([%Michelson ({| { DROP; PUSH nat 9223372036854775807 } |} : unit -> nat)])
+let max_uint64 () : nat =
+  ([%Michelson ({| { DROP; PUSH nat 18446744073709551615 } |} : unit -> nat)])
     ()
 
 let concat_bytes  : bytes list -> bytes =
@@ -46,9 +46,9 @@ let nth_byte (number : nat) (n : nat) : bytes =
 
 
 [@inline]
-let nat_to_int64_big_endian (number : nat) : bytes =
-  if number > (max_int64 ())
-  then (failwith "BAD_INT64_NAT" : bytes)
+let nat_to_uint64_big_endian (number : nat) : bytes =
+  if number > (max_uint64 ())
+  then (failwith "BAD_UINT64_NAT" : bytes)
   else
     concat_bytes
       [nth_byte number 7n;
@@ -72,12 +72,12 @@ let rec nat_to_0x_hex_big_endian_rec ((number : nat), (acc : string)) : string =
 let nat_to_0x_hex_big_endian (number : nat) : string =
   if number = 0n then "0x0" else nat_to_0x_hex_big_endian_rec (number, "")
 
-let timestamp_to_int64_big_endian (timestamp : timestamp) : bytes =
+let timestamp_to_uint64_big_endian (timestamp : timestamp) : bytes =
   let seconds_since_epoch =
     match is_nat (timestamp - (0 : timestamp)) with
     | None -> (failwith "" : nat)
     | Some s -> s in
-  nat_to_int64_big_endian seconds_since_epoch
+  nat_to_uint64_big_endian seconds_since_epoch
 
 let drop_n_first_bytes (b : bytes) (n : nat) : bytes =
   let len = Bytes.length b in
@@ -117,7 +117,7 @@ let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
     = p in
   let nonce =
     Bytes.concat tt_nonce.nonce
-      (timestamp_to_int64_big_endian tt_nonce.timestamp) in
+      (timestamp_to_uint64_big_endian tt_nonce.timestamp) in
   let operation = string_to_bytes "transfer" in
   let assetType = string_to_bytes "finp2p" in
   let assetId = match tt_asset_id with | Asset_id id -> id in
@@ -146,7 +146,7 @@ let encode_issue_tokens_payload (p : issue_tokens_param) =
     = p in
   let nonce =
     Bytes.concat it_nonce.nonce
-      (timestamp_to_int64_big_endian it_nonce.timestamp) in
+      (timestamp_to_uint64_big_endian it_nonce.timestamp) in
   let operation = string_to_bytes "issue" in
   let assetType = string_to_bytes "finp2p" in
   let assetId = match it_asset_id with | Asset_id id -> id in
@@ -170,7 +170,7 @@ let encode_redeem_tokens_payload (p : redeem_tokens_param) =
     = p in
   let nonce =
     Bytes.concat rt_nonce.nonce
-      (timestamp_to_int64_big_endian rt_nonce.timestamp) in
+      (timestamp_to_uint64_big_endian rt_nonce.timestamp) in
   let operation = string_to_bytes "redeem" in
   let assetId = match rt_asset_id with | Asset_id id -> id in
   let quantity = amount_to_bytes rt_amount in

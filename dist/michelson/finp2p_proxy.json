@@ -1604,7 +1604,8 @@
                           { "prim": "FAILWITH" } ], [] ] },
                   { "prim": "PUSH",
                     "args":
-                      [ { "prim": "nat" }, { "int": "9223372036854775807" } ] },
+                      [ { "prim": "nat" },
+                        { "int": "18446744073709551615" } ] },
                   { "prim": "SWAP" }, { "prim": "DUP" },
                   { "prim": "DUG", "args": [ { "int": "2" } ] },
                   { "prim": "COMPARE" }, { "prim": "GT" },
@@ -1614,7 +1615,7 @@
                           { "prim": "PUSH",
                             "args":
                               [ { "prim": "string" },
-                                { "string": "BAD_INT64_NAT" } ] },
+                                { "string": "BAD_UINT64_NAT" } ] },
                           { "prim": "FAILWITH" } ],
                         [ { "prim": "NIL", "args": [ { "prim": "bytes" } ] },
                           { "prim": "SWAP" }, { "prim": "DUP" },
