@@ -1,9 +1,13 @@
 (* Fa2 *)
 
+type token_id = nat
+
+type token_amount = nat
+
 type transfer_destination = {
   tr_dst : address; [@key "to_"]
-  tr_token_id : nat;
-  tr_amount : nat;
+  tr_token_id : token_id;
+  tr_amount : token_amount;
 }
 [@@comb] [@@param Transfer]
 
@@ -13,9 +17,12 @@ type transfer = {
 }
 [@@comb] [@@param Transfer]
 
-type balance_of_request = {ba_owner : address; ba_token_id : nat} [@@comb]
+type balance_of_request = {ba_owner : address; ba_token_id : token_id} [@@comb]
 
-type balance_of_response = {ba_request : balance_of_request; ba_balance : nat}
+type balance_of_response = {
+  ba_request : balance_of_request;
+  ba_balance : token_amount;
+}
 [@@comb]
 
 type balance_of_param = {
@@ -27,7 +34,7 @@ type balance_of_param = {
 type operator_param = {
   op_owner : address;
   op_operator : address;
-  op_token_id : nat;
+  op_token_id : token_id;
 }
 [@@comb] [@@param Update_operators]
 
@@ -50,13 +57,16 @@ type fa2 =
 (* Manager *)
 
 type mint_param = {
-  mi_token_id : nat;
+  mi_token_id : token_id;
   mi_token_info : (string, bytes) map option;
-  mi_owners : (address * nat) list;
+  mi_owners : (address * token_id) list;
 }
 [@@comb] [@@param Mint_tokens]
 
-type burn_param = {bu_token_id : nat; bu_owners : (address * nat) list}
+type burn_param = {
+  bu_token_id : token_id;
+  bu_owners : (address * token_amount) list;
+}
 [@@comb] [@@param Burn_tokens]
 
 type manager = Mint of mint_param | Burn of burn_param [@@entry Tokens]
@@ -64,7 +74,7 @@ type manager = Mint of mint_param | Burn of burn_param [@@entry Tokens]
 (* Admin *)
 
 type update_token_metadata_param = {
-  utm_token_id : nat;
+  utm_token_id : token_id;
   utm_metadata : (string, bytes) map;
 }
 [@@comb] [@@param Update_token_metadata]

@@ -1,10 +1,14 @@
 #if !FA2_PARAMS
 #define FA2_PARAMS
 
+type token_id = nat
+
+type token_amount = nat
+
 type transfer_destination = [@layout:comb]  {
-  to_: address ;
-  token_id: nat ;
-  amount: nat }
+    to_: address ;
+    token_id: token_id ;
+    amount: token_amount }
 
 type transfer = [@layout:comb]  {
   from_: address ;
@@ -12,20 +16,20 @@ type transfer = [@layout:comb]  {
 
 type balance_of_request = [@layout:comb]  {
   owner: address ;
-  token_id: nat }
+  token_id: token_id }
 
 type balance_of_response = [@layout:comb]  {
-  request: balance_of_request ;
-  balance: nat }
+    request: balance_of_request ;
+    balance: token_amount }
 
 type balance_of_param = [@layout:comb]  {
     requests: balance_of_request list ;
     callback: balance_of_response list contract }
 
 type operator_param = [@layout:comb]  {
-  owner: address ;
-  operator: address ;
-  token_id: nat }
+    owner: address ;
+    operator: address ;
+    token_id: token_id }
 
 type operator_update =
   | Add_operator of operator_param 
@@ -41,20 +45,20 @@ type fa2 =
   | Update_operators of operator_update list 
 
 type mint_param = [@layout:comb]  {
-    token_id: nat ;
+    token_id: token_id ;
     token_info: (string, bytes) map option ;
-    owners: (address * nat) list }
+    owners: (address * token_id) list }
 
 type burn_param = [@layout:comb]  {
-  token_id: nat ;
-  owners: (address * nat) list }
+    token_id: token_id ;
+    owners: (address * token_amount) list }
 
 type manager =
   | Mint of mint_param 
   | Burn of burn_param 
 
 type update_token_metadata_param = [@layout:comb]  {
-    token_id: nat ;
+    token_id: token_id ;
     metadata: (string, bytes) map }
 
 type admin =

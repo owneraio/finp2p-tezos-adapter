@@ -2,18 +2,18 @@ include Fa2_params
 
 (* Storage *)
 
-type ledger = (address * nat, nat) big_map [@@param Store]
+type ledger = (address * token_id, token_amount) big_map [@@param Store]
 
-type operators_storage = (address * (address * nat), unit) big_map
+type operators_storage = (address * (address * token_id), unit) big_map
 [@@param Store]
 
 type operators_for_all_storage = (address * address, unit) big_map
 [@@param Store]
 
-type token_metadata_storage = (nat, nat * (string, bytes) map) big_map
+type token_metadata_storage = (token_id, token_id * (string, bytes) map) big_map
 [@@param Store]
 
-type total_supply_storage = (nat, nat) big_map [@@param Store]
+type total_supply_storage = (token_id, token_amount) big_map [@@param Store]
 
 type storage = {
   auth_contract : address;
