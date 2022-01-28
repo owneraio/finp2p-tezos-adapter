@@ -35,7 +35,6 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token
   in
-  let tr_amount = match p.tt_amount with Amount a -> a in
   let fa2_transfer =
     {
       tr_src = address_of_key p.tt_src_account;
@@ -44,7 +43,7 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
           {
             tr_dst = address_of_key p.tt_dst_account;
             tr_token_id = fa2_token.id;
-            tr_amount;
+            tr_amount = p.tt_amount;
           };
         ];
     }
@@ -65,10 +64,10 @@ let create_asset (p : create_asset_param) (s : storage) : operation * storage =
         | None -> (
             match
               (Tezos.call_view None "get_max_token_id" () ca_address
-                : nat option)
+                : token_id option)
             with
-            | None -> (failwith "CANNOT_COMPUTE_NEXT_TOKEN_ID" : nat)
-            | Some id -> id + 1n))
+            | None -> (failwith "CANNOT_COMPUTE_NEXT_TOKEN_ID" : token_id)
+            | Some (Token_id id) -> Token_id (id + 1n)))
   in
   let fa2_token = {address = ca_address; id = token_id} in
   (* Create new asset *)
@@ -84,15 +83,18 @@ let create_asset (p : create_asset_param) (s : storage) : operation * storage =
     {
       mi_token_id = fa2_token.id;
       mi_token_info = Some token_info;
-      mi_owners = ([] : (address * nat) list);
+      mi_owners = ([] : (address * token_amount) list);
     }
   in
   let mint_ep = get_mint_entrypoint fa2_token.address in
   let relay_op = Tezos.transaction None fa2_mint 0t mint_ep in
   let next_token_id =
+    let token_id_plus_1 =
+      match token_id with Token_id i -> Token_id (i + 1n)
+    in
     match next_token_id with
-    | None -> token_id + 1n
-    | Some id -> if token_id >= id then token_id + 1n else id
+    | None -> token_id_plus_1
+    | Some id -> if token_id >= id then token_id_plus_1 else id
   in
   let next_token_ids = Big_map.add ca_address next_token_id s.next_token_ids in
   let s = {s with finp2p_assets; next_token_ids} in
@@ -112,12 +114,11 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : operation * storage =
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token
   in
-  let issued_amount = match p.it_amount with Amount a -> a in
   let fa2_mint =
     {
       mi_token_id = fa2_token.id;
       mi_token_info = (None : (string, bytes) map option);
-      mi_owners = [(address_of_key p.it_dst_account, issued_amount)];
+      mi_owners = [(address_of_key p.it_dst_account, p.it_amount)];
     }
   in
   let mint_ep = get_mint_entrypoint fa2_token.address in
@@ -143,11 +144,10 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : operation * storage
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token
   in
-  let redeemed_amount = match p.rt_amount with Amount a -> a in
   let fa2_burn =
     {
       bu_token_id = fa2_token.id;
-      bu_owners = [(address_of_key p.rt_src_account, redeemed_amount)];
+      bu_owners = [(address_of_key p.rt_src_account, p.rt_amount)];
     }
   in
   let burn_ep = get_burn_entrypoint fa2_token.address in
@@ -183,7 +183,8 @@ let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
   (* Check that the contract has the correct interface *)
   let () = check_fa2_contract fa2.address in
   let (old_next_token_id, next_token_ids) =
-    Big_map.get_and_update fa2.address (Some (fa2.id + 1n)) s.next_token_ids
+    let next_id = match fa2.id with Token_id id -> Token_id (id + 1n) in
+    Big_map.get_and_update fa2.address (Some next_id) s.next_token_ids
   in
   let next_token_ids =
     match old_next_token_id with

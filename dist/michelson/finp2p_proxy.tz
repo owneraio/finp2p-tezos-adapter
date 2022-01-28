@@ -1063,20 +1063,18 @@
                      SWAP ;
                      PAIR ;
                      TRANSFER_TOKENS ;
-                     DIG 3 ;
-                     IF_NONE
-                       { PUSH nat 1 ; DIG 3 ; ADD }
-                       { DUP ;
-                         DUP 5 ;
-                         COMPARE ;
-                         GE ;
-                         IF { DROP ; PUSH nat 1 ; DIG 3 ; ADD } { DIG 3 ; DROP } } ;
-                     DUP 5 ;
+                     PUSH nat 1 ;
+                     DUP 4 ;
+                     ADD ;
+                     DUP 7 ;
                      DIG 3 ;
                      UPDATE 5 ;
-                     DIG 4 ;
+                     DIG 6 ;
                      GET 8 ;
-                     DIG 2 ;
+                     DIG 5 ;
+                     IF_NONE
+                       { DIG 4 ; DROP ; DIG 2 }
+                       { DUP ; DIG 6 ; COMPARE ; GE ; IF { DROP ; DIG 2 } { DIG 3 ; DROP } } ;
                      DIG 4 ;
                      SWAP ;
                      SOME ;
@@ -1532,12 +1530,15 @@
                                  SWAP ;
                                  EXEC ;
                                  DROP ;
-                                 DUP ;
-                                 GET 8 ;
                                  PUSH nat 1 ;
-                                 DUP 5 ;
+                                 DUP 4 ;
                                  CDR ;
                                  ADD ;
+                                 SWAP ;
+                                 DUP ;
+                                 DUG 2 ;
+                                 GET 8 ;
+                                 SWAP ;
                                  SOME ;
                                  DUP 5 ;
                                  CAR ;

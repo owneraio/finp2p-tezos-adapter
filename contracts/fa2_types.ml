@@ -22,7 +22,7 @@ type storage = {
   operators : operators_storage;
   token_metadata : token_metadata_storage;
   total_supply : total_supply_storage;
-  max_token_id : nat;
+  max_token_id : token_id;
   metadata : (string, bytes) big_map;
 }
 [@@comb]

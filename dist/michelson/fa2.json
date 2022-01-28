@@ -424,6 +424,16 @@
                                                                   { "prim":
                                                                     "FAILWITH" } ],
                                                                 [ { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                  { "prim":
+                                                                    "GET",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "4" } ] },
+                                                                  { "prim":
                                                                     "PUSH",
                                                                     "args":
                                                                     [ { "prim":
@@ -431,15 +441,14 @@
                                                                     { "int":
                                                                     "0" } ] },
                                                                   { "prim":
-                                                                    "DUP",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "4" } ] },
+                                                                    "SWAP" },
                                                                   { "prim":
-                                                                    "GET",
+                                                                    "DUP" },
+                                                                  { "prim":
+                                                                    "DUG",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "4" } ] },
+                                                                    "2" } ] },
                                                                   { "prim":
                                                                     "COMPARE" },
                                                                   { "prim":
@@ -448,27 +457,24 @@
                                                                     "IF",
                                                                     "args":
                                                                     [ [ { "prim":
-                                                                    "DIG",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "2" } ] },
+                                                                    "SWAP" },
                                                                     { "prim":
-                                                                    "DROP",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "2" } ] } ],
-                                                                    [ { "prim":
-                                                                    "DUP",
+                                                                    "DIG",
                                                                     "args":
                                                                     [ { "int":
                                                                     "3" } ] },
                                                                     { "prim":
-                                                                    "GET",
+                                                                    "DROP",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "4" } ] },
+                                                                    "3" } ] } ],
+                                                                    [ { "prim":
+                                                                    "DUP" },
                                                                     { "prim":
-                                                                    "SWAP" },
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" } ] },
                                                                     { "prim":
                                                                     "SUB" },
                                                                     { "prim":
@@ -480,7 +486,7 @@
                                                                     "DROP",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "2" } ] },
+                                                                    "3" } ] },
                                                                     { "prim":
                                                                     "DUP",
                                                                     "args":
@@ -516,38 +522,6 @@
                                                                     { "prim":
                                                                     "SWAP" },
                                                                     { "prim":
-                                                                    "DUP" },
-                                                                    { "prim":
-                                                                    "DUG",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "2" } ] },
-                                                                    { "prim":
-                                                                    "GET",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "3" } ] },
-                                                                    { "prim":
-                                                                    "DUP",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "4" } ] },
-                                                                    { "prim":
-                                                                    "CAR" },
-                                                                    { "prim":
-                                                                    "PAIR" },
-                                                                    { "prim":
-                                                                    "NONE",
-                                                                    "args":
-                                                                    [ { "prim":
-                                                                    "nat" } ] },
-                                                                    { "prim":
-                                                                    "SWAP" },
-                                                                    { "prim":
-                                                                    "UPDATE" } ],
-                                                                    [ { "prim":
-                                                                    "SOME" },
-                                                                    { "prim":
                                                                     "DUP",
                                                                     "args":
                                                                     [ { "int":
@@ -567,14 +541,28 @@
                                                                     { "prim":
                                                                     "PAIR" },
                                                                     { "prim":
-                                                                    "UPDATE" } ] ] },
+                                                                    "NONE",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
-                                                                    "DUP" },
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "UPDATE" } ],
+                                                                    [ { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" } ] },
+                                                                    { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "SOME" },
                                                                     { "prim":
                                                                     "DUP",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "3" } ] },
+                                                                    "4" } ] },
                                                                     { "prim":
                                                                     "GET",
                                                                     "args":
@@ -584,7 +572,30 @@
                                                                     "DUP",
                                                                     "args":
                                                                     [ { "int":
+                                                                    "6" } ] },
+                                                                    { "prim":
+                                                                    "CAR" },
+                                                                    { "prim":
+                                                                    "PAIR" },
+                                                                    { "prim":
+                                                                    "UPDATE" } ] ] },
+                                                                    { "prim":
+                                                                    "DUP" },
+                                                                    { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
                                                                     "4" } ] },
+                                                                    { "prim":
+                                                                    "GET",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                    { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "5" } ] },
                                                                     { "prim":
                                                                     "CAR" },
                                                                     { "prim":
@@ -595,6 +606,10 @@
                                                                     "IF_NONE",
                                                                     "args":
                                                                     [ [ { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "DROP" },
+                                                                    { "prim":
                                                                     "SWAP" },
                                                                     { "prim":
                                                                     "DUP" },
@@ -638,17 +653,7 @@
                                                                     [ { "prim":
                                                                     "SWAP" },
                                                                     { "prim":
-                                                                    "DUP",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "3" } ] },
-                                                                    { "prim":
-                                                                    "GET",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "4" } ] },
-                                                                    { "prim":
-                                                                    "DIG",
+                                                                    "DUG",
                                                                     "args":
                                                                     [ { "int":
                                                                     "2" } ] },

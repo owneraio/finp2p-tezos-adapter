@@ -10,7 +10,7 @@ let get_balance (p : balance_of_param) (s : storage) : operation =
     else
       (let ba_balance =
          match Big_map.find_opt (r.owner, r.token_id) s.ledger with
-         | None -> 0n
+         | None -> Amount 0n
          | Some ba_balance -> ba_balance in
        { request = r; balance = ba_balance  }) in
   let responses = List.map to_balance p.requests in
@@ -23,26 +23,27 @@ let transfer (txs : transfer list) (s : storage) : ledger =
          (fun ((ll, dst) : (ledger * transfer_destination)) ->
             match Big_map.find_opt (tx.from_, dst.token_id) ll with
             | None -> (failwith fa2_insufficient_balance : ledger)
-            | Some am ->
-              if dst.amount = 0n
+            | Some (Amount am) ->
+              let tr_amount = match dst.amount with | Amount a -> a in
+              if tr_amount = 0n
               then ll
               else
-                (match is_nat (am - dst.amount) with
+                (match is_nat (am - tr_amount) with
                  | None -> (failwith fa2_insufficient_balance : ledger)
                  | Some diff ->
                    let ll =
                      if diff = 0n
                      then Big_map.remove (tx.from_, dst.token_id) ll
                      else
-                       Big_map.update (tx.from_, dst.token_id) (Some diff)
-                         ll in
+                       Big_map.update (tx.from_, dst.token_id)
+                         (Some (Amount diff)) ll in
                    (match Big_map.find_opt (dst.to_, dst.token_id) ll with
                     | None ->
                       Big_map.add (dst.to_, dst.token_id) dst.amount ll
-                    | Some am ->
+                    | Some (Amount am) ->
                       Big_map.update (dst.to_, dst.token_id)
-                        (Some (am + dst.amount)) ll))) tx.txs l) txs
-    s.ledger
+                        (Some (Amount (am + tr_amount))) ll))) tx.txs l)
+    txs s.ledger
 
 let update_operator (storage : operators_storage) (update : operator_update) : operators_storage =
   match update with

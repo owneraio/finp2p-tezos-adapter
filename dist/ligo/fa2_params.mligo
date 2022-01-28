@@ -1,9 +1,11 @@
 #if !FA2_PARAMS
 #define FA2_PARAMS
 
-type token_id = nat
+type token_id =
+  | Token_id of nat 
 
-type token_amount = nat
+type token_amount =
+  | Amount of nat 
 
 type transfer_destination = [@layout:comb]  {
     to_: address ;
@@ -47,7 +49,7 @@ type fa2 =
 type mint_param = [@layout:comb]  {
     token_id: token_id ;
     token_info: (string, bytes) map option ;
-    owners: (address * token_id) list }
+    owners: (address * token_amount) list }
 
 type burn_param = [@layout:comb]  {
     token_id: token_id ;

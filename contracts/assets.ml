@@ -8,7 +8,7 @@ let get_balance (p : balance_of_param) (s : storage) : operation =
     else
       let ba_balance =
         match Big_map.find_opt (r.ba_owner, r.ba_token_id) s.ledger with
-        | None -> 0n
+        | None -> Amount 0n
         | Some ba_balance -> ba_balance
       in
       {ba_request = r; ba_balance}
@@ -23,10 +23,11 @@ let transfer (txs : transfer list) (s : storage) : ledger =
         (fun ((ll, dst) : ledger * transfer_destination) ->
           match Big_map.find_opt (tx.tr_src, dst.tr_token_id) ll with
           | None -> (failwith fa2_insufficient_balance : ledger)
-          | Some am -> (
-              if dst.tr_amount = 0n then ll
+          | Some (Amount am) -> (
+              let tr_amount = match dst.tr_amount with Amount a -> a in
+              if tr_amount = 0n then ll
               else
-                match is_nat (am - dst.tr_amount) with
+                match is_nat (am - tr_amount) with
                 | None -> (failwith fa2_insufficient_balance : ledger)
                 | Some diff -> (
                     let ll =
@@ -35,7 +36,7 @@ let transfer (txs : transfer list) (s : storage) : ledger =
                       else
                         Big_map.update
                           (tx.tr_src, dst.tr_token_id)
-                          (Some diff)
+                          (Some (Amount diff))
                           ll
                     in
                     match Big_map.find_opt (dst.tr_dst, dst.tr_token_id) ll with
@@ -44,10 +45,10 @@ let transfer (txs : transfer list) (s : storage) : ledger =
                           (dst.tr_dst, dst.tr_token_id)
                           dst.tr_amount
                           ll
-                    | Some am ->
+                    | Some (Amount am) ->
                         Big_map.update
                           (dst.tr_dst, dst.tr_token_id)
-                          (Some (am + dst.tr_amount))
+                          (Some (Amount (am + tr_amount)))
                           ll)))
         tx.tr_txs
         l)
