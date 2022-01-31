@@ -58,8 +58,10 @@ let asset_already_exists = "FINP2P_ASSET_ALREADY_EXISTS"
 (** Invalid signature for asset operation *)
 let invalid_signature = "FINP2P_INVALID_SIGNATURE"
 
-let hold_already_exists = "FINP2P_HOLD_ALREADY_EXISTS"
+let fa2_hold_already_exists = "FA2_HOLD_ALREADY_EXISTS"
 
 let unknown_hold_id = "FINP2P_UNKNOWN_HOLD_ID"
 
 let insufficient_spendable_balance = "FA2_INSUFFICIENT_SPENDABLE_BALANCE"
+
+let hold_already_exists = "FINP2P_HOLD_ALREADY_EXISTS"

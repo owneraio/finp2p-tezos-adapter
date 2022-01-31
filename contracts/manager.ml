@@ -92,7 +92,7 @@ let hold (h : hold) (s : storage) : storage =
   let () =
     match already_hold with
     | None -> ()
-    | Some _ -> (failwith hold_already_exists : unit)
+    | Some _ -> (failwith fa2_hold_already_exists : unit)
   in
   let total_on_hold =
     match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with

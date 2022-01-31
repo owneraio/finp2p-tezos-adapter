@@ -75,3 +75,5 @@ let[@view] get_balance (((owner, token_id) : address * token_id), (s : storage))
     | Some b -> b
 
 let[@view] get_max_token_id ((), (s : storage)) : token_id = s.max_token_id
+
+let[@view] get_max_hold_id ((), (s : storage)) : hold_id = s.max_hold_id
