@@ -121,7 +121,9 @@ let release (hold_id : hold_id) (s : storage) : storage =
     Big_map.get_and_update hold_id (None : hold option) s.holds
   in
   let h =
-    match existed with None -> (failwith unknown_hold_id : hold) | Some h -> h
+    match existed with
+    | None -> (failwith fa2_unknown_hold_id : hold)
+    | Some h -> h
   in
   let total_on_hold =
     match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with

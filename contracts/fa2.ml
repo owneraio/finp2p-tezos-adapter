@@ -77,3 +77,6 @@ let[@view] get_balance (((owner, token_id) : address * token_id), (s : storage))
 let[@view] get_max_token_id ((), (s : storage)) : token_id = s.max_token_id
 
 let[@view] get_max_hold_id ((), (s : storage)) : hold_id = s.max_hold_id
+
+let[@view] get_hold ((id : hold_id), (s : storage)) : hold option =
+  Big_map.find_opt id s.holds

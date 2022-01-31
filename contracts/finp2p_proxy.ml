@@ -178,7 +178,10 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
   in
   (* Register hold id *)
   let (old_hold_id, holds) =
-    Big_map.get_and_update p.ht_hold_id (Some fa2_hold_id) s.holds
+    Big_map.get_and_update
+      p.ht_hold_id
+      (Some {fa2_hold_id; held_asset = p.ht_asset_id})
+      s.holds
   in
   let () =
     match old_hold_id with
@@ -208,9 +211,57 @@ let execute_hold (_p : execute_hold_param) (_s : storage) : operation * storage
     =
   assert false
 
-let release_hold (_p : release_hold_param) (_s : storage) : operation * storage
-    =
-  assert false
+let release_hold (p : release_hold_param) (s : storage) : operation * storage =
+  (* Remove hold from storage *)
+  (* TODO: do we need to keep until expiration date? *)
+  (* TODO: do we need to keep for records? *)
+  let (hold_to_release, holds) =
+    Big_map.get_and_update p.rh_hold_id None s.holds
+  in
+  let s = {s with holds} in
+  let {fa2_hold_id; held_asset} =
+    match hold_to_release with
+    | None -> (failwith unknown_hold_id : hold_info)
+    | Some h -> h
+  in
+  let fa2_token =
+    match Big_map.find_opt held_asset s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  let fa2_hold =
+    match
+      (Tezos.call_view None "get_hold" fa2_hold_id fa2_token.address
+        : hold option option)
+    with
+    | None -> (failwith fa2_unknown_hold_id : hold)
+    | Some None -> (failwith fa2_unknown_hold_id : hold)
+    | Some (Some h) -> h
+  in
+  (* Checks *)
+  let () =
+    match p.rh_asset_id with
+    | None -> ()
+    | Some asset_id ->
+        if asset_id <> held_asset then failwith "UNEXPECTED_RELEASE_ASSET"
+  in
+  let () =
+    match p.rh_amount with
+    | None -> ()
+    | Some amt ->
+        if amt <> fa2_hold.ho_amount then failwith "UNEXPECTED_RELEASE_AMOUNT"
+  in
+  let () =
+    match p.rh_src_account with
+    | None -> ()
+    | Some account ->
+        if address_of_key account <> fa2_hold.ho_src then
+          failwith "UNEXPECTED_RELEASE_SOURCE"
+  in
+  (* Release corresponding on hold FA2 *)
+  let release_ep = get_release_entrypoint fa2_token.address in
+  let relay_op = Tezos.transaction None fa2_hold_id 0t release_ep in
+  (relay_op, s)
 
 let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
     operation * storage =
