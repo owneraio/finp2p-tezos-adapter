@@ -654,7 +654,7 @@ async function mk_hold_tokens(i : {
     hold_id : utf8.encode(i.hold_id),
     asset_id : utf8.encode(i.asset_id),
     src_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
-    dst_account : pubkey_to_tezos_secp256k1(i.dst),
+    dst_account : (i.dst === undefined) ? undefined : pubkey_to_tezos_secp256k1(i.dst),
     amount: BigInt(i.amount),
     expiration : i.expiration,
     nonce,
@@ -743,7 +743,7 @@ async function get_balance_big_int(i : {
   owner : Buffer,
   asset_id : string}) {
   return await FinP2PTezos.getAssetBalance(
-    '0x01' /* secp256k1 */ + i.owner.toString('hex'),
+    pubkey_to_tezos_secp256k1(i.owner),
     utf8.encode(i.asset_id)
   )
 }
@@ -753,6 +753,24 @@ async function get_balance(i : {
   asset_id : string}) {
   let balance = await get_balance_big_int(i)
   return Number(balance)
+}
+
+async function get_spendable_balance(i : {
+  owner : Buffer,
+  asset_id : string}) {
+  return await FinP2PTezos.getAssetSpendableBalance(
+    pubkey_to_tezos_secp256k1(i.owner),
+    utf8.encode(i.asset_id)
+  )
+}
+
+async function get_balance_info(i : {
+  owner : Buffer,
+  asset_id : string}) {
+  return await FinP2PTezos.getAssetBalanceInfo(
+    pubkey_to_tezos_secp256k1(i.owner),
+    utf8.encode(i.asset_id)
+  )
 }
 
 function accountPkh(account : finp2p_account) {
@@ -1493,7 +1511,7 @@ describe('FA2 contract',  () => {
       {
         from_ : accountPkh(accounts[2]),
         txs: [
-          {to_ : accountPkh(accounts[1]), token_id: token_id1, amount: 100},
+          {to_ : accountPkh(accounts[1]), token_id: token_id1, amount: 50},
         ],
       }]).send()
     log("waiting inclusion")
@@ -1540,52 +1558,282 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0001",
         asset_id : asset_id1,
         src : accounts[0],
-        dst : accounts[0].pubKey,
+        dst : accounts[1].pubKey,
         amount : 50,
         expiration,
       })
     log("waiting inclusion")
     await FinP2PTezos.waitInclusion(op)
+    let bi0 = await get_balance_info({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi0, { balance: 100n, on_hold: 50n })
+    let bs0 = await get_spendable_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 50n)
+  })
+
+  it("Hold wrong signature", async () => {
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    await assert.rejects(
+      async () => {
+        await hold_tokens(
+          { hold_id: "HOLD-ID-0001",
+            asset_id : asset_id1,
+            src : accounts[0],
+            dst : accounts[1].pubKey,
+            amount : 1,
+            expiration,
+            signer : accounts[1]
+          })
+      },
+      { message : "FINP2P_INVALID_SIGNATURE"})
+  })
+
+  it("Hold duplicate id", async () => {
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    await assert.rejects(
+      async () => {
+        await hold_tokens(
+          { hold_id: "HOLD-ID-0001",
+            asset_id : asset_id1,
+            src : accounts[0],
+            dst : accounts[1].pubKey,
+            amount : 1,
+            expiration,
+          })
+      },
+      { message : "FINP2P_HOLD_ALREADY_EXISTS"})
+  })
+
+  it("Hold on same token", async () => {
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    let op = await hold_tokens(
+      { hold_id: "HOLD-ID-0002",
+        asset_id : asset_id1,
+        src : accounts[0],
+        dst : accounts[2].pubKey,
+        amount : 1,
+        expiration,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let bi0 = await get_balance_info({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi0, { balance: 100n, on_hold: 51n })
+    let bs0 = await get_spendable_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 49n)
   })
 
   it('Transfer more than spendable', async () => {
+    let bs0 = await get_spendable_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
     await assert.rejects(
       async () => {
     await transfer_tokens(
       { src : accounts[0],
         dest : accounts[3].pubKey,
         asset_id : asset_id1,
-        amount : 51,
+        amount : bs0 + 1n,
       })
       },
       { message : "FA2_INSUFFICIENT_SPENDABLE_BALANCE"})
   })
 
   it('Transfer less than spendable', async () => {
-    let b0 = await get_balance({
+    let bs0 = await get_spendable_balance({
       owner : accounts[0].pubKey,
       asset_id : asset_id1 })
-    let b3 = await get_balance({
-      owner : accounts[3].pubKey,
+    let b2 = await get_balance({
+      owner : accounts[2].pubKey,
       asset_id : asset_id1 })
-    assert.equal(b0, 100)
-    assert.equal(b3, 1)
+    assert.equal(bs0, 49n)
+    assert.equal(b2, 0)
     let op = await transfer_tokens(
       { src : accounts[0],
-        dest : accounts[3].pubKey,
+        dest : accounts[2].pubKey,
         asset_id : asset_id1,
-        amount : 5,
+        amount : bs0,
       })
     log("waiting inclusion")
     await FinP2PTezos.waitInclusion(op)
-    b0 = await get_balance({
+    let b0 = await get_balance({
       owner : accounts[0].pubKey,
       asset_id : asset_id1 })
-    b3 = await get_balance({
-      owner : accounts[3].pubKey,
+    b2 = await get_balance({
+      owner : accounts[2].pubKey,
       asset_id : asset_id1 })
-    assert.equal(b0, 95)
-    assert.equal(b3, 6)
+    assert.equal(b0, 51)
+    assert.equal(b2, 49)
+    let bi0 = await get_balance_info({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi0, { balance: 51n, on_hold: 51n })
+    bs0 = await get_spendable_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 0n)
+  })
+
+  it("Hold without destination", async () => {
+    let b2 = await get_balance({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b2, 49)
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    let op = await hold_tokens(
+      { hold_id: "HOLD-ID-0003",
+        asset_id : asset_id1,
+        src : accounts[2],
+        amount : 1,
+        expiration,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let bi2 = await get_balance_info({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi2, { balance: 49n, on_hold: 1n })
+    let bs0 = await get_spendable_balance({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 48n)
+  })
+
+  it("Hold with date in the past", async () => {
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() - 3600);
+    let op = await hold_tokens(
+      { hold_id: "HOLD-ID-0004",
+        asset_id : asset_id1,
+        src : accounts[2],
+        dst : accounts[1].pubKey,
+        amount : 20,
+        expiration,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let bi2 = await get_balance_info({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi2, { balance: 49n, on_hold: 21n })
+    let bs0 = await get_spendable_balance({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 28n)
+  })
+
+  it("Hold for self", async () => {
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    let op = await hold_tokens(
+      { hold_id: "HOLD-ID-0005",
+        asset_id : asset_id1,
+        src : accounts[2],
+        dst : accounts[2].pubKey,
+        amount : 10,
+        expiration,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    let bi2 = await get_balance_info({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi2, { balance: 49n, on_hold: 31n })
+    let bs0 = await get_spendable_balance({
+      owner : accounts[2].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(bs0, 18n)
+  })
+
+  it("Release missing hold", async () => {
+    await assert.rejects(
+      async () => {
+        await release_hold(
+          { hold_id: "HOLD-ID-0000" }
+        )
+      },
+      { message : "FINP2P_UNKNOWN_HOLD_ID"})
+  })
+
+  it("Execute hold mismatch amount", async () => {
+    await assert.rejects(
+      async () => {
+        await execute_hold(
+          { hold_id: "HOLD-ID-0001",
+            amount: 49
+          }
+        )
+      },
+      { message : "UNEXPECTED_EXECUTE_HOLD_AMOUNT"})
+  })
+
+  it("Execute hold mismatch asset", async () => {
+
+    await assert.rejects(
+      async () => {
+        await execute_hold(
+          { hold_id: "HOLD-ID-0001",
+            asset_id: asset_id4
+          }
+        )
+      },
+      { message : "UNEXPECTED_EXECUTE_HOLD_ASSET"})
+  })
+
+  it("Execute hold mismatch source", async () => {
+    await assert.rejects(
+      async () => {
+        await execute_hold(
+          { hold_id: "HOLD-ID-0001",
+            src: accounts[1].pubKey
+          }
+        )
+      },
+      { message : "UNEXPECTED_EXECUTE_HOLD_SOURCE"})
+  })
+
+  it("Execute hold mismatch destination", async () => {
+    await assert.rejects(
+      async () => {
+        await execute_hold(
+          { hold_id: "HOLD-ID-0001",
+            dst: accounts[0].pubKey
+          }
+        )
+      },
+      { message : "UNEXPECTED_EXECUTE_HOLD_DESTINATION"})
+  })
+
+  it("Execute hold", async () => {
+    let bi0 = await get_balance_info({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi0, { balance: 51n, on_hold: 51n })
+    let b1 = await get_spendable_balance({
+      owner : accounts[1].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b1, 250n)
+    let op = await execute_hold({ hold_id: "HOLD-ID-0001"})
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    bi0 = await get_balance_info({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi0, { balance: 1n, on_hold: 1n })
+    let bi1 = await get_balance_info({
+      owner : accounts[1].pubKey,
+      asset_id : asset_id1 })
+    assert.deepEqual(bi1, { balance: 300n, on_hold: 0n })
   })
 
 })
