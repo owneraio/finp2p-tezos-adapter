@@ -477,3 +477,41 @@ let[@view] get_asset_balance
   with
   | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : nat)
   | Some b -> b
+
+let[@view] get_asset_spendable_balance
+    (((owner : key), (asset_id : asset_id)), (s : storage)) : nat =
+  let owner = address_of_key owner in
+  let fa2_token =
+    match Big_map.find_opt asset_id s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  match
+    (Tezos.call_view
+       None
+       "get_spendable_balance"
+       (owner, fa2_token.id)
+       fa2_token.address
+      : nat option)
+  with
+  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : nat)
+  | Some b -> b
+
+let[@view] get_asset_balance_info
+    (((owner : key), (asset_id : asset_id)), (s : storage)) : balance_info =
+  let owner = address_of_key owner in
+  let fa2_token =
+    match Big_map.find_opt asset_id s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  match
+    (Tezos.call_view
+       None
+       "get_balance_info"
+       (owner, fa2_token.id)
+       fa2_token.address
+      : balance_info option)
+  with
+  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : balance_info)
+  | Some b -> b
