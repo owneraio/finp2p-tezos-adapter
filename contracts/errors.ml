@@ -57,3 +57,9 @@ let asset_already_exists = "FINP2P_ASSET_ALREADY_EXISTS"
 
 (** Invalid signature for asset operation *)
 let invalid_signature = "FINP2P_INVALID_SIGNATURE"
+
+let hold_already_exists = "FINP2P_HOLD_ALREADY_EXISTS"
+
+let unknown_hold_id = "FINP2P_UNKNOWN_HOLD_ID"
+
+let cannot_transfer_hold = "FINP2P_CANNOT_TRANSFER_TOKENS_ON_HOLD"

@@ -1,10 +1,7 @@
 include Errors
 include Admin
 include Fa2_params
-
-let[@inline] check_token_exists (id : token_id) (s : storage) : unit =
-  if not (Big_map.mem id s.token_metadata) then
-    (failwith fa2_token_undefined : unit)
+include Fa2_common
 
 let mint (p : mint_param) (s : storage) : storage =
   let token_id = p.mi_token_id in
@@ -67,6 +64,7 @@ let burn (p : burn_param) (s : storage) : storage =
         match sub_amount old_balance burn_amount with
         | None -> (failwith fa2_insufficient_balance : ledger * token_amount)
         | Some new_balance ->
+            let () = check_hold owner id new_balance s in
             let ledger =
               if new_balance = Amount 0n then Big_map.remove (owner, id) ledger
               else Big_map.add (owner, id) new_balance ledger
@@ -88,6 +86,64 @@ let burn (p : burn_param) (s : storage) : storage =
   in
   {s with ledger; total_supply}
 
+let hold (h : hold) (s : storage) : storage =
+  let hold_id = h.ho_hold_id in
+  let (already_hold, holds) = Big_map.get_and_update hold_id (Some h) s.holds in
+  let () =
+    match already_hold with
+    | None -> ()
+    | Some _ -> (failwith hold_already_exists : unit)
+  in
+  let total_on_hold =
+    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with
+    | None -> h.ho_amount
+    | Some total -> add_amount total h.ho_amount
+  in
+  let balance_src =
+    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.ledger with
+    | None -> Amount 0n
+    | Some b -> b
+  in
+  let () =
+    if total_on_hold > balance_src then
+      (failwith fa2_insufficient_balance : unit)
+  in
+  let holds_totals =
+    Big_map.add (h.ho_src, h.ho_token_id) total_on_hold s.holds_totals
+  in
+  let max_hold_id =
+    if hold_id > s.max_hold_id then hold_id else s.max_hold_id
+  in
+  {s with holds; holds_totals; max_hold_id}
+
+let release (hold_id : hold_id) (s : storage) : storage =
+  let (existed, holds) =
+    Big_map.get_and_update hold_id (None : hold option) s.holds
+  in
+  let h =
+    match existed with None -> (failwith unknown_hold_id : hold) | Some h -> h
+  in
+  let total_on_hold =
+    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with
+    | None -> Amount 0n
+    | Some total -> total
+  in
+  let new_total_on_hold =
+    match sub_amount total_on_hold h.ho_amount with
+    | None -> None
+    | Some total -> if total = Amount 0n then None else Some total
+  in
+  let holds_totals =
+    Big_map.update (h.ho_src, h.ho_token_id) new_total_on_hold s.holds_totals
+  in
+  {s with holds; holds_totals}
+
 let manager ((param, s) : manager * storage) : operation list * storage =
-  let s = match param with Mint p -> mint p s | Burn p -> burn p s in
+  let s =
+    match param with
+    | Mint p -> mint p s
+    | Burn p -> burn p s
+    | Hold p -> hold p s
+    | Release p -> release p s
+  in
   (([] : operation list), s)

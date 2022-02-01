@@ -1,6 +1,6 @@
 (library
  (name base)
- (modules errors fa2_params auth_params fa2_types auth_types finp2p_proxy_types)
+ (modules errors utils fa2_params auth_params fa2_types auth_types finp2p_proxy_types)
  (preprocess
   (pps mligo.ppx))
  (flags
@@ -8,7 +8,7 @@
 
 (library
  (name fa2)
- (modules assets admin manager fa2)
+ (modules fa2_common assets admin manager fa2)
  (libraries base)
  (preprocess
   (pps mligo.ppx))
@@ -42,13 +42,6 @@
  (flags
   (:standard -open Mligo -open Base)))
 
-(library
- (name fa2_test)
- (modules fa2_test)
- (libraries fa2)
- (preprocess
-  (pps mligo.ppx)))
-
 (rule
  (mode promote)
  (deps scripts/gen_finp2p_conv.ml)
@@ -66,11 +59,12 @@
   fa2_params.mligo
   fa2_types.mligo
   fa2_sig.mligo
+  fa2_common.mligo
+  utils.mligo
   assets.mligo
   admin.mligo
   manager.mligo
   fa2.mligo
-  fa2_test.mligo
   auth_params.mligo
   auth_types.mligo
   authorization.mligo
@@ -82,8 +76,7 @@
   (progn
    (run to_mligo fa2.ml)
    (run to_mligo authorization.ml)
-   (run to_mligo finp2p_proxy.ml)
-   (run to_mligo fa2_test.ml))))
+   (run to_mligo finp2p_proxy.ml))))
 
 (rule
  (alias michelson)
@@ -92,11 +85,12 @@
    fa2_params.mligo
    fa2_types.mligo
    fa2_sig.ml
+   fa2_common.mligo
+   utils.mligo
    assets.mligo
    admin.mligo
    manager.mligo
    fa2.mligo
-   fa2_test.mligo
    auth_params.mligo
    auth_types.mligo
    authorization.mligo
@@ -124,11 +118,12 @@
    fa2_params.mligo
    fa2_types.mligo
    fa2_sig.ml
+   fa2_common.mligo
+   utils.mligo
    assets.mligo
    admin.mligo
    manager.mligo
    fa2.mligo
-   fa2_test.mligo
    auth_params.mligo
    auth_types.mligo
    authorization.mligo

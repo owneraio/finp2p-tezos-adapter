@@ -1,5 +1,6 @@
 include Errors
 include Fa2_types
+include Fa2_common
 
 let[@inline] check_token_exists (id : token_id) (s : storage) : unit =
   if not (Big_map.mem id s.token_metadata) then
@@ -36,7 +37,9 @@ let transfer (txs : transfer list) (s : storage) : ledger =
               match sub_amount src_balance tr_amount with
               | None ->
                   (failwith fa2_insufficient_balance : token_amount option)
-              | Some b -> if b = Amount 0n then None else Some b
+              | Some b ->
+                  let () = check_hold tx.tr_src dst.tr_token_id b s in
+                  if b = Amount 0n then None else Some b
             in
             let ledger =
               Big_map.update

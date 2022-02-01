@@ -1,24 +1,6 @@
+include Utils
+
 (* Fa2 *)
-
-type token_id = Token_id of nat
-
-type token_amount = Amount of nat
-
-let[@inline] nat_amount (a : token_amount) : nat = match a with Amount a -> a
-
-let[@inline] add_amount (a1 : token_amount) (a2 : token_amount) : token_amount =
-  Amount (nat_amount a1 + nat_amount a2)
-
-let[@inline] sub_amount (a1 : token_amount) (a2 : token_amount) :
-    token_amount option =
-  match is_nat (nat_amount a1 - nat_amount a2) with
-  | None -> None
-  | Some n -> Some (Amount n)
-
-let[@inline] nat_token_id (i : token_id) : nat = match i with Token_id i -> i
-
-let[@inline] succ_token_id (i : token_id) : token_id =
-  match i with Token_id i -> Token_id (i + 1n)
 
 type transfer_destination = {
   tr_dst : address; [@key "to_"]
@@ -85,7 +67,21 @@ type burn_param = {
 }
 [@@comb] [@@param Burn_tokens]
 
-type manager = Mint of mint_param | Burn of burn_param [@@entry Tokens]
+type hold = {
+  ho_hold_id : hold_id;
+  ho_token_id : token_id;
+  ho_amount : token_amount;
+  ho_src : address;
+  ho_dst : address option;
+}
+[@@comb] [@@param Hold_tokens]
+
+type manager =
+  | Mint of mint_param
+  | Burn of burn_param
+  | Hold of hold
+  | Release of hold_id
+[@@entry Manager]
 
 (* Admin *)
 
