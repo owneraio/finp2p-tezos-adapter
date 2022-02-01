@@ -33,7 +33,7 @@ export type Operationhash = Uint8Array;
 export type Nonce = Uint8Array;
 export type Timestamp = Date;
 export type Signature = string;
-export type FinP2PHoldId = Bytes;
+export type Finp2pHoldId = Bytes;
 export type FA2HoldId = Nat;
 
 let utf8 = new TextEncoder();
@@ -100,6 +100,33 @@ export interface RedeemTokensParam {
   signature: Signature;
 }
 
+export interface HoldTokensParam {
+  hold_id : Finp2pHoldId;
+  asset_id : AssetId;
+  amount : TokenAmount;
+  src_account : Key;
+  dst_account? : Key;
+  expiration : Timestamp;
+  nonce : Finp2pNonce;
+  ahg_wo_nonce : Bytes;
+  signature : Signature;
+}
+
+export interface ExecuteHoldParam {
+  hold_id : Finp2pHoldId;
+  asset_id? : AssetId;
+  amount? : TokenAmount;
+  src_account? : Key;
+  dst_account? : Key;
+}
+
+export interface ReleaseHoldParam {
+  hold_id : Finp2pHoldId;
+  asset_id? : AssetId;
+  amount? : TokenAmount;
+  src_account? : Key;
+}
+
 type CleanupParam = string[] | undefined;
 
 type BatchEntryPoint =
@@ -107,6 +134,10 @@ type BatchEntryPoint =
   | 'create_asset'
   | 'issue_tokens'
   | 'redeem_tokens'
+  | 'hold_tokens'
+  | 'execute_hold'
+  | 'release_hold'
+  | 'hold_tokens'
   | 'cleanup'
   | 'update_admins'
   | 'add_admins'
@@ -119,6 +150,9 @@ type ProxyBatchParam =
   | CreateAssetParam
   | IssueTokensParam
   | RedeemTokensParam
+  | HoldTokensParam
+  | ExecuteHoldParam
+  | ReleaseHoldParam
   | CleanupParam
   | Address[]
   | Address[]
@@ -152,7 +186,7 @@ interface InitialStorage {
   finp2p_assets: MichelsonMap<AssetId, FA2Token>;
   admins: Address[];
   next_token_ids: MichelsonMap<Address, Nat>;
-  holds: MichelsonMap<FinP2PHoldId, HoldInfo>;
+  holds: MichelsonMap<Finp2pHoldId, HoldInfo>;
 }
 
 export interface FA2Storage {
@@ -320,6 +354,58 @@ export namespace Michelson {
         /* src_account */ maybeBytes(rt.src_account),
         { /* amount */ int: rt.amount.toString() },
         /* signature */ maybeBytes(rt.signature),
+      ],
+    };
+  }
+
+  export function holdTokensParam(ht: HoldTokensParam): MichelsonV1Expression {
+    let dstAccount =
+      mkOpt(ht.dst_account,
+        (s => { return maybeBytes(s); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(ht.hold_id) },
+        { /* asset_id */ bytes: bytesToHex(ht.asset_id) },
+        { /* amount */ int: ht.amount.toString() },
+        /* src_account */ maybeBytes(ht.src_account),
+        /* dst_account */ dstAccount,
+        { /* expiration */ string: ht.expiration.toISOString() },
+        /* nonce */ finp2pNonce(ht.nonce),
+        { /* ahg_wo_nonce */ bytes: bytesToHex(ht.ahg_wo_nonce) },
+        /* signature */ maybeBytes(ht.signature),
+      ],
+    };
+  }
+
+  export function executeHoldParam(eh: ExecuteHoldParam): MichelsonV1Expression {
+    let assetId = mkOpt(eh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
+    let amount = mkOpt(eh.amount, (s => { return { int : s.toString() }; }));
+    let srcAccount = mkOpt(eh.src_account, (s => { return maybeBytes(s); }));
+    let dstAccount = mkOpt(eh.dst_account, (s => { return maybeBytes(s); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(eh.hold_id) },
+        assetId,
+        amount,
+        srcAccount,
+        dstAccount,
+      ],
+    };
+  }
+
+  export function releaseHoldParam(rh: ReleaseHoldParam): MichelsonV1Expression {
+    let assetId = mkOpt(rh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
+    let amount = mkOpt(rh.amount, (s => { return { int : s.toString() }; }));
+    let srcAccount = mkOpt(rh.src_account, (s => { return maybeBytes(s); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(rh.hold_id) },
+        assetId,
+        amount,
+        srcAccount,
       ],
     };
   }
@@ -762,6 +848,45 @@ export class FinP2PTezos {
   }
 
   /**
+   * @description Call the entry-point `hold_tokens` of the FinP2P proxy
+   * @param ht: the parameters of the hold
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async holdTokens(
+    ht: HoldTokensParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('hold_tokens', ht, options);
+  }
+
+  /**
+   * @description Call the entry-point `execute_hold` of the FinP2P proxy
+   * @param eh: the parameters of the execution
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async executeHold(
+    eh: ExecuteHoldParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('execute_hold', eh, options);
+  }
+
+  /**
+   * @description Call the entry-point `release_hold` of the FinP2P proxy
+   * @param rh: the parameters of the release
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async releaseHold(
+    rh: ReleaseHoldParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('release_hold', rh, options);
+  }
+
+  /**
    * @description Call the entry-point `update_admins` of the FinP2P proxy
    * @param newAdmins: the new set of administrators (addresses)
    * @param options : options for the call, including contract address and cleanup
@@ -1004,6 +1129,30 @@ export class FinP2PTezos {
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
               value: Michelson.redeemTokensParam(vRt) },
+          };
+        case 'hold_tokens':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.holdTokensParam(<HoldTokensParam>bp.param) },
+          };
+        case 'execute_hold':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.executeHoldParam(<ExecuteHoldParam>bp.param) },
+          };
+        case 'release_hold':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.releaseHoldParam(<ReleaseHoldParam>bp.param) },
           };
         case 'cleanup':
           let vCl = <CleanupParam>bp.param;
