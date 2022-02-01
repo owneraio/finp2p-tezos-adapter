@@ -398,6 +398,10 @@ function to_str(x : any) : string {
   return JSON.stringify(x)
 }
 
+function pubkey_to_tezos_secp256k1(pubKey : Buffer) : string {
+  return ('0x01' /* secp256k1 */ + pubKey.toString('hex'))
+}
+
 function generateNonce(): Finp2pProxy.Finp2pNonce {
   return {
     nonce : crypto.randomBytes(24) ,
@@ -405,10 +409,14 @@ function generateNonce(): Finp2pProxy.Finp2pNonce {
   }
 }
 
+function dateToSec(d : Date) : number {
+  return Math.floor(d.getTime() / 1000);
+}
+
 function nonce_to_bytes(n: Finp2pProxy.Finp2pNonce) : Buffer {
   const buffer = Buffer.alloc(32)
   buffer.fill(n.nonce, 0, 24);
-  const t_sec = Math.floor(n.timestamp.getTime() / 1000);
+  const t_sec = dateToSec(n.timestamp);
   const t = BigInt(t_sec);
   buffer.writeBigInt64BE(t, 24);
   return buffer;
@@ -454,7 +462,7 @@ async function mk_issue_tokens(i : {
   let param: Finp2pProxy.IssueTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
-    dst_account : '0x01' /* secp256k1 */ + i.dest.pubKey.toString('hex'),
+    dst_account : pubkey_to_tezos_secp256k1(i.dest.pubKey),
     amount: BigInt(i.amount),
     shg,
     signature: '0x' + (Buffer.from(signature)).toString('hex'),
@@ -537,8 +545,8 @@ async function mk_transfer_tokens(i : {
   let param: Finp2pProxy.TransferTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
-    src_account : '0x01' /* secp256k1 */ + i.src.pubKey.toString('hex'),
-    dst_account : '0x01' /* secp256k1 */ + i.dest.toString('hex'),
+    src_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
+    dst_account : pubkey_to_tezos_secp256k1(i.dest),
     amount: BigInt(i.amount),
     shg,
     signature: '0x' + (Buffer.from(signature)).toString('hex'),
@@ -582,7 +590,7 @@ async function mk_redeem_tokens(i : {
   let param: Finp2pProxy.RedeemTokensParam = {
     nonce,
     asset_id : utf8.encode(i.asset_id),
-    src_account : '0x01' /* secp256k1 */ + i.src.pubKey.toString('hex'),
+    src_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
     amount: BigInt(i.amount),
     signature: '0x' + (Buffer.from(signature)).toString('hex'),
   }
@@ -600,6 +608,135 @@ async function redeem_tokens(i : {
   let param = await mk_redeem_tokens(i)
   log("Redeem parameters:", param)
   return await FinP2PTezos.redeemTokens(param, i.options)
+}
+
+async function mk_hold_tokens(i : {
+  hold_id : string,
+  asset_id : string,
+  amount : number | bigint,
+  src : finp2p_account,
+  dst? : Buffer,
+  expiration : Date,
+  signer? : finp2p_account}) {
+  let nonce = generateNonce()
+  let nonce_bytes = nonce_to_bytes(nonce)
+  let ahg_wo_nonce = crypto.randomBytes(55)
+  let assetGroup = [
+    nonce_bytes, ahg_wo_nonce
+  ]
+  log_hashgroup(assetGroup)
+  let assetHashGroup = await hashValues(assetGroup);
+  log('AHG:', assetHashGroup.toString('hex'))
+  let settlementGroup = [
+    'finp2p',
+    i.asset_id,
+    'finId',
+    i.src.pubKey.toString('hex'),
+  ]
+  if (i.dst !== undefined) {
+    settlementGroup = settlementGroup.concat([
+      'finId',
+      i.dst.toString('hex'),
+    ])
+  }
+  settlementGroup = settlementGroup.concat([
+    '0x' + i.amount.toString(16),
+    '0x' + (dateToSec(i.expiration)).toString(16)
+  ])
+  let settlementHashGroup = await hashValues(settlementGroup);
+  log('SHG:', settlementHashGroup.toString('hex'))
+  let digest = await hashValues([assetHashGroup, settlementHashGroup])
+  log('digest:', digest.toString('hex'))
+  let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
+  let signature = secp256k1.ecdsaSign(digest, privKey).signature;
+
+  let param: Finp2pProxy.HoldTokensParam = {
+    hold_id : utf8.encode(i.hold_id),
+    asset_id : utf8.encode(i.asset_id),
+    src_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
+    dst_account : pubkey_to_tezos_secp256k1(i.dst),
+    amount: BigInt(i.amount),
+    expiration : i.expiration,
+    nonce,
+    ahg_wo_nonce,
+    signature: '0x' + (Buffer.from(signature)).toString('hex'),
+  }
+
+  return param
+}
+
+async function hold_tokens(i : {
+  hold_id : string,
+  asset_id : string,
+  amount : number | bigint,
+  src : finp2p_account,
+  dst? : Buffer,
+  expiration : Date,
+  signer? : finp2p_account,
+  options? : Finp2pProxy.CallOptions,
+}) {
+  let param = await mk_hold_tokens(i)
+  log("Hold parameters:", param)
+  return await FinP2PTezos.holdTokens(param, i.options)
+}
+
+async function mk_execute_hold(i : {
+  hold_id : string,
+  asset_id? : string,
+  amount? : number | bigint,
+  src? : Buffer,
+  dst? : Buffer,
+}) {
+  let param: Finp2pProxy.ExecuteHoldParam = {
+    hold_id : utf8.encode(i.hold_id),
+    asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
+    amount : (i.amount === undefined)? undefined : BigInt(i.amount),
+    src_account : (i.src === undefined)? undefined : pubkey_to_tezos_secp256k1(i.src),
+    dst_account : (i.dst === undefined)? undefined : pubkey_to_tezos_secp256k1(i.dst),
+  }
+
+  return param
+}
+
+async function execute_hold(i : {
+  hold_id : string,
+  asset_id? : string,
+  amount? : number | bigint,
+  src? : Buffer,
+  dst? : Buffer,
+  options? : Finp2pProxy.CallOptions,
+}) {
+  let param = await mk_execute_hold(i)
+  log("Execute hold parameters:", param)
+  return await FinP2PTezos.executeHold(param, i.options)
+}
+
+async function mk_release_hold(i : {
+  hold_id : string,
+  asset_id? : string,
+  amount? : number | bigint,
+  src? : Buffer,
+}) {
+  let param: Finp2pProxy.ReleaseHoldParam = {
+    hold_id : utf8.encode(i.hold_id),
+    asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
+    amount : (i.amount === undefined)? undefined : BigInt(i.amount),
+    src_account : (i.src === undefined)? undefined : pubkey_to_tezos_secp256k1(i.src),
+  }
+
+  return param
+}
+
+async function release_hold(i : {
+  hold_id : string,
+  asset_id? : string,
+  amount? : number | bigint,
+  src? : Buffer,
+  options? : Finp2pProxy.CallOptions,
+}) {
+  let param = await mk_release_hold(i)
+  log("Release hold parameters:", param)
+  return await FinP2PTezos.releaseHold(param, i.options)
 }
 
 async function get_balance_big_int(i : {
@@ -1027,7 +1164,7 @@ describe('FinP2P proxy contract',  () => {
     let op = await transfer_tokens(
       { src : accounts[0],
         dest : accounts[0].pubKey,
-        asset_id : asset_id4,
+        asset_id : asset_id1,
         amount : 0})
     log("waiting inclusion")
     await FinP2PTezos.waitInclusion(op)
@@ -1045,7 +1182,7 @@ describe('FinP2P proxy contract',  () => {
     let op = await transfer_tokens(
       { src : accounts[0],
         dest : accounts[0].pubKey,
-        asset_id : asset_id4,
+        asset_id : asset_id1,
         amount : 1})
     log("waiting inclusion")
     await FinP2PTezos.waitInclusion(op)
@@ -1064,7 +1201,7 @@ describe('FinP2P proxy contract',  () => {
     let op = await transfer_tokens(
       { src : accounts[0],
         dest : accounts[0].pubKey,
-        asset_id : asset_id4,
+        asset_id : asset_id1,
         amount : b0})
     log("waiting inclusion")
     await FinP2PTezos.waitInclusion(op)
@@ -1364,6 +1501,97 @@ describe('FA2 contract',  () => {
   })
 
 })
+  .afterAll(() =>
+  FinP2PTezos.taquito
+    .setSignerProvider(new InMemorySigner(Net.account.sk)))
+
+
+describe('Hold / Execute / Release',  () => {
+
+  it("Hold more than balance", async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, 100)
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    await assert.rejects(
+      async () => {
+        await hold_tokens(
+          { hold_id: "HOLD-ID-0001",
+            asset_id : asset_id1,
+            src : accounts[0],
+            dst : accounts[0].pubKey,
+            amount : b0 + 1,
+            expiration,
+          })
+      },
+      { message : "FA2_INSUFFICIENT_BALANCE"})
+  })
+
+  it("Hold half balance", async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, 100)
+    const expiration = new Date()
+    expiration.setSeconds(expiration.getSeconds() + 3600);
+    let op = await hold_tokens(
+      { hold_id: "HOLD-ID-0001",
+        asset_id : asset_id1,
+        src : accounts[0],
+        dst : accounts[0].pubKey,
+        amount : 50,
+        expiration,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+  })
+
+  it('Transfer more than spendable', async () => {
+    await assert.rejects(
+      async () => {
+    await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[3].pubKey,
+        asset_id : asset_id1,
+        amount : 51,
+      })
+      },
+      { message : "FA2_INSUFFICIENT_SPENDABLE_BALANCE"})
+  })
+
+  it('Transfer less than spendable', async () => {
+    let b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    let b3 = await get_balance({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, 100)
+    assert.equal(b3, 1)
+    let op = await transfer_tokens(
+      { src : accounts[0],
+        dest : accounts[3].pubKey,
+        asset_id : asset_id1,
+        amount : 5,
+      })
+    log("waiting inclusion")
+    await FinP2PTezos.waitInclusion(op)
+    b0 = await get_balance({
+      owner : accounts[0].pubKey,
+      asset_id : asset_id1 })
+    b3 = await get_balance({
+      owner : accounts[3].pubKey,
+      asset_id : asset_id1 })
+    assert.equal(b0, 95)
+    assert.equal(b3, 6)
+  })
+
+})
+
+
+
 
 })
   .beforeAll(Net.start_network)
