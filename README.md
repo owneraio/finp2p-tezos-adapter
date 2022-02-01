@@ -46,7 +46,7 @@ $ make server
 The JavaScript code will be produced in the server/lib directory.
 
 ### Docker
-The prject can be built and baked using Docker in [dockerfile](build/Dockerfile)
+The project can be built and baked using Docker in [dockerfile](build/Dockerfile)
 
 ```bash
 $ make docker
@@ -71,7 +71,7 @@ The rest of this section gives the necessary steps to re-compile the contracts.
 ### Prerequisites for compilation of smart contracts
 
 - [Install Opam](https://opam.ocaml.org/doc/Install.html)
-- [Install Ligo](https://ligolang.org/docs/intro/installation)
+- [Install Ligo](https://ligolang.org/docs/intro/installation) version 0.34 or greater
 
 ### Installation and compilation
 
