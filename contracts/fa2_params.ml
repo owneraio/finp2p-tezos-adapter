@@ -2,6 +2,8 @@ include Utils
 
 (* Fa2 *)
 
+type balance_info = {balance : token_amount; on_hold : token_amount}
+
 type transfer_destination = {
   tr_dst : address; [@key "to_"]
   tr_token_id : token_id;
