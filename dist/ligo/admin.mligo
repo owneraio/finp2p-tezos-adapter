@@ -23,7 +23,7 @@ let update_token_metadata (token_id : token_id) (metadata : (string, bytes) map)
   | None -> (failwith fa2_token_undefined : storage)
   | Some _ -> { s with token_metadata = token_metadata  }
 
-let admin ((param, s) : (admin * storage)) : (operation list * storage) =
+let admin ((param, s) : (admin_params * storage)) : (operation list * storage) =
   let ops : operation list = [] in
   let s =
     match param with

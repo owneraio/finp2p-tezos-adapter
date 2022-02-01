@@ -96,6 +96,51 @@
                                                                     "annots":
                                                                     [ "%balance_of" ] },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address",
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%hold" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%id" ] } ],
+                                                                    "annots":
+                                                                    [ "%hold" ] } ] },
+                                                                    { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "list",
                                                                     "args":
                                                                     [ { "prim":
@@ -129,7 +174,7 @@
                                                                     "annots":
                                                                     [ "%txs" ] } ] } ],
                                                                     "annots":
-                                                                    [ "%transfer" ] } ] },
+                                                                    [ "%transfer" ] },
                                                                     { "prim":
                                                                     "list",
                                                                     "args":
@@ -177,12 +222,15 @@
                                                                     "annots":
                                                                     [ "%remove_operator" ] } ] } ],
                                                                     "annots":
-                                                                    [ "%update_operators" ] } ],
+                                                                    [ "%update_operators" ] } ] } ],
                                                                 "annots":
                                                                   [ "%assets_action" ] },
                                                               { "prim": "or",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "or",
                                                                     "args":
                                                                     [ { "prim":
@@ -207,6 +255,55 @@
                                                                     "annots":
                                                                     [ "%burn" ] },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%hold_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%execute" ] } ] },
+                                                                    { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
@@ -241,7 +338,43 @@
                                                                     "annots":
                                                                     [ "%owners" ] } ] } ],
                                                                     "annots":
-                                                                    [ "%mint" ] } ],
+                                                                    [ "%mint" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%hold_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%release" ] } ] } ],
                                                                     "annots":
                                                                     [ "%manage_action" ] },
                                                                     { "prim":
@@ -340,7 +473,44 @@
                                                             [ "%callback" ] } ],
                                                     "annots":
                                                       [ "%balance_of" ] },
-                                                  { "prim": "list",
+                                                  { "prim": "pair",
+                                                    "args":
+                                                      [ { "prim": "pair",
+                                                          "args":
+                                                            [ { "prim": "nat",
+                                                                "annots":
+                                                                  [ "%token_id" ] },
+                                                              { "prim":
+                                                                  "pair",
+                                                                "args":
+                                                                  [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address",
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ],
+                                                          "annots":
+                                                            [ "%hold" ] },
+                                                        { "prim": "option",
+                                                          "args":
+                                                            [ { "prim": "nat" } ],
+                                                          "annots": [ "%id" ] } ],
+                                                    "annots": [ "%hold" ] } ] },
+                                            { "prim": "or",
+                                              "args":
+                                                [ { "prim": "list",
                                                     "args":
                                                       [ { "prim": "pair",
                                                           "args":
@@ -371,21 +541,22 @@
                                                                     [ "%amount" ] } ] } ] } ],
                                                                 "annots":
                                                                   [ "%txs" ] } ] } ],
-                                                    "annots": [ "%transfer" ] } ] },
-                                            { "prim": "list",
-                                              "args":
-                                                [ { "prim": "or",
+                                                    "annots": [ "%transfer" ] },
+                                                  { "prim": "list",
                                                     "args":
-                                                      [ { "prim": "pair",
+                                                      [ { "prim": "or",
                                                           "args":
                                                             [ { "prim":
-                                                                  "address",
-                                                                "annots":
-                                                                  [ "%owner" ] },
-                                                              { "prim":
                                                                   "pair",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "address",
+                                                                    "annots":
+                                                                    [ "%owner" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "address",
                                                                     "annots":
                                                                     [ "%operator" ] },
@@ -393,18 +564,19 @@
                                                                     "nat",
                                                                     "annots":
                                                                     [ "%token_id" ] } ] } ],
-                                                          "annots":
-                                                            [ "%add_operator" ] },
-                                                        { "prim": "pair",
-                                                          "args":
-                                                            [ { "prim":
-                                                                  "address",
                                                                 "annots":
-                                                                  [ "%owner" ] },
+                                                                  [ "%add_operator" ] },
                                                               { "prim":
                                                                   "pair",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "address",
+                                                                    "annots":
+                                                                    [ "%owner" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "address",
                                                                     "annots":
                                                                     [ "%operator" ] },
@@ -412,51 +584,22 @@
                                                                     "nat",
                                                                     "annots":
                                                                     [ "%token_id" ] } ] } ],
-                                                          "annots":
-                                                            [ "%remove_operator" ] } ] } ],
-                                              "annots":
-                                                [ "%update_operators" ] } ],
+                                                                "annots":
+                                                                  [ "%remove_operator" ] } ] } ],
+                                                    "annots":
+                                                      [ "%update_operators" ] } ] } ],
                                         "annots": [ "%assets_action" ] },
                                       { "prim": "or",
                                         "args":
                                           [ { "prim": "or",
                                               "args":
-                                                [ { "prim": "pair",
+                                                [ { "prim": "or",
                                                     "args":
-                                                      [ { "prim": "nat",
-                                                          "annots":
-                                                            [ "%token_id" ] },
-                                                        { "prim": "list",
+                                                      [ { "prim": "pair",
                                                           "args":
-                                                            [ { "prim":
-                                                                  "pair",
-                                                                "args":
-                                                                  [ { "prim":
-                                                                    "address" },
-                                                                    { "prim":
-                                                                    "nat" } ] } ],
-                                                          "annots":
-                                                            [ "%owners" ] } ],
-                                                    "annots": [ "%burn" ] },
-                                                  { "prim": "pair",
-                                                    "args":
-                                                      [ { "prim": "nat",
-                                                          "annots":
-                                                            [ "%token_id" ] },
-                                                        { "prim": "pair",
-                                                          "args":
-                                                            [ { "prim":
-                                                                  "option",
-                                                                "args":
-                                                                  [ { "prim":
-                                                                    "map",
-                                                                    "args":
-                                                                    [ { "prim":
-                                                                    "string" },
-                                                                    { "prim":
-                                                                    "bytes" } ] } ],
+                                                            [ { "prim": "nat",
                                                                 "annots":
-                                                                  [ "%token_info" ] },
+                                                                  [ "%token_id" ] },
                                                               { "prim":
                                                                   "list",
                                                                 "args":
@@ -468,8 +611,123 @@
                                                                     { "prim":
                                                                     "nat" } ] } ],
                                                                 "annots":
-                                                                  [ "%owners" ] } ] } ],
-                                                    "annots": [ "%mint" ] } ],
+                                                                  [ "%owners" ] } ],
+                                                          "annots":
+                                                            [ "%burn" ] },
+                                                        { "prim": "pair",
+                                                          "args":
+                                                            [ { "prim": "nat",
+                                                                "annots":
+                                                                  [ "%hold_id" ] },
+                                                              { "prim":
+                                                                  "pair",
+                                                                "args":
+                                                                  [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ] } ],
+                                                          "annots":
+                                                            [ "%execute" ] } ] },
+                                                  { "prim": "or",
+                                                    "args":
+                                                      [ { "prim": "pair",
+                                                          "args":
+                                                            [ { "prim": "nat",
+                                                                "annots":
+                                                                  [ "%token_id" ] },
+                                                              { "prim":
+                                                                  "pair",
+                                                                "args":
+                                                                  [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "map",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "string" },
+                                                                    { "prim":
+                                                                    "bytes" } ] } ],
+                                                                    "annots":
+                                                                    [ "%token_info" ] },
+                                                                    { "prim":
+                                                                    "list",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" },
+                                                                    { "prim":
+                                                                    "nat" } ] } ],
+                                                                    "annots":
+                                                                    [ "%owners" ] } ] } ],
+                                                          "annots":
+                                                            [ "%mint" ] },
+                                                        { "prim": "pair",
+                                                          "args":
+                                                            [ { "prim": "nat",
+                                                                "annots":
+                                                                  [ "%hold_id" ] },
+                                                              { "prim":
+                                                                  "pair",
+                                                                "args":
+                                                                  [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] } ] } ] } ],
+                                                          "annots":
+                                                            [ "%release" ] } ] } ],
                                               "annots": [ "%manage_action" ] },
                                             { "prim": "unit",
                                               "annots": [ "%admin_action" ] } ] } ],
@@ -561,6 +819,50 @@
                                                                 "annots":
                                                                   [ "%balance_of" ] },
                                                               { "prim":
+                                                                  "pair",
+                                                                "args":
+                                                                  [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address",
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%hold" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%id" ] } ],
+                                                                "annots":
+                                                                  [ "%hold" ] } ] },
+                                                        { "prim": "or",
+                                                          "args":
+                                                            [ { "prim":
                                                                   "list",
                                                                 "args":
                                                                   [ { "prim":
@@ -594,12 +896,14 @@
                                                                     "annots":
                                                                     [ "%txs" ] } ] } ],
                                                                 "annots":
-                                                                  [ "%transfer" ] } ] },
-                                                        { "prim": "list",
-                                                          "args":
-                                                            [ { "prim": "or",
+                                                                  [ "%transfer" ] },
+                                                              { "prim":
+                                                                  "list",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
@@ -639,18 +943,20 @@
                                                                     [ "%token_id" ] } ] } ],
                                                                     "annots":
                                                                     [ "%remove_operator" ] } ] } ],
-                                                          "annots":
-                                                            [ "%update_operators" ] } ],
+                                                                "annots":
+                                                                  [ "%update_operators" ] } ] } ],
                                                     "annots":
                                                       [ "%assets_action" ] },
                                                   { "prim": "or",
                                                     "args":
                                                       [ { "prim": "or",
                                                           "args":
-                                                            [ { "prim":
-                                                                  "pair",
+                                                            [ { "prim": "or",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "nat",
                                                                     "annots":
                                                                     [ "%token_id" ] },
@@ -666,12 +972,60 @@
                                                                     "nat" } ] } ],
                                                                     "annots":
                                                                     [ "%owners" ] } ],
-                                                                "annots":
-                                                                  [ "%burn" ] },
-                                                              { "prim":
-                                                                  "pair",
+                                                                    "annots":
+                                                                    [ "%burn" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%hold_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%dst" ] } ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%execute" ] } ] },
+                                                              { "prim": "or",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "nat",
                                                                     "annots":
                                                                     [ "%token_id" ] },
@@ -702,8 +1056,44 @@
                                                                     "nat" } ] } ],
                                                                     "annots":
                                                                     [ "%owners" ] } ] } ],
-                                                                "annots":
-                                                                  [ "%mint" ] } ],
+                                                                    "annots":
+                                                                    [ "%mint" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat",
+                                                                    "annots":
+                                                                    [ "%hold_id" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%amount" ] },
+                                                                    { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" } ],
+                                                                    "annots":
+                                                                    [ "%token_id" ] },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" } ],
+                                                                    "annots":
+                                                                    [ "%src" ] } ] } ] } ],
+                                                                    "annots":
+                                                                    [ "%release" ] } ] } ],
                                                           "annots":
                                                             [ "%manage_action" ] },
                                                         { "prim": "unit",

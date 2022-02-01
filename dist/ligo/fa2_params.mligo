@@ -1,38 +1,10 @@
 #if !FA2_PARAMS
 #define FA2_PARAMS
 
-type token_id =
-  | Token_id of nat 
-
-type token_amount =
-  | Amount of nat 
-
-
-[@inline]
-let nat_amount (a : token_amount) : nat =
-  match a with | Amount a -> a
-
-
-[@inline]
-let add_amount (a1 : token_amount) (a2 : token_amount) : token_amount =
-  Amount ((nat_amount a1) + (nat_amount a2))
-
-
-[@inline]
-let sub_amount (a1 : token_amount) (a2 : token_amount) : token_amount option =
-  match is_nat ((nat_amount a1) - (nat_amount a2)) with
-  | None -> None
-  | Some n -> Some (Amount n)
-
-
-[@inline]
-let nat_token_id (i : token_id) : nat =
-  match i with | Token_id i -> i
-
-
-[@inline]
-let succ_token_id (i : token_id) : token_id =
-  match i with | Token_id i -> Token_id (i + 1n)
+#include "utils.mligo"
+type balance_info = {
+  balance: token_amount ;
+  on_hold: token_amount }
 
 type transfer_destination = [@layout:comb]  {
     to_: address ;
@@ -68,10 +40,21 @@ type operator_update_for_all =
   | Add_operator_for_all of address 
   | Remove_operator_for_all of address 
 
-type fa2 =
+type hold = [@layout:comb]  {
+    token_id: token_id ;
+    amount: token_amount ;
+    src: address ;
+    dst: address option }
+
+type hold_param = {
+  id: hold_id option ;
+  hold: hold }
+
+type assets_params =
   | Transfer of transfer list 
   | Balance_of of balance_of_param 
   | Update_operators of operator_update list 
+  | Hold of hold_param 
 
 type mint_param = [@layout:comb]  {
     token_id: token_id ;
@@ -82,22 +65,37 @@ type burn_param = [@layout:comb]  {
     token_id: token_id ;
     owners: (address * token_amount) list }
 
-type manager =
+type release_param = [@layout:comb]  {
+    hold_id: hold_id ;
+    amount: token_amount option ;
+    token_id: token_id option ;
+    src: address option }
+
+type execute_param = [@layout:comb]  {
+    hold_id: hold_id ;
+    amount: token_amount option ;
+    token_id: token_id option ;
+    src: address option ;
+    dst: address option }
+
+type manager_params =
   | Mint of mint_param 
   | Burn of burn_param 
+  | Release of release_param 
+  | Execute of execute_param 
 
 type update_token_metadata_param = [@layout:comb]  {
     token_id: token_id ;
     metadata: (string, bytes) map }
 
-type admin =
+type admin_params =
   | Update_auth_contract of address 
   | Pause of bool 
   | Update_token_metadata of update_token_metadata_param 
 
 type param =
-  | Assets of fa2 
-  | Admin of admin 
-  | Manager of manager 
+  | Assets of assets_params 
+  | Admin of admin_params 
+  | Manager of manager_params 
 
 #endif

@@ -60,7 +60,49 @@ let get_balance (((owner, token_id) : (address * token_id)), (s : storage)) : to
 
 
 [@view]
+let get_balance_info (((owner, token_id) : (address * token_id)), (s : storage)) : balance_info =
+  if not (Big_map.mem token_id s.token_metadata)
+  then (failwith fa2_token_undefined : balance_info)
+  else
+    (let balance_ =
+       match Big_map.find_opt (owner, token_id) s.ledger with
+       | None -> Amount 0n
+       | Some b -> b in
+     let on_hold =
+       match Big_map.find_opt (owner, token_id) s.holds_totals with
+       | None -> Amount 0n
+       | Some total -> total in
+     { balance = balance_; on_hold = on_hold  })
+
+
+[@view]
+let get_spendable_balance (((owner, token_id) : (address * token_id)), (s : storage)) : token_amount =
+  if not (Big_map.mem token_id s.token_metadata)
+  then (failwith fa2_token_undefined : token_amount)
+  else
+    (let balance_ =
+       match Big_map.find_opt (owner, token_id) s.ledger with
+       | None -> Amount 0n
+       | Some b -> b in
+     let on_hold =
+       match Big_map.find_opt (owner, token_id) s.holds_totals with
+       | None -> Amount 0n
+       | Some total -> total in
+     match sub_amount balance_ on_hold with | None -> Amount 0n | Some b -> b)
+
+
+[@view]
 let get_max_token_id ((), (s : storage)) : token_id =
   s.max_token_id
+
+
+[@view]
+let get_max_hold_id ((), (s : storage)) : hold_id =
+  s.max_hold_id
+
+
+[@view]
+let get_hold ((id : hold_id), (s : storage)) : hold option =
+  Big_map.find_opt id s.holds
 
 #endif
