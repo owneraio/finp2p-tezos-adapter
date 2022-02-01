@@ -33,6 +33,8 @@ export type Operationhash = Uint8Array;
 export type Nonce = Uint8Array;
 export type Timestamp = Date;
 export type Signature = string;
+export type FinP2PHoldId = Bytes;
+export type FA2HoldId = Nat;
 
 let utf8 = new TextEncoder();
 let utf8dec = new TextDecoder();
@@ -59,6 +61,11 @@ export interface CreateFA2Token {
 export interface Finp2pNonce {
   nonce: Nonce;
   timestamp: Timestamp;
+}
+
+export interface HoldInfo {
+  fa2_hold_id: FA2HoldId;
+  held_asset: AssetId;
 }
 
 export interface TransferTokensParam {
@@ -136,6 +143,7 @@ export interface ProxyStorage {
   finp2p_assets: BigMapAbstraction;
   admins: Address[];
   next_token_ids: BigMapAbstraction;
+  holds: BigMapAbstraction;
 }
 
 interface InitialStorage {
@@ -144,6 +152,7 @@ interface InitialStorage {
   finp2p_assets: MichelsonMap<AssetId, FA2Token>;
   admins: Address[];
   next_token_ids: MichelsonMap<Address, Nat>;
+  holds: MichelsonMap<FinP2PHoldId, HoldInfo>;
 }
 
 export interface FA2Storage {
@@ -153,8 +162,11 @@ export interface FA2Storage {
   operators : BigMapAbstraction,
   token_metadata : BigMapAbstraction,
   total_supply : BigMapAbstraction,
-  max_token_id : bigint,
-  metadata: MichelsonMap<string, Bytes>
+  max_token_id : BigNumber,
+  metadata : BigMapAbstraction,
+  max_hold_id : BigNumber,
+  holds : BigMapAbstraction,
+  holds_totals : BigMapAbstraction,
 }
 
 type OpStatus =
@@ -532,6 +544,7 @@ export class FinP2PTezos {
       finp2p_assets: new MichelsonMap(),
       admins,
       next_token_ids: new MichelsonMap(),
+      holds : new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P Proxy smart contract');
     return this.taquito.contract.originate({
@@ -591,6 +604,9 @@ export class FinP2PTezos {
       total_supply : new MichelsonMap<Nat, Nat>(),
       max_token_id : BigInt(0),
       metadata: michMetadata,
+      max_hold_id : BigInt(0),
+      holds : new MichelsonMap(),
+      holds_totals : new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P FA2 asset smart contract');
     return this.taquito.contract.originate({
