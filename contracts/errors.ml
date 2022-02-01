@@ -62,4 +62,4 @@ let hold_already_exists = "FINP2P_HOLD_ALREADY_EXISTS"
 
 let unknown_hold_id = "FINP2P_UNKNOWN_HOLD_ID"
 
-let cannot_transfer_hold = "FINP2P_CANNOT_TRANSFER_TOKENS_ON_HOLD"
+let insufficient_spendable_balance = "FA2_INSUFFICIENT_SPENDABLE_BALANCE"

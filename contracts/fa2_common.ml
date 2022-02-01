@@ -12,4 +12,5 @@ let[@inline] check_hold (src : address) (token_id : token_id)
     | None -> Amount 0n
     | Some total -> total
   in
-  if total_on_hold > new_balance then (failwith cannot_transfer_hold : unit)
+  if total_on_hold > new_balance then
+    (failwith insufficient_spendable_balance : unit)

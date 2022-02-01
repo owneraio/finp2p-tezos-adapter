@@ -73,8 +73,10 @@ type hold = {
   ho_amount : token_amount;
   ho_src : address;
   ho_dst : address option;
+      (* TODO: we may want to remove ho_dst if never used in FA2 *)
 }
 [@@comb] [@@param Hold_tokens]
+(* TODO: we may wanto to add an expiration date if we want to use it *)
 
 type manager =
   | Mint of mint_param
