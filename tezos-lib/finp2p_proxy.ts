@@ -68,6 +68,11 @@ export interface HoldInfo {
   held_asset: AssetId;
 }
 
+export interface BalanceInfo {
+  balance: bigint;
+  on_hold: bigint;
+}
+
 export interface TransferTokensParam {
   nonce: Finp2pNonce;
   asset_id: AssetId;
@@ -1219,6 +1224,30 @@ export class FinP2PTezos {
   }
 
 
+  private async callProxyView<T>(
+    viewMethod : string, // : (_ :[Key, AssetId]) => OnChainView,
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address
+  ) : Promise<T | undefined> {
+    let addr = this.getProxyAddress(kt1);
+    const contract = await this.taquito.contract.at(addr);
+    let pk = publicKey;
+    if (publicKey.substring(0, 2) == '0x') {
+      pk = encodeKey(publicKey.substring(2));
+    }
+    try {
+      return await contract.contractViews[viewMethod](
+          [pk, assetId],
+        ).executeView({ viewCaller : addr }) as T | undefined;
+    } catch (e : any) {
+      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
+      if (matches) {
+        throw Error(matches[1]);
+      } else { throw e; }
+    }
+  }
+
   /**
    * @description Retrieve balance of account in a given asset
    * @param publicKey: the public key of the account for which to lookup the balance
@@ -1233,23 +1262,57 @@ export class FinP2PTezos {
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<bigint> {
-    let addr = this.getProxyAddress(kt1);
-    const contract = await this.taquito.contract.at(addr);
-    let pk = publicKey;
-    if (publicKey.substring(0, 2) == '0x') {
-      pk = encodeKey(publicKey.substring(2));
-    }
-    try {
-      let balance =
-        await contract.contractViews.get_asset_balance(
-          [pk, assetId],
-        ).executeView({ viewCaller : addr }) as BigNumber | undefined;
-      return (BigInt((balance || new BigNumber(0)).toString()));
-    } catch (e : any) {
-      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
-      if (matches) {
-        throw Error(matches[1]);
-      } else { throw e; }
+    let balance =
+      await this.callProxyView<BigNumber>(
+        'get_asset_balance', publicKey, assetId, kt1);
+    return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+  /**
+   * @description Retrieve the spendable balance of account in a given asset, i.e.
+   * the balance without the tokens on hold
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetSpendableBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let balance =
+      await this.callProxyView<BigNumber>(
+        'get_asset_spendable_balance', publicKey, assetId, kt1);
+    return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+  /**
+   * @description Retrieve the balance and tokens on hold of account in a given asset
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetBalanceInfo(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<BalanceInfo> {
+    let info =
+      await this.callProxyView<{ balance : BigNumber, on_hold : BigNumber }>(
+        'get_asset_balance_info', publicKey, assetId, kt1);
+    if (info === undefined) {
+      return { balance : 0n, on_hold : 0n };
+    } else {
+      return {
+        balance : BigInt(info.balance.toString()),
+        on_hold : BigInt(info.on_hold.toString())
+      }
     }
   }
 
