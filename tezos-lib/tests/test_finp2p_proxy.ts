@@ -1765,16 +1765,16 @@ describe('Hold / Execute / Release',  () => {
       { message : "FINP2P_UNKNOWN_HOLD_ID"})
   })
 
-  it("Execute hold mismatch amount", async () => {
+  it("Execute hold amount too large", async () => {
     await assert.rejects(
       async () => {
         await execute_hold(
           { hold_id: "HOLD-ID-0001",
-            amount: 49
+            amount: 51
           }
         )
       },
-      { message : "UNEXPECTED_EXECUTE_HOLD_AMOUNT"})
+      { message : "FA2_INSUFFICIENT_HOLD"})
   })
 
   it("Execute hold mismatch asset", async () => {
