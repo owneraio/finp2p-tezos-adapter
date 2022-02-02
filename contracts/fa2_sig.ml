@@ -25,19 +25,20 @@ let get_burn_entrypoint (addr : address) : (burn_param, _) contract =
   | None -> (failwith invalid_fa2_contract : (burn_param, _) contract)
   | Some c -> c
 
-let get_hold_entrypoint (addr : address) : (hold, _) contract =
+let get_hold_entrypoint (addr : address) : (hold_param, _) contract =
   match
-    (Tezos.get_entrypoint_opt None "%hold" addr : (hold, _) contract option)
+    (Tezos.get_entrypoint_opt None "%hold" addr
+      : (hold_param, _) contract option)
   with
-  | None -> (failwith invalid_fa2_contract : (hold, _) contract)
+  | None -> (failwith invalid_fa2_contract : (hold_param, _) contract)
   | Some c -> c
 
-let get_release_entrypoint (addr : address) : (hold_id, _) contract =
+let get_release_entrypoint (addr : address) : (release_param, _) contract =
   match
     (Tezos.get_entrypoint_opt None "%release" addr
-      : (hold_id, _) contract option)
+      : (release_param, _) contract option)
   with
-  | None -> (failwith invalid_fa2_contract : (hold_id, _) contract)
+  | None -> (failwith invalid_fa2_contract : (release_param, _) contract)
   | Some c -> c
 
 (** Fails if the contract does not have at least the correct transfer

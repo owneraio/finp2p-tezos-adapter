@@ -80,11 +80,16 @@ type hold = {
 [@@comb] [@@param Hold_tokens]
 (* TODO: we may wanto to add an expiration date if we want to use it *)
 
+type hold_param = hold
+
+type release_param = {rl_hold_id : hold_id; rl_amount : token_amount option}
+[@@comb] [@@param Release]
+
 type manager =
   | Mint of mint_param
   | Burn of burn_param
-  | Hold of hold
-  | Release of hold_id
+  | Hold of hold_param
+  | Release of release_param
 [@@entry Manager]
 
 (* Admin *)

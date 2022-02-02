@@ -245,14 +245,9 @@ let execute_hold (p : execute_hold_param) (s : storage) :
     | Some asset_id ->
         if asset_id <> held_asset then failwith "UNEXPECTED_EXECUTE_HOLD_ASSET"
   in
-  let () =
-    match p.eh_amount with
-    | None -> ()
-    | Some amt ->
-        if amt <> fa2_hold.ho_amount then
-          failwith "UNEXPECTED_EXECUTE_HOLD_AMOUNT"
+  let tr_amount =
+    match p.eh_amount with None -> fa2_hold.ho_amount | Some a -> a
   in
-  let tr_amount = fa2_hold.ho_amount in
   let () =
     match p.eh_src_account with
     | None -> ()
@@ -272,7 +267,13 @@ let execute_hold (p : execute_hold_param) (s : storage) :
   in
   (* Release hold and transfer tokens on FA2 *)
   let release_ep = get_release_entrypoint fa2_token.address in
-  let relay_op1 = Tezos.transaction None fa2_hold_id 0t release_ep in
+  let relay_op1 =
+    Tezos.transaction
+      None
+      {rl_hold_id = fa2_hold_id; rl_amount = p.eh_amount}
+      0t
+      release_ep
+  in
   let fa2_transfer =
     {
       tr_src = fa2_hold.ho_src;
@@ -319,12 +320,6 @@ let release_hold (p : release_hold_param) (s : storage) :
         if asset_id <> held_asset then failwith "UNEXPECTED_RELEASE_ASSET"
   in
   let () =
-    match p.rh_amount with
-    | None -> ()
-    | Some amt ->
-        if amt <> fa2_hold.ho_amount then failwith "UNEXPECTED_RELEASE_AMOUNT"
-  in
-  let () =
     match p.rh_src_account with
     | None -> ()
     | Some account ->
@@ -333,7 +328,13 @@ let release_hold (p : release_hold_param) (s : storage) :
   in
   (* Release corresponding on hold FA2 *)
   let release_ep = get_release_entrypoint fa2_token.address in
-  let relay_op = Tezos.transaction None fa2_hold_id 0t release_ep in
+  let relay_op =
+    Tezos.transaction
+      None
+      {rl_hold_id = fa2_hold_id; rl_amount = p.rh_amount}
+      0t
+      release_ep
+  in
   ([relay_op], s)
 
 let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :

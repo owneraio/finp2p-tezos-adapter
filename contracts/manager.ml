@@ -116,22 +116,29 @@ let hold (h : hold) (s : storage) : storage =
   in
   {s with holds; holds_totals; max_hold_id}
 
-let release (hold_id : hold_id) (s : storage) : storage =
-  let (existed, holds) =
-    Big_map.get_and_update hold_id (None : hold option) s.holds
-  in
+let release (r : release_param) (s : storage) : storage =
+  let hold_id = r.rl_hold_id in
   let h =
-    match existed with
+    match Big_map.find_opt hold_id s.holds with
     | None -> (failwith fa2_unknown_hold_id : hold)
     | Some h -> h
   in
+  let release_amount =
+    match r.rl_amount with None -> h.ho_amount | Some a -> a
+  in
+  let new_hold =
+    match sub_amount h.ho_amount release_amount with
+    | None -> (failwith fa2_insufficient_hold : hold option)
+    | Some a -> if a = Amount 0n then None else Some {h with ho_amount = a}
+  in
+  let holds = Big_map.update hold_id new_hold s.holds in
   let total_on_hold =
     match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with
     | None -> Amount 0n
     | Some total -> total
   in
   let new_total_on_hold =
-    match sub_amount total_on_hold h.ho_amount with
+    match sub_amount total_on_hold release_amount with
     | None -> None
     | Some total -> if total = Amount 0n then None else Some total
   in
