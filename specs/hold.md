@@ -63,8 +63,147 @@ assets on Tezos (like stable coins) will be held in an escrow contract whereas
 FinP2P assets tokens will be held with a _built-in_ hold and release mechanism
 in the FA2 smart contract.
 
-TODO: Schema
+**TODO**: Schema
 
+
+## Native Hold in FA2 Asset Contract
+
+The proposed solution is similar to the
+[UniversalToken](https://github.com/ConsenSys/UniversalToken) developed by
+Consensys on the Ethereum blockchain, with the difference that our solution is
+lower level and only provides the necessary basic building blocks for a hold
+mechanism.
+
+We extend the FA2 contract with three additional entry points:
+
+- `hold` to put tokens on hold,
+- `release` to release tokens on hold back to their owner,
+- `execute` to execute a on hold.
+
+Additional views are also provided to query the balance and total number of
+tokens on hold for a specific user and token.
+
+To keep track of this information we must augment the storage with the following
+fields:
+- `holds` :  a big map from unique `hold_id`s to hold information to store each
+  new hold that is made,
+- `holds_totals` : a big map from address and token id to an amount that
+  represent the total number of tokens (of this token id) on hold for a given user,
+- `max_hold_id` : a global incrementing counter to generate new fresh hold_ids.
+
+
+### `hold`
+
+```ocaml
+type hold = {
+  token_id : token_id;
+  amount : token_amount;
+  src : address;
+  dst : address option;
+}
+
+type hold_param = { id : hold_id option; hold : hold }
+
+let hold (h : hold_param) (s : storage) : storage = ...
+```
+
+This entry point has the same authorization policy as the `transfer` entry
+point. This means that it can be called by the proxy contract or an accredited
+user. For this reason it is grouped with what we call the asset entry points of
+the FA2 contract (namely `transfer`, `add/remove_operator`, `balance_of`).
+
+#### Spec
+
+The `hold` entry point checks that the `hold_id`, when provided, is strictly
+greater than `max_hold_id`. This prevents reusing released hold ids. If the
+hold_id is not provided, a fresh hold id is computed as `max_hold_id + 1`.
+
+Note that when a user provides his or her own hold id, the transaction is
+subject to _front running_ attacks. It is possible for an attacker to make all
+these hold operations fail by monitoring the mempool and injecting hold
+transactions (of say 0 tokens) with the same `hold_id`. This is not a problem in
+our solution with the proxy because the hold operation is internal and the hold
+id is computed dynamically.
+
+The hold information is then stored in the `holds` table. And finally, the total
+held for the user is incremented with the hold amount in the table `holds_totals`.
+
+### `release`
+
+```ocaml
+type release_param = { 
+  hold_id : hold_id; 
+  amount : token_amount option;
+  token_id : token_id option;
+  src : address option;
+}
+
+let release (r : release_param) (s : storage) : storage =
+```
+
+The authorization policy for this entry point restricts calls to be made only by
+the proxy.
+
+#### Spec
+
+Calling `release` will remove the hold (if no amount is provided or if the
+amount is the one of the hold) or decrement the hold, effectively returning the
+held tokens to the original user.
+
+When provided, `token_id` and `src` must match the one of the hold.
+
+If the `amount` is smaller than the amount of the hold (it cannot be greater),
+then the hold remains active, but is decremented by the released amount. In this
+case we talk about a _partial release_ of the tokens.
+
+
+### `execute`
+
+```ocaml
+type execute_param = { 
+  hold_id : hold_id; 
+  amount : token_amount option;
+  token_id : token_id option;
+  src : address option;
+  dst : address option;
+}
+
+let execute (e : execute_param) (s : storage) : storage =
+```
+
+The authorization policy for this entry point restricts calls to be made only by
+the proxy.
+
+#### Spec
+
+Calling `execute` will remove the hold (if no amount is provided or if the
+amount is the one of the hold) or decrement the hold, and transfer the executed
+amount to the intended destination.
+
+It is important to remove the hold before transferring the tokens to be able to
+reuse the internal transfer function and ensure it goes through.
+
+When provided, `token_id` and `src` must match the one of the hold.
+
+When the hold was not registered with a destination, `dst` must be provided. (It
+can also be provided if there is a destination in the hold, but it must be
+identical.)
+
+If the `amount` is smaller than the amount of the hold (it cannot be greater),
+then the hold remains active, but is decremented by the executed amount. In this
+case we talk about a _partial hold execution_.
+
+
+### Modifications to the Other Entry Points
+
+The entry points of the contract which transfer funds out of an account must
+ensure that only the tokens that are not on hold are transferred. We talk about
+the _spendable_ balance of an account (the full balance minus the total tokens
+on hold).
+
+In the case of our FA2, only the entry points `transfer` and `burn` needs to be
+modified to ensure that the transferred (resp. burned) tokens are within the
+spendable balance of the source account.
 
 
 ## Changes to the Proxy Contract
@@ -234,12 +373,54 @@ resides in an external **Escrow** contract.
 
 ##### Execute Native Hold on FA2 
 
-1. Retrieve the hold information from the FA2 contract.
-2. Call the `release` entry point with corresponding amount.
-3. Call the `transfer` entry point to transfer tokens from holder to the
-   expected destination. (Note that this must be called after `release` for the
-   funds to be transferable.)
+1. Remove `hold_id` association from storage.
+2. Call the `execute` entry point with corresponding amount and destination.
 
 ##### Execute Hold by Escrow
+
+**TODO**
+
+
+### `release_hold`
+
+```ocaml
+type release_hold_param = {
+  hold_id : finp2p_hold_id; (* = boxed bytes *)
+  asset_id : asset_id option;  (* = boxed bytes *)
+  amount : token_amount option;
+  src_account : public_key option;
+}
+
+let release_hold (p : release_hold_param) (s : storage) : operation * storage = ...
+```
+
+This Tezos operation must be signed/injected by an administrator.
+
+
+#### Spec for Release Hold
+
+Releasing a hold happens when the other side of the bargain has not been
+fulfilled or if the FinP2P transaction is canceled. This event is initiated by
+the notary (_i.e._ an admin of the proxy contract). In this case, the funds are
+not transferred to their intended destination but are instead returned to the
+original owner.
+
+Only the FinP2P `hold_id` is compulsory. The other information, _i.e._
+`asset_id` and `src_account` are used to perform extra checks to ensure that the
+values are the expected ones.
+
+The `amount` can be inferior to the amount that was put on hold. In this case,
+the release is _partial_, and there is still a hold for the difference.
+**TODO**: Do we want to forbid partial release or not?
+
+The `release_hold` works differently if the hold is native to the FA2 or if it
+resides in an external **Escrow** contract.
+
+##### Release Native Hold on FA2 
+
+1. Remove `hold_id` association from storage.
+2. Call the `release` entry point with corresponding amount.
+
+##### Release Hold by Escrow
 
 **TODO**
