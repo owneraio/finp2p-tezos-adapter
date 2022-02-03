@@ -1228,7 +1228,7 @@ export class FinP2PTezos {
     viewMethod : string, // : (_ :[Key, AssetId]) => OnChainView,
     publicKey : Key,
     assetId : AssetId,
-    kt1?: Address
+    kt1?: Address,
   ) : Promise<T | undefined> {
     let addr = this.getProxyAddress(kt1);
     const contract = await this.taquito.contract.at(addr);
@@ -1238,8 +1238,8 @@ export class FinP2PTezos {
     }
     try {
       return await contract.contractViews[viewMethod](
-          [pk, assetId],
-        ).executeView({ viewCaller : addr }) as T | undefined;
+        [pk, assetId],
+      ).executeView({ viewCaller : addr }) as T | undefined;
     } catch (e : any) {
       const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
       if (matches) {
@@ -1311,8 +1311,8 @@ export class FinP2PTezos {
     } else {
       return {
         balance : BigInt(info.balance.toString()),
-        on_hold : BigInt(info.on_hold.toString())
-      }
+        on_hold : BigInt(info.on_hold.toString()),
+      };
     }
   }
 
