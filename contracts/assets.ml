@@ -87,7 +87,43 @@ let update_operators (storage : operators_storage) (ops : operator_update list)
     ops
     storage
 
-let fa2 ((param, storage) : fa2 * storage) : operation list * storage =
+let hold (h : hold_param) (s : storage) : storage =
+  let {h_id = id; h_hold = h} = h in
+  let hold_id =
+    match id with
+    | None -> succ_hold_id s.max_hold_id
+    | Some id ->
+        if id <= s.max_hold_id then (failwith fa2_hold_already_exists : hold_id)
+        else id
+  in
+  let (already_hold, holds) = Big_map.get_and_update hold_id (Some h) s.holds in
+  let () =
+    match already_hold with
+    | None -> ()
+    | Some _ -> (failwith fa2_hold_already_exists : unit)
+  in
+  let total_on_hold =
+    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with
+    | None -> h.ho_amount
+    | Some total -> add_amount total h.ho_amount
+  in
+  let balance_src =
+    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.ledger with
+    | None -> Amount 0n
+    | Some b -> b
+  in
+  let () =
+    if total_on_hold > balance_src then
+      (failwith fa2_insufficient_balance : unit)
+  in
+  let holds_totals =
+    Big_map.add (h.ho_src, h.ho_token_id) total_on_hold s.holds_totals
+  in
+  let max_hold_id = hold_id in
+  {s with holds; holds_totals; max_hold_id}
+
+let fa2 ((param, storage) : assets_params * storage) : operation list * storage
+    =
   match param with
   | Transfer txs ->
       let ledger = transfer txs storage in
@@ -98,4 +134,7 @@ let fa2 ((param, storage) : fa2 * storage) : operation list * storage =
   | Update_operators ops ->
       let operators = update_operators storage.operators ops in
       let storage = {storage with operators} in
+      (([] : operation list), storage)
+  | Hold p ->
+      let storage = hold p storage in
       (([] : operation list), storage)

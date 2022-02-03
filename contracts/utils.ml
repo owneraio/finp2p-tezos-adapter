@@ -20,6 +20,9 @@ let[@inline] nat_token_id (i : token_id) : nat = match i with Token_id i -> i
 let[@inline] succ_token_id (i : token_id) : token_id =
   match i with Token_id i -> Token_id (i + 1n)
 
+let[@inline] succ_hold_id (i : hold_id) : hold_id =
+  match i with Hold_id i -> Hold_id (i + 1n)
+
 (* Polymorphism doesn't work with mligo.
    Instantiated version for type operation. *)
 let[@inline] rev_append (l1 : operation list) (l2 : operation list) :

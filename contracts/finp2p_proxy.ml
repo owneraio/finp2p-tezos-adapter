@@ -199,7 +199,6 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation list * storage
   in
   let fa2_hold =
     {
-      ho_hold_id = fa2_hold_id;
       ho_token_id = fa2_token.id;
       ho_amount = p.ht_amount;
       ho_src = address_of_key p.ht_src_account;
@@ -207,131 +206,122 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation list * storage
     }
   in
   let hold_ep = get_hold_entrypoint fa2_token.address in
-  let relay_op = Tezos.transaction None fa2_hold 0t hold_ep in
-  ([relay_op], s)
-
-let execute_hold (p : execute_hold_param) (s : storage) :
-    operation list * storage =
-  (* Remove hold from storage *)
-  (* TODO: do we need to keep until expiration date? *)
-  (* TODO: do we need to keep for records? *)
-  let (hold_to_execute, holds) =
-    Big_map.get_and_update p.eh_hold_id (None : hold_info option) s.holds
-  in
-  let s = {s with holds} in
-  let {fa2_hold_id; held_asset} =
-    match hold_to_execute with
-    | None -> (failwith unknown_hold_id : hold_info)
-    | Some h -> h
-  in
-  let fa2_token =
-    match Big_map.find_opt held_asset s.finp2p_assets with
-    | None -> (failwith unknown_asset_id : fa2_token)
-    | Some fa2_token -> fa2_token
-  in
-  let fa2_hold =
-    match
-      (Tezos.call_view None "get_hold" fa2_hold_id fa2_token.address
-        : hold option option)
-    with
-    | None -> (failwith fa2_unknown_hold_id : hold)
-    | Some None -> (failwith fa2_unknown_hold_id : hold)
-    | Some (Some h) -> h
-  in
-  (* Checks *)
-  let () =
-    match p.eh_asset_id with
-    | None -> ()
-    | Some asset_id ->
-        if asset_id <> held_asset then failwith "UNEXPECTED_EXECUTE_HOLD_ASSET"
-  in
-  let tr_amount =
-    match p.eh_amount with None -> fa2_hold.ho_amount | Some a -> a
-  in
-  let () =
-    match p.eh_src_account with
-    | None -> ()
-    | Some account ->
-        if address_of_key account <> fa2_hold.ho_src then
-          failwith "UNEXPECTED_EXECUTE_HOLD_SOURCE"
-  in
-  let dst =
-    match (p.eh_dst_account, fa2_hold.ho_dst) with
-    | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
-    | (Some account, None) -> address_of_key account
-    | (None, Some dst) -> dst
-    | (Some account, Some dst) ->
-        if address_of_key account <> dst then
-          (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
-        else dst
-  in
-  (* Release hold and transfer tokens on FA2 *)
-  let release_ep = get_release_entrypoint fa2_token.address in
-  let relay_op1 =
-    Tezos.transaction
-      None
-      {rl_hold_id = fa2_hold_id; rl_amount = p.eh_amount}
-      0t
-      release_ep
-  in
-  let fa2_transfer =
-    {
-      tr_src = fa2_hold.ho_src;
-      tr_txs = [{tr_dst = dst; tr_token_id = fa2_token.id; tr_amount}];
-    }
-  in
-  let transfer_ep = get_transfer_entrypoint fa2_token.address in
-  let relay_op2 = Tezos.transaction None [fa2_transfer] 0t transfer_ep in
-  ([relay_op1; relay_op2], s)
-
-let release_hold (p : release_hold_param) (s : storage) :
-    operation list * storage =
-  (* Remove hold from storage *)
-  (* TODO: do we need to keep until expiration date? *)
-  (* TODO: do we need to keep for records? *)
-  let (hold_to_release, holds) =
-    Big_map.get_and_update p.rh_hold_id (None : hold_info option) s.holds
-  in
-  let s = {s with holds} in
-  let {fa2_hold_id; held_asset} =
-    match hold_to_release with
-    | None -> (failwith unknown_hold_id : hold_info)
-    | Some h -> h
-  in
-  let fa2_token =
-    match Big_map.find_opt held_asset s.finp2p_assets with
-    | None -> (failwith unknown_asset_id : fa2_token)
-    | Some fa2_token -> fa2_token
-  in
-  let fa2_hold =
-    match
-      (Tezos.call_view None "get_hold" fa2_hold_id fa2_token.address
-        : hold option option)
-    with
-    | None -> (failwith fa2_unknown_hold_id : hold)
-    | Some None -> (failwith fa2_unknown_hold_id : hold)
-    | Some (Some h) -> h
-  in
-  (* Checks *)
-  let () =
-    match p.rh_asset_id with
-    | None -> ()
-    | Some asset_id ->
-        if asset_id <> held_asset then failwith "UNEXPECTED_RELEASE_ASSET"
-  in
-  let () =
-    match p.rh_src_account with
-    | None -> ()
-    | Some account ->
-        if address_of_key account <> fa2_hold.ho_src then
-          failwith "UNEXPECTED_RELEASE_SOURCE"
-  in
-  (* Release corresponding on hold FA2 *)
-  let release_ep = get_release_entrypoint fa2_token.address in
   let relay_op =
     Tezos.transaction
       None
-      {rl_hold_id = fa2_hold_id; rl_amount = p.rh_amount}
+      {h_id = Some fa2_hold_id; h_hold = fa2_hold}
+      0t
+      hold_ep
+  in
+  ([relay_op], s)
+
+let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
+    (amount_ : token_amount option) (s : storage) :
+    storage * hold_id * fa2_token =
+  (* Preemptively remove hold from storage *)
+  let (fa2_hold, cleaned_holds) =
+    Big_map.get_and_update hold_id (None : hold_info option) s.holds
+  in
+  let {fa2_hold_id; held_asset} =
+    match fa2_hold with
+    | None -> (failwith unknown_hold_id : hold_info)
+    | Some h -> h
+  in
+  let () =
+    match asset_id with
+    | None -> ()
+    | Some asset_id ->
+        if asset_id <> held_asset then failwith "UNEXPECTED_HOLD_ASSET_ID"
+  in
+  let fa2_token =
+    match Big_map.find_opt held_asset s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  let fa2_hold =
+    match
+      (Tezos.call_view None "get_hold" fa2_hold_id fa2_token.address
+        : hold option option)
+    with
+    | None -> (failwith fa2_unknown_hold_id : hold)
+    | Some None -> (failwith fa2_unknown_hold_id : hold)
+    | Some (Some h) -> h
+  in
+  (* Only remove hold if full release/execution *)
+  let holds =
+    match amount_ with
+    | None ->
+        (* Full hold release/execution *)
+        cleaned_holds
+    | Some a ->
+        if a = fa2_hold.ho_amount then
+          (* Full hold release/execution *)
+          cleaned_holds
+        else (* Partial hold release/execution *)
+          s.holds
+  in
+  let s = {s with holds} in
+  (s, fa2_hold_id, fa2_token)
+
+let execute_hold (p : execute_hold_param) (s : storage) :
+    operation list * storage =
+  let {
+    eh_hold_id = hold_id;
+    eh_asset_id = asset_id;
+    eh_amount = amount_;
+    eh_src_account = src_account;
+    eh_dst_account = dst_account;
+  } =
+    p
+  in
+  let (s, fa2_hold_id, fa2_token) = unhold_aux hold_id asset_id amount_ s in
+  (* Release hold and transfer tokens on FA2 *)
+  let execute_ep = get_execute_entrypoint fa2_token.address in
+  let e_src =
+    match src_account with None -> None | Some k -> Some (address_of_key k)
+  in
+  let e_dst =
+    match dst_account with None -> None | Some k -> Some (address_of_key k)
+  in
+  let relay_op =
+    Tezos.transaction
+      None
+      {
+        e_hold_id = fa2_hold_id;
+        e_amount = amount_;
+        e_token_id = Some fa2_token.id;
+        e_src;
+        e_dst;
+      }
+      0t
+      execute_ep
+  in
+  ([relay_op], s)
+
+let release_hold (p : release_hold_param) (s : storage) :
+    operation list * storage =
+  let {
+    rh_hold_id = hold_id;
+    rh_asset_id = asset_id;
+    rh_amount = amount_;
+    rh_src_account = src_account;
+  } =
+    p
+  in
+  let (s, fa2_hold_id, fa2_token) = unhold_aux hold_id asset_id amount_ s in
+  let release_ep = get_release_entrypoint fa2_token.address in
+  let rl_src =
+    match src_account with None -> None | Some k -> Some (address_of_key k)
+  in
+  let relay_op =
+    Tezos.transaction
+      None
+      {
+        rl_hold_id = fa2_hold_id;
+        rl_amount = amount_;
+        rl_token_id = Some fa2_token.id;
+        rl_src;
+      }
       0t
       release_ep
   in

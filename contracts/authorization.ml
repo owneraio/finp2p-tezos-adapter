@@ -16,7 +16,7 @@ let auth_authorize ((param, s) : auth_param * auth_storage) :
         match Big_map.find_opt param.sender s.accredited with
         | None -> (failwith unauthorized : unit)
         | Some data ->
-            if data = 0x00h then (* Proxy contract, can do all *)
+            if data = 0x00h then (* Proxy contract, can do it all *)
               ()
             else if data = 0x01h then
               (* Accredited user, can send from his account *)
@@ -30,7 +30,22 @@ let auth_authorize ((param, s) : auth_param * auth_storage) :
                           if not (t.tr_src = fa2_sender) then
                             (failwith unauthorized : unit))
                         l
-                  | Update_operators _ -> ()
+                  | Update_operators l ->
+                      (* Sender on FA2 must be owner of tokens *)
+                      List.iter
+                        (fun (u : operator_update) ->
+                          let operator_p =
+                            match u with
+                            | Add_operator p -> p
+                            | Remove_operator p -> p
+                          in
+                          if not (operator_p.op_owner = fa2_sender) then
+                            (failwith unauthorized : unit))
+                        l
+                  | Hold h ->
+                      (* Sender on FA2 must be source of hold *)
+                      if not (h.h_hold.ho_src = fa2_sender) then
+                        (failwith unauthorized : unit)
                   | Balance_of _ -> ())
               | _ -> (failwith unauthorized : unit)
             else

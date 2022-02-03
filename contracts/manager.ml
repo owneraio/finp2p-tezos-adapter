@@ -1,5 +1,6 @@
 include Errors
 include Admin
+include Assets
 include Fa2_params
 include Fa2_common
 
@@ -86,46 +87,33 @@ let burn (p : burn_param) (s : storage) : storage =
   in
   {s with ledger; total_supply}
 
-let hold (h : hold) (s : storage) : storage =
-  let hold_id = h.ho_hold_id in
-  let (already_hold, holds) = Big_map.get_and_update hold_id (Some h) s.holds in
-  let () =
-    match already_hold with
-    | None -> ()
-    | Some _ -> (failwith fa2_hold_already_exists : unit)
+let release (r : release_param) (s : storage) : storage * (token_amount * hold)
+    =
+  let {
+    rl_hold_id = hold_id;
+    rl_amount = amount_;
+    rl_token_id = token_id;
+    rl_src = src;
+  } =
+    r
   in
-  let total_on_hold =
-    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.holds_totals with
-    | None -> h.ho_amount
-    | Some total -> add_amount total h.ho_amount
-  in
-  let balance_src =
-    match Big_map.find_opt (h.ho_src, h.ho_token_id) s.ledger with
-    | None -> Amount 0n
-    | Some b -> b
-  in
-  let () =
-    if total_on_hold > balance_src then
-      (failwith fa2_insufficient_balance : unit)
-  in
-  let holds_totals =
-    Big_map.add (h.ho_src, h.ho_token_id) total_on_hold s.holds_totals
-  in
-  let max_hold_id =
-    if hold_id > s.max_hold_id then hold_id else s.max_hold_id
-  in
-  {s with holds; holds_totals; max_hold_id}
-
-let release (r : release_param) (s : storage) : storage =
-  let hold_id = r.rl_hold_id in
   let h =
     match Big_map.find_opt hold_id s.holds with
     | None -> (failwith fa2_unknown_hold_id : hold)
     | Some h -> h
   in
-  let release_amount =
-    match r.rl_amount with None -> h.ho_amount | Some a -> a
+  let () =
+    match token_id with
+    | None -> ()
+    | Some token_id ->
+        if token_id <> h.ho_token_id then failwith "UNEXPECTED_HOLD_TOKEN_ID"
   in
+  let () =
+    match src with
+    | None -> ()
+    | Some src -> if src <> h.ho_src then failwith "UNEXPECTED_HOLD_SOURCE"
+  in
+  let release_amount = match amount_ with None -> h.ho_amount | Some a -> a in
   let new_hold =
     match sub_amount h.ho_amount release_amount with
     | None -> (failwith fa2_insufficient_hold : hold option)
@@ -145,14 +133,52 @@ let release (r : release_param) (s : storage) : storage =
   let holds_totals =
     Big_map.update (h.ho_src, h.ho_token_id) new_total_on_hold s.holds_totals
   in
-  {s with holds; holds_totals}
+  ({s with holds; holds_totals}, (release_amount, h))
 
-let manager ((param, s) : manager * storage) : operation list * storage =
+let execute (e : execute_param) (s : storage) : storage =
+  let {
+    e_hold_id = hold_id_;
+    e_amount = amount_;
+    e_token_id = token_id_;
+    e_src = src_;
+    e_dst = dst;
+  } =
+    e
+  in
+  let (s, (tr_amount, hold)) =
+    release
+      {
+        rl_hold_id = hold_id_;
+        rl_amount = amount_;
+        rl_token_id = token_id_;
+        rl_src = src_;
+      }
+      s
+  in
+  let tr_dst =
+    match (dst, hold.ho_dst) with
+    | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
+    | (Some dst, None) -> dst
+    | (None, Some dst) -> dst
+    | (Some dst, Some hold_dst) ->
+        if dst <> hold_dst then
+          (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
+        else dst
+  in
+  let tr_src = hold.ho_src in
+  let tr_token_id = hold.ho_token_id in
+  let fa2_transfer = {tr_src; tr_txs = [{tr_dst; tr_token_id; tr_amount}]} in
+  let ledger = transfer [fa2_transfer] s in
+  {s with ledger}
+
+let manager ((param, s) : manager_params * storage) : operation list * storage =
   let s =
     match param with
     | Mint p -> mint p s
     | Burn p -> burn p s
-    | Hold p -> hold p s
-    | Release p -> release p s
+    | Release p ->
+        let (s, _) = release p s in
+        s
+    | Execute p -> execute p s
   in
   (([] : operation list), s)
