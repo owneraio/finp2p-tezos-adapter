@@ -183,6 +183,7 @@ export interface ProxyStorage {
   admins: Address[];
   next_token_ids: BigMapAbstraction;
   holds: BigMapAbstraction;
+  escrow_totals: BigMapAbstraction;
 }
 
 interface InitialStorage {
@@ -192,6 +193,7 @@ interface InitialStorage {
   admins: Address[];
   next_token_ids: MichelsonMap<Address, Nat>;
   holds: MichelsonMap<Finp2pHoldId, HoldInfo>;
+  escrow_totals: MichelsonMap<[Key, FA2Token], TokenAmount>;
 }
 
 export interface FA2Storage {
@@ -636,6 +638,7 @@ export class FinP2PTezos {
       admins,
       next_token_ids: new MichelsonMap(),
       holds : new MichelsonMap(),
+      escrow_totals : new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P Proxy smart contract');
     return this.taquito.contract.originate({
