@@ -112,7 +112,7 @@ type finp2p_proxy_param =
   | Cleanup of operation_hash list
 [@@param Main]
 
-type hold_info = {fa2_hold_id : hold_id; held_asset : asset_id}
+type hold_info = {fa2_hold_id : hold_id; held_token : fa2_token}
 
 type storage = {
   operation_ttl : operation_ttl;

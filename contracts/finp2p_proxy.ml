@@ -180,7 +180,7 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
   let (old_hold_id, holds) =
     Big_map.get_and_update
       p.ht_hold_id
-      (Some {fa2_hold_id; held_asset = p.ht_asset_id})
+      (Some {fa2_hold_id; held_token = fa2_token})
       s.holds
   in
   let () =
@@ -219,7 +219,7 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
   let (fa2_hold, cleaned_holds) =
     Big_map.get_and_update hold_id (None : hold_info option) s.holds
   in
-  let {fa2_hold_id; held_asset} =
+  let {fa2_hold_id; held_token} =
     match fa2_hold with
     | None -> (failwith unknown_hold_id : hold_info)
     | Some h -> h
@@ -228,16 +228,17 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
     match asset_id with
     | None -> ()
     | Some asset_id ->
-        if asset_id <> held_asset then failwith "UNEXPECTED_HOLD_ASSET_ID"
-  in
-  let fa2_token =
-    match Big_map.find_opt held_asset s.finp2p_assets with
-    | None -> (failwith unknown_asset_id : fa2_token)
-    | Some fa2_token -> fa2_token
+        let expected_held_token =
+          match Big_map.find_opt asset_id s.finp2p_assets with
+          | None -> (failwith unknown_asset_id : fa2_token)
+          | Some fa2_token -> fa2_token
+        in
+        if held_token <> expected_held_token then
+          failwith "UNEXPECTED_HOLD_ASSET_ID"
   in
   let fa2_hold =
     match
-      (Tezos.call_view None "get_hold" fa2_hold_id fa2_token.address
+      (Tezos.call_view None "get_hold" fa2_hold_id held_token.address
         : hold option option)
     with
     | None -> (failwith fa2_unknown_hold_id : hold)
@@ -258,7 +259,7 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
           s.holds
   in
   let s = {s with holds} in
-  (s, fa2_hold_id, fa2_token)
+  (s, fa2_hold_id, held_token)
 
 let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
   let {
@@ -270,9 +271,9 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
   } =
     p
   in
-  let (s, fa2_hold_id, fa2_token) = unhold_aux hold_id asset_id amount_ s in
+  let (s, fa2_hold_id, held_token) = unhold_aux hold_id asset_id amount_ s in
   (* Release hold and transfer tokens on FA2 *)
-  let execute_ep = get_execute_entrypoint fa2_token.address in
+  let execute_ep = get_execute_entrypoint held_token.address in
   let e_src =
     match src_account with None -> None | Some k -> Some (address_of_key k)
   in
@@ -285,7 +286,7 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
       {
         e_hold_id = fa2_hold_id;
         e_amount = amount_;
-        e_token_id = Some fa2_token.id;
+        e_token_id = Some held_token.id;
         e_src;
         e_dst;
       }
