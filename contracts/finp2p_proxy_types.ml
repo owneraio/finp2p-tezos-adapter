@@ -112,7 +112,18 @@ type finp2p_proxy_param =
   | Cleanup of operation_hash list
 [@@param Main]
 
-type hold_info = {fa2_hold_id : hold_id; held_token : fa2_token}
+type fa2_native_hold_info = {fa2_hold_id : hold_id; held_token : fa2_token}
+
+type escrow_hold_info = {
+  (* es_asset_id : asset_id; *)
+  es_held_token : fa2_token;
+  es_amount : token_amount;
+  es_src_account : key;
+  es_dst_account : key option;
+}
+[@@comb]
+
+type hold_info = FA2_hold of fa2_native_hold_info | Escrow of escrow_hold_info
 
 type storage = {
   operation_ttl : operation_ttl;
@@ -122,5 +133,6 @@ type storage = {
   admins : address set;
   next_token_ids : (address, token_id) big_map;
   holds : (finp2p_hold_id, hold_info) big_map;
+  escrow_totals : (key * fa2_token, token_amount) big_map;
 }
 [@@comb] [@@store]

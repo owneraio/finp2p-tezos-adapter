@@ -168,20 +168,94 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token
   in
-  let fa2_hold_id =
-    match
-      (Tezos.call_view None "get_max_hold_id" () fa2_token.address
-        : hold_id option)
-    with
-    | None -> (failwith "CANNOT_COMPUTE_NEXT_HOLD_ID" : hold_id)
-    | Some (Hold_id id) -> Hold_id (id + 1n)
+  let (op, hold_info, s) =
+    match get_hold_entrypoint_opt fa2_token.address with
+    | Some hold_ep ->
+        (* FA2 contract supports native hold *)
+        let fa2_hold_id =
+          match
+            (Tezos.call_view None "get_max_hold_id" () fa2_token.address
+              : hold_id option)
+          with
+          | None -> (failwith "CANNOT_COMPUTE_NEXT_HOLD_ID" : hold_id)
+          | Some (Hold_id id) -> Hold_id (id + 1n)
+        in
+        let hold_info = FA2_hold {fa2_hold_id; held_token = fa2_token} in
+        let ho_dst =
+          match p.ht_dst_account with
+          | None -> None
+          | Some dst -> Some (address_of_key dst)
+        in
+        let fa2_hold =
+          {
+            ho_token_id = fa2_token.id;
+            ho_amount = p.ht_amount;
+            ho_src = address_of_key p.ht_src_account;
+            ho_dst;
+          }
+        in
+        let relay_op =
+          Tezos.transaction
+            None
+            {h_id = Some fa2_hold_id; h_hold = fa2_hold}
+            0t
+            hold_ep
+        in
+        (relay_op, hold_info, s)
+    | None ->
+        (* FA2 contract does not support native hold, use escrow to proxy *)
+        let hold_info =
+          Escrow
+            {
+              es_held_token = fa2_token;
+              es_amount = p.ht_amount;
+              es_src_account = p.ht_src_account;
+              es_dst_account = p.ht_dst_account;
+            }
+        in
+        (* Register total on hold *)
+        let total_in_escrow =
+          match
+            Big_map.find_opt (p.ht_src_account, fa2_token) s.escrow_totals
+          with
+          | None -> p.ht_amount
+          | Some total -> add_amount total p.ht_amount
+        in
+        let s =
+          {
+            s with
+            escrow_totals =
+              Big_map.add
+                (p.ht_src_account, fa2_token)
+                total_in_escrow
+                s.escrow_totals;
+          }
+        in
+        (* Escrow funds to proxy contract.
+           Note: the proxy contract must be an operator of the source of the hold
+           for the given FA2 token. *)
+        let fa2_transfer_to_escrow =
+          {
+            tr_src = address_of_key p.ht_src_account;
+            tr_txs =
+              [
+                {
+                  tr_dst = Tezos.self_address None;
+                  tr_token_id = fa2_token.id;
+                  tr_amount = p.ht_amount;
+                };
+              ];
+          }
+        in
+        let transfer_ep = get_transfer_entrypoint fa2_token.address in
+        let relay_op =
+          Tezos.transaction None [fa2_transfer_to_escrow] 0t transfer_ep
+        in
+        (relay_op, hold_info, s)
   in
   (* Register hold id *)
   let (old_hold_id, holds) =
-    Big_map.get_and_update
-      p.ht_hold_id
-      (Some {fa2_hold_id; held_token = fa2_token})
-      s.holds
+    Big_map.get_and_update p.ht_hold_id (Some hold_info) s.holds
   in
   let () =
     match old_hold_id with
@@ -189,40 +263,26 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
     | None -> ()
   in
   let s = {s with live_operations; holds} in
-  let ho_dst =
-    match p.ht_dst_account with
-    | None -> None
-    | Some dst -> Some (address_of_key dst)
-  in
-  let fa2_hold =
-    {
-      ho_token_id = fa2_token.id;
-      ho_amount = p.ht_amount;
-      ho_src = address_of_key p.ht_src_account;
-      ho_dst;
-    }
-  in
-  let hold_ep = get_hold_entrypoint fa2_token.address in
-  let relay_op =
-    Tezos.transaction
-      None
-      {h_id = Some fa2_hold_id; h_hold = fa2_hold}
-      0t
-      hold_ep
-  in
-  (relay_op, s)
+  (op, s)
+
+(* Local type to differentiate between escrow and hold *)
+type hold_kind = Escrow_kind | Hold_kind
 
 let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
-    (amount_ : token_amount option) (s : storage) :
-    storage * hold_id * fa2_token =
+    (amount_ : token_amount option) (s : storage) : storage * hold_info =
   (* Preemptively remove hold from storage *)
   let (fa2_hold, cleaned_holds) =
     Big_map.get_and_update hold_id (None : hold_info option) s.holds
   in
-  let {fa2_hold_id; held_token} =
+  let hold_info =
     match fa2_hold with
     | None -> (failwith unknown_hold_id : hold_info)
-    | Some h -> h
+    | Some info -> info
+  in
+  let held_token =
+    match hold_info with
+    | FA2_hold h -> h.held_token
+    | Escrow e -> e.es_held_token
   in
   let () =
     match asset_id with
@@ -236,14 +296,17 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
         if held_token <> expected_held_token then
           failwith "UNEXPECTED_HOLD_ASSET_ID"
   in
-  let fa2_hold =
-    match
-      (Tezos.call_view None "get_hold" fa2_hold_id held_token.address
-        : hold option option)
-    with
-    | None -> (failwith fa2_unknown_hold_id : hold)
-    | Some None -> (failwith fa2_unknown_hold_id : hold)
-    | Some (Some h) -> h
+  let hold_amount =
+    match hold_info with
+    | FA2_hold {fa2_hold_id; held_token} -> (
+        match
+          (Tezos.call_view None "get_hold" fa2_hold_id held_token.address
+            : hold option option)
+        with
+        | None -> (failwith fa2_unknown_hold_id : token_amount)
+        | Some None -> (failwith fa2_unknown_hold_id : token_amount)
+        | Some (Some fa2_hold) -> fa2_hold.ho_amount)
+    | Escrow e -> e.es_amount
   in
   (* Only remove hold if full release/execution *)
   let holds =
@@ -252,14 +315,37 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
         (* Full hold release/execution *)
         cleaned_holds
     | Some a ->
-        if a = fa2_hold.ho_amount then
-          (* Full hold release/execution *)
+        if a = hold_amount then (* Full hold release/execution *)
           cleaned_holds
         else (* Partial hold release/execution *)
           s.holds
   in
-  let s = {s with holds} in
-  (s, fa2_hold_id, held_token)
+  let escrow_totals =
+    match hold_info with
+    | FA2_hold _ -> s.escrow_totals
+    | Escrow e ->
+        let unescrow_amount =
+          match amount_ with None -> hold_amount | Some a -> a
+        in
+        let escrow_total =
+          match
+            Big_map.find_opt (e.es_src_account, e.es_held_token) s.escrow_totals
+          with
+          | None -> Amount 0n (* Should not happen *)
+          | Some total -> total
+        in
+        let new_escrow_total =
+          match sub_amount escrow_total unescrow_amount with
+          | None -> None (* Should not happen *)
+          | Some total -> if total = Amount 0n then None else Some total
+        in
+        Big_map.update
+          (e.es_src_account, e.es_held_token)
+          new_escrow_total
+          s.escrow_totals
+  in
+  let s = {s with holds; escrow_totals} in
+  (s, hold_info)
 
 let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
   let {
@@ -271,29 +357,55 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
   } =
     p
   in
-  let (s, fa2_hold_id, held_token) = unhold_aux hold_id asset_id amount_ s in
-  (* Release hold and transfer tokens on FA2 *)
-  let execute_ep = get_execute_entrypoint held_token.address in
-  let e_src =
-    match src_account with None -> None | Some k -> Some (address_of_key k)
+  let (s, hold_info) = unhold_aux hold_id asset_id amount_ s in
+  let op =
+    match hold_info with
+    | FA2_hold {fa2_hold_id; held_token} ->
+        (* Execute native hold on FA2 *)
+        let execute_ep = get_execute_entrypoint held_token.address in
+        let e_src =
+          match src_account with
+          | None -> None
+          | Some k -> Some (address_of_key k)
+        in
+        let e_dst =
+          match dst_account with
+          | None -> None
+          | Some k -> Some (address_of_key k)
+        in
+        Tezos.transaction
+          None
+          {
+            e_hold_id = fa2_hold_id;
+            e_amount = amount_;
+            e_token_id = Some held_token.id;
+            e_src;
+            e_dst;
+          }
+          0t
+          execute_ep
+    | Escrow {es_held_token; es_amount; es_src_account = _; es_dst_account} ->
+        let tr_dst_acc =
+          match (dst_account, es_dst_account) with
+          | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : key)
+          | (Some dst, None) -> dst
+          | (None, Some dst) -> dst
+          | (Some dst, Some escrow_dst) ->
+              if dst <> escrow_dst then
+                (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : key)
+              else dst
+        in
+        let tr_src = Tezos.self_address None in
+        let tr_dst = address_of_key tr_dst_acc in
+        let tr_amount = match amount_ with None -> es_amount | Some a -> a in
+        let tr_token_id = es_held_token.id in
+        let execute_transfer =
+          {tr_src; tr_txs = [{tr_dst; tr_token_id; tr_amount}]}
+        in
+        let transfer_ep = get_transfer_entrypoint es_held_token.address in
+        Tezos.transaction None [execute_transfer] 0t transfer_ep
   in
-  let e_dst =
-    match dst_account with None -> None | Some k -> Some (address_of_key k)
-  in
-  let relay_op =
-    Tezos.transaction
-      None
-      {
-        e_hold_id = fa2_hold_id;
-        e_amount = amount_;
-        e_token_id = Some held_token.id;
-        e_src;
-        e_dst;
-      }
-      0t
-      execute_ep
-  in
-  (relay_op, s)
+  (op, s)
 
 let release_hold (p : release_hold_param) (s : storage) : operation * storage =
   let {
@@ -304,24 +416,39 @@ let release_hold (p : release_hold_param) (s : storage) : operation * storage =
   } =
     p
   in
-  let (s, fa2_hold_id, fa2_token) = unhold_aux hold_id asset_id amount_ s in
-  let release_ep = get_release_entrypoint fa2_token.address in
-  let rl_src =
-    match src_account with None -> None | Some k -> Some (address_of_key k)
+  let (s, hold_info) = unhold_aux hold_id asset_id amount_ s in
+  let op =
+    match hold_info with
+    | FA2_hold {fa2_hold_id; held_token} ->
+        (* Release native hold on FA2 *)
+        let release_ep = get_release_entrypoint held_token.address in
+        let rl_src =
+          match src_account with
+          | None -> None
+          | Some k -> Some (address_of_key k)
+        in
+        Tezos.transaction
+          None
+          {
+            rl_hold_id = fa2_hold_id;
+            rl_amount = amount_;
+            rl_token_id = Some held_token.id;
+            rl_src;
+          }
+          0t
+          release_ep
+    | Escrow {es_held_token; es_amount; es_src_account; es_dst_account = _} ->
+        let tr_src = Tezos.self_address None in
+        let tr_dst = address_of_key es_src_account in
+        let tr_amount = match amount_ with None -> es_amount | Some a -> a in
+        let tr_token_id = es_held_token.id in
+        let release_transfer =
+          {tr_src; tr_txs = [{tr_dst; tr_token_id; tr_amount}]}
+        in
+        let transfer_ep = get_transfer_entrypoint es_held_token.address in
+        Tezos.transaction None [release_transfer] 0t transfer_ep
   in
-  let relay_op =
-    Tezos.transaction
-      None
-      {
-        rl_hold_id = fa2_hold_id;
-        rl_amount = amount_;
-        rl_token_id = Some fa2_token.id;
-        rl_src;
-      }
-      0t
-      release_ep
-  in
-  (relay_op, s)
+  (op, s)
 
 let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
     operation * storage =
