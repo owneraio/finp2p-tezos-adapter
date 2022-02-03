@@ -1787,7 +1787,7 @@ describe('Hold / Execute / Release',  () => {
           }
         )
       },
-      { message : "UNEXPECTED_EXECUTE_HOLD_ASSET"})
+      { message : "UNEXPECTED_HOLD_ASSET_ID"})
   })
 
   it("Execute hold mismatch source", async () => {
@@ -1799,7 +1799,7 @@ describe('Hold / Execute / Release',  () => {
           }
         )
       },
-      { message : "UNEXPECTED_EXECUTE_HOLD_SOURCE"})
+      { message : "UNEXPECTED_HOLD_SOURCE"})
   })
 
   it("Execute hold mismatch destination", async () => {
