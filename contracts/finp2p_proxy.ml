@@ -14,8 +14,15 @@ let is_operation_live (op_timestamp : timestamp) (s : storage) : bool =
   op_timestamp <= Tezos.now None + int s.operation_ttl.allowed_in_the_future
   && not (is_operation_expired op_timestamp s)
 
-let address_of_key (k : key) : address =
-  Tezos.address (Tezos.implicit_account None (Crypto.hash_key k))
+let address_of_key (k : key) (s : storage) : address =
+  match Big_map.find_opt k s.external_addresses with
+  | None ->
+      (* This is a FinP2P internal key *)
+      Tezos.address (Tezos.implicit_account None (Crypto.hash_key k))
+  | Some addr ->
+      (* This is a FinP2P for a user that registered their own external Tezos
+         address, (for which they have the private key) *)
+      addr
 
 let transfer_tokens (p : transfer_tokens_param) (s : storage) :
     operation * storage =
@@ -37,11 +44,11 @@ let transfer_tokens (p : transfer_tokens_param) (s : storage) :
   in
   let fa2_transfer =
     {
-      tr_src = address_of_key p.tt_src_account;
+      tr_src = address_of_key p.tt_src_account s;
       tr_txs =
         [
           {
-            tr_dst = address_of_key p.tt_dst_account;
+            tr_dst = address_of_key p.tt_dst_account s;
             tr_token_id = fa2_token.id;
             tr_amount = p.tt_amount;
           };
@@ -118,7 +125,7 @@ let issue_tokens (p : issue_tokens_param) (s : storage) : operation * storage =
     {
       mi_token_id = fa2_token.id;
       mi_token_info = (None : (string, bytes) map option);
-      mi_owners = [(address_of_key p.it_dst_account, p.it_amount)];
+      mi_owners = [(address_of_key p.it_dst_account s, p.it_amount)];
     }
   in
   let mint_ep = get_mint_entrypoint fa2_token.address in
@@ -147,7 +154,7 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : operation * storage
   let fa2_burn =
     {
       bu_token_id = fa2_token.id;
-      bu_owners = [(address_of_key p.rt_src_account, p.rt_amount)];
+      bu_owners = [(address_of_key p.rt_src_account s, p.rt_amount)];
     }
   in
   let burn_ep = get_burn_entrypoint fa2_token.address in
@@ -184,13 +191,13 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
         let ho_dst =
           match p.ht_dst_account with
           | None -> None
-          | Some dst -> Some (address_of_key dst)
+          | Some dst -> Some (address_of_key dst s)
         in
         let fa2_hold =
           {
             ho_token_id = fa2_token.id;
             ho_amount = p.ht_amount;
-            ho_src = address_of_key p.ht_src_account;
+            ho_src = address_of_key p.ht_src_account s;
             ho_dst;
           }
         in
@@ -236,7 +243,7 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
            for the given FA2 token. *)
         let fa2_transfer_to_escrow =
           {
-            tr_src = address_of_key p.ht_src_account;
+            tr_src = address_of_key p.ht_src_account s;
             tr_txs =
               [
                 {
@@ -366,12 +373,12 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
         let e_src =
           match src_account with
           | None -> None
-          | Some k -> Some (address_of_key k)
+          | Some k -> Some (address_of_key k s)
         in
         let e_dst =
           match dst_account with
           | None -> None
-          | Some k -> Some (address_of_key k)
+          | Some k -> Some (address_of_key k s)
         in
         Tezos.transaction
           None
@@ -396,7 +403,7 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
               else dst
         in
         let tr_src = Tezos.self_address None in
-        let tr_dst = address_of_key tr_dst_acc in
+        let tr_dst = address_of_key tr_dst_acc s in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in
         let tr_token_id = es_held_token.id in
         let execute_transfer =
@@ -425,7 +432,7 @@ let release_hold (p : release_hold_param) (s : storage) : operation * storage =
         let rl_src =
           match src_account with
           | None -> None
-          | Some k -> Some (address_of_key k)
+          | Some k -> Some (address_of_key k s)
         in
         Tezos.transaction
           None
@@ -439,7 +446,7 @@ let release_hold (p : release_hold_param) (s : storage) : operation * storage =
           release_ep
     | Escrow {es_held_token; es_amount; es_src_account; es_dst_account = _} ->
         let tr_src = Tezos.self_address None in
-        let tr_dst = address_of_key es_src_account in
+        let tr_dst = address_of_key es_src_account s in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in
         let tr_token_id = es_held_token.id in
         let release_transfer =
@@ -523,6 +530,10 @@ let update_fa2_token ((asset_id : asset_id), (fa2 : fa2_token)) (s : storage) =
     next_token_ids;
   }
 
+let register_external_address (k : key) (addr_opt : address option)
+    (s : storage) =
+  {s with external_addresses = Big_map.update k addr_opt s.external_addresses}
+
 (** This entry point removes expired operations (passed in argument) from the
     [live_operations] table *)
 let cleanup (ops : operation_hash list) (s : storage) : storage =
@@ -555,6 +566,8 @@ let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
     | Add_admins p -> add_admins p s
     | Remove_admins p -> remove_admins p s
     | Update_fa2_token p -> update_fa2_token p s
+    | Register_external_address (k, addr_opt) ->
+        register_external_address k addr_opt s
   in
   (([] : operation list), s)
 
@@ -579,7 +592,7 @@ let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
 
 let[@view] get_asset_balance
     (((owner : key), (asset_id : asset_id)), (s : storage)) : nat =
-  let owner = address_of_key owner in
+  let owner = address_of_key owner s in
   let fa2_token =
     match Big_map.find_opt asset_id s.finp2p_assets with
     | None -> (failwith unknown_asset_id : fa2_token)
@@ -594,7 +607,7 @@ let[@view] get_asset_balance
 
 let[@view] get_asset_spendable_balance
     (((owner : key), (asset_id : asset_id)), (s : storage)) : nat =
-  let owner = address_of_key owner in
+  let owner = address_of_key owner s in
   let fa2_token =
     match Big_map.find_opt asset_id s.finp2p_assets with
     | None -> (failwith unknown_asset_id : fa2_token)
@@ -613,7 +626,7 @@ let[@view] get_asset_spendable_balance
 
 let[@view] get_asset_balance_info
     (((owner : key), (asset_id : asset_id)), (s : storage)) : balance_info =
-  let owner = address_of_key owner in
+  let owner = address_of_key owner s in
   let fa2_token =
     match Big_map.find_opt asset_id s.finp2p_assets with
     | None -> (failwith unknown_asset_id : fa2_token)

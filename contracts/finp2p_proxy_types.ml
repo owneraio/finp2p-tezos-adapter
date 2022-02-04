@@ -103,6 +103,7 @@ type finp2p_proxy_admin_param =
   | Add_admins of address list
   | Remove_admins of address list
   | Update_fa2_token of update_fa2_token_param
+  | Register_external_address of key * address option
 [@@param Finp2p_asset]
 
 type finp2p_proxy_param =
@@ -130,6 +131,7 @@ type storage = {
   (* in seconds *)
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
+  external_addresses : (key, address) big_map;
   admins : address set;
   next_token_ids : (address, token_id) big_map;
   holds : (finp2p_hold_id, hold_info) big_map;
