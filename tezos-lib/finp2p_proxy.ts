@@ -11,7 +11,7 @@ import { encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
-import { b58cdecode, prefix } from '@taquito/utils';
+import { b58cdecode, prefix, getPkhfromPk } from '@taquito/utils';
 import { ParameterSchema } from '@taquito/michelson-encoder';
 const PromiseAny = require('promise-any');
 import { BigNumber } from 'bignumber.js';
@@ -995,6 +995,19 @@ export class FinP2PTezos {
     return storage;
   }
 
+  /**
+   * Retrieve the ledger big map of an FA2 contract
+   * @param addr : address of the FA2 contract
+   * @returns a promise with the big map abstraction
+   */
+  async getFA2Ledger(
+    addr: Address)
+    : Promise<BigMapAbstraction> {
+    const contract = await this.taquito.contract.at(addr);
+    let storage = await contract.storage() as any;
+    return storage.ledger as BigMapAbstraction;
+  }
+
 
   proxyAccreditation = new Uint8Array([0]);
 
@@ -1254,6 +1267,78 @@ export class FinP2PTezos {
     }
   }
 
+  async getFinP2PAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let balance =
+      await this.callProxyView<BigNumber>(
+        'get_asset_balance', publicKey, assetId, kt1);
+    return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+  async getExternalAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let pk = publicKey;
+    if (publicKey.substring(0, 2) == '0x') {
+      pk = encodeKey(publicKey.substring(2));
+    }
+    let proxyStorage = await this.getProxyStorage(kt1);
+    let fa2TokenP = proxyStorage.finp2p_assets.get<FA2Token>(Michelson.bytesToHex(assetId));
+    let ownerP = proxyStorage.external_addresses.get<Address>(pk)
+      .then(addr => {
+        if (addr === undefined) {
+          return getPkhfromPk(pk);
+        } else {
+          return addr;
+        }
+      });
+    let fa2Token = await fa2TokenP;
+    if (fa2Token === undefined) {
+      throw (new Error('FINP2P_UNKNOWN_ASSET_ID'));
+    }
+    let ledger = await this.getFA2Ledger(fa2Token.address);
+    let owner = await ownerP;
+    // Retrieve balance for different kinds of assets, see
+    // https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md#token-balance-updates
+    //
+    // Multi asset contract
+    //   big_map %ledger (pair address nat) nat
+    //   where key is the pair [owner's address, token ID] and value is the
+    //   amount of tokens owned.
+    async function getBalanceMulti() {
+      if (fa2Token === undefined) { return (null as never) ; }
+      const balance = await ledger.get<BigNumber>([owner, fa2Token.id]);
+      return (BigInt((balance || new BigNumber(0)).toString()));
+    }
+    // Single asset contract
+    //   big_map %ledger address nat
+    //   where key is the owner's address and value is the amount of tokens
+    //   owned.
+    async function getBalanceSingle() {
+      const balance = await ledger.get<BigNumber>(owner);
+      return (BigInt((balance || new BigNumber(0)).toString()));
+    }
+    // NFT asset contract
+    //    big_map %ledger nat address
+    //    where key is the token ID and value is owner's address.
+    async function getBalanceNFT() {
+      if (fa2Token === undefined) { return (null as never) ; }
+      const nftOwner = await ledger.get<Address>(Number(fa2Token.id)); // BigMapAbstraction only support number
+      if (nftOwner === undefined || nftOwner !== owner) {
+        return 0n;
+      } else {
+        return 1n;
+      }
+    }
+    // Try each of them successively
+    return getBalanceMulti()
+      .catch(getBalanceSingle)
+      .catch(getBalanceNFT);
+  }
+
   /**
    * @description Retrieve balance of account in a given asset
    * @param publicKey: the public key of the account for which to lookup the balance
@@ -1268,10 +1353,92 @@ export class FinP2PTezos {
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<bigint> {
+    try {
+      // External balance should work for all FA2 assets but is slower than
+      // retrieving the balance for a FinP2P asset
+      return await this.getFinP2PAssetBalance(publicKey, assetId, kt1);
+    } catch (e : any) {
+      if (e.message == 'NOT_FINP2P_FA2') {
+        return await this.getExternalAssetBalance(publicKey, assetId, kt1);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * @description Retrieve the total amount of tokens of a given asset on hold
+   * for an account
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetHold(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
     let balance =
       await this.callProxyView<BigNumber>(
-        'get_asset_balance', publicKey, assetId, kt1);
+        'get_asset_hold', publicKey, assetId, kt1);
     return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+
+
+  async getFinP2PAssetBalanceInfo(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<BalanceInfo> {
+    let info =
+      await this.callProxyView<{ balance : BigNumber, on_hold : BigNumber }>(
+        'get_asset_balance_info', publicKey, assetId, kt1);
+    if (info === undefined) {
+      return { balance : 0n, on_hold : 0n };
+    } else {
+      return {
+        balance : BigInt(info.balance.toString()),
+        on_hold : BigInt(info.on_hold.toString()),
+      };
+    }
+  }
+
+  /**
+   * @description Retrieve the balance and tokens on hold of account in a given asset
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetBalanceInfo(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address,
+  ) : Promise<BalanceInfo> {
+    try {
+      return await this.getFinP2PAssetBalanceInfo(publicKey, assetId, kt1);
+    } catch (e : any) {
+      if (e.message == 'NOT_FINP2P_FA2') {
+        // If this view fails, it is an external asset
+        let [balance, hold] =
+          await Promise.all([
+            this.getExternalAssetBalance(publicKey, assetId, kt1),
+            this.getAssetHold(publicKey, assetId, kt1),
+          ]);
+        return {
+          balance,
+          on_hold : hold,
+        };
+      } else {
+        throw e;
+      }
+    }
   }
 
   /**
@@ -1288,38 +1455,11 @@ export class FinP2PTezos {
   async getAssetSpendableBalance(
     publicKey : Key,
     assetId : AssetId,
-    kt1?: Address) : Promise<bigint> {
-    let balance =
-      await this.callProxyView<BigNumber>(
-        'get_asset_spendable_balance', publicKey, assetId, kt1);
-    return (BigInt((balance || new BigNumber(0)).toString()));
-  }
-
-  /**
-   * @description Retrieve the balance and tokens on hold of account in a given asset
-   * @param publicKey: the public key of the account for which to lookup the balance
-   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
-   * representation of the key with the curve prefix and starting with `0x`)
-   * @param assetId: the finId of the asset (encoded)
-   * @returns a bigint representing the balance
-   * @throws `Error` if the asset id is not known by the contract or if the
-   * FA2 is an external FA2 (this last case needs to be implemented)
-   */
-  async getAssetBalanceInfo(
-    publicKey : Key,
-    assetId : AssetId,
-    kt1?: Address) : Promise<BalanceInfo> {
-    let info =
-      await this.callProxyView<{ balance : BigNumber, on_hold : BigNumber }>(
-        'get_asset_balance_info', publicKey, assetId, kt1);
-    if (info === undefined) {
-      return { balance : 0n, on_hold : 0n };
-    } else {
-      return {
-        balance : BigInt(info.balance.toString()),
-        on_hold : BigInt(info.on_hold.toString()),
-      };
-    }
+    kt1?: Address,
+  ) : Promise<bigint> {
+    const info =
+      await this.getAssetBalanceInfo(publicKey, assetId, kt1);
+    return (info.balance - info.on_hold);
   }
 
   async getTzktReceipt(op : OperationResult,
