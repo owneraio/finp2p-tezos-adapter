@@ -602,26 +602,7 @@ let[@view] get_asset_balance
     (Tezos.call_view None "get_balance" (owner, fa2_token.id) fa2_token.address
       : nat option)
   with
-  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : nat)
-  | Some b -> b
-
-let[@view] get_asset_spendable_balance
-    (((owner : key), (asset_id : asset_id)), (s : storage)) : nat =
-  let owner = address_of_key owner s in
-  let fa2_token =
-    match Big_map.find_opt asset_id s.finp2p_assets with
-    | None -> (failwith unknown_asset_id : fa2_token)
-    | Some fa2_token -> fa2_token
-  in
-  match
-    (Tezos.call_view
-       None
-       "get_spendable_balance"
-       (owner, fa2_token.id)
-       fa2_token.address
-      : nat option)
-  with
-  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : nat)
+  | None -> (failwith "NOT_FINP2P_FA2" : nat)
   | Some b -> b
 
 let[@view] get_asset_balance_info
@@ -640,5 +621,32 @@ let[@view] get_asset_balance_info
        fa2_token.address
       : balance_info option)
   with
-  | None -> (failwith "UNAVAILBLE_ASSET_BALANCE" : balance_info)
+  | None -> (failwith "NOT_FINP2P_FA2" : balance_info)
   | Some b -> b
+
+let[@view] get_asset_hold (((owner : key), (asset_id : asset_id)), (s : storage))
+    : token_amount =
+  let owner_addr = address_of_key owner s in
+  let fa2_token =
+    match Big_map.find_opt asset_id s.finp2p_assets with
+    | None -> (failwith unknown_asset_id : fa2_token)
+    | Some fa2_token -> fa2_token
+  in
+  let native_hold =
+    match
+      (Tezos.call_view
+         None
+         "get_balance_info"
+         (owner_addr, fa2_token.id)
+         fa2_token.address
+        : balance_info option)
+    with
+    | None -> Amount 0n
+    | Some b -> b.on_hold
+  in
+  let escrow_hold =
+    match Big_map.find_opt (owner, fa2_token) s.escrow_totals with
+    | None -> Amount 0n
+    | Some a -> a
+  in
+  add_amount native_hold escrow_hold

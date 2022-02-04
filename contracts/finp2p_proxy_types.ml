@@ -94,7 +94,10 @@ type finp2p_proxy_asset_param =
 
 type update_fa2_token_param = asset_id * fa2_token [@@param Update_fa2_token]
 
-type operation_ttl = {ttl : nat; allowed_in_the_future : nat}
+type operation_ttl = {
+  ttl : nat; (* in seconds *)
+  allowed_in_the_future : nat; (* in seconds *)
+}
 [@@comb] [@@param Update_operation_ttl]
 
 type finp2p_proxy_admin_param =
@@ -128,11 +131,10 @@ type hold_info = FA2_hold of fa2_native_hold_info | Escrow of escrow_hold_info
 
 type storage = {
   operation_ttl : operation_ttl;
-  (* in seconds *)
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
-  external_addresses : (key, address) big_map;
   admins : address set;
+  external_addresses : (key, address) big_map;
   next_token_ids : (address, token_id) big_map;
   holds : (finp2p_hold_id, hold_info) big_map;
   escrow_totals : (key * fa2_token, token_amount) big_map;
