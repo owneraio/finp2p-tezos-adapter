@@ -100,13 +100,16 @@ type operation_ttl = {
 }
 [@@comb] [@@param Update_operation_ttl]
 
+type register_external_param = key * fa2_token * address option
+[@@param Register_external_address]
+
 type finp2p_proxy_admin_param =
   | Update_operation_ttl of operation_ttl
   | Update_admins of address set
   | Add_admins of address list
   | Remove_admins of address list
   | Update_fa2_token of update_fa2_token_param
-  | Register_external_address of key * address option
+  | Register_external_address of register_external_param
 [@@param Finp2p_asset]
 
 type finp2p_proxy_param =
@@ -134,7 +137,7 @@ type storage = {
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
   admins : address set;
-  external_addresses : (key, address) big_map;
+  external_addresses : (key * fa2_token, address) big_map;
   next_token_ids : (address, token_id) big_map;
   holds : (finp2p_hold_id, hold_info) big_map;
   escrow_totals : (key * fa2_token, token_amount) big_map;
