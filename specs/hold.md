@@ -206,7 +206,97 @@ modified to ensure that the transferred (resp. burned) tokens are within the
 spendable balance of the source account.
 
 
-## Changes to the Proxy Contract
+## Escrow of External Tokens
+
+Instead of deploying one (or multiple) _escrow contracts_ we propose that the
+**Proxy** contract also plays to role of escrow. This presents the following
+advantages:
+
+1. The information about escrowed tokens is directly available to the Proxy.
+2. This reduces the number of internal calls (which reduces the gas used and so
+   the fees).
+3. This prevents having to add an indirection for the hold ids (or to store the
+   information about the hold twice) which reduces the amount of data stored on
+   chain and in turn also reduces the fees of the hold operations.
+4. It is conceptually simpler. This 
+   
+The only drawback is that if the proxy is changed, the holds that are currently
+opened will be lost or we will have to migrate them over to the new proxy
+contract. We consider that an acceptable trade-off considering the advantages
+listed above.
+
+### Adding Support for Escrow in the Proxy Contract
+
+We store the information about holds in a new big map of the storage called
+`holds`. This is used both for tokens that were put on hold through a [native
+FA2 hold](#native-hold-in-fa2-asset-contract) or an
+[escrow](#escrow-of-external-tokens).
+
+```ocaml
+type hold_info = FA2_hold of fa2_native_hold_info | Escrow of escrow_hold_info
+
+```
+
+For a native FA2 hold, we only store the hold id on the FA2 and the token
+(address + id).
+
+```ocaml
+type fa2_native_hold_info = {
+  fa2_hold_id : hold_id; 
+  held_token : fa2_token;
+}
+```
+
+For an escrow we store the token (address + id) and the relevant information
+about the hold, _i.e._ the amount the source of the hold and the potential
+destination. Note that we do not store the expiry timestamp as it only used for
+the signature check.
+
+```ocaml
+type escrow_hold_info = {
+  held_token : fa2_token;
+  amount : token_amount;
+  src_account : key;
+  dst_account : key option;
+}
+```
+
+We also store the totals of tokens in escrow for a user and a given token in a
+big map `escrow_totals`. The amount that are on hold is the sum of what is in
+escrow on the Proxy contract and what is on hold in the FA2 contract. (However a
+given token cannot be both put in escrow and on hold natively, as the proxy will
+always [prefer native holds](#hold_tokens) when possible.)
+
+The way the escrow operates is described in more details in the [next
+section](#proxy-hold), but we give a high level overview of the general idea.
+
+A hold operation put tokens in escrow by transferring them to the Proxy contract
+(_i.e._ the tokens are owned by the proxy contract in the token's FA2 ledger). A
+release makes the proxy transfer the token back to the original owner, while a
+hold execution makes the proxy transfer the tokens to their intended destination.
+
+### Working with External Addresses
+
+Let's take the case of Alice who possesses USDtz on Tezos and wants to use them
+to make a payment to Bob in exchange of another asset. Even if Alice already has
+a FinP2P account, she does not have access to the associated private key, and
+the FinP2P Tezos adapter cannot, in general, make actions on FA2 contracts which
+were not deployed through FinP2P. However, Alice should _authorize the FinP2P
+Proxy contract_ to be an operator (this is done with the `add_operator` in
+FA2 contracts) and to act on her behalf on her USDtz account (she can also move
+the funds she wants to allocate to another addresses she controls). The FinP2P
+server must now register Alice's USDtz (Tezos) address as being her own in the
+Proxy contract.
+
+Once this is done the proxy contract can emit operations on the FA2 contract
+which transfer tokens outside of Alice's account. In particular, the proxy
+contract can reflect the movement of FinP2P assets, put the tokens in escrow,
+_etc_.
+
+
+<a id="proxy-hold">
+
+## FinP2P Hold and Release in Proxy Contract
 
 To support these new features the Proxy contract is augmented with three new
 entry points:
@@ -256,7 +346,7 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage = ..
 
 This Tezos operation must be signed/injected by an administrator.
 
-##### Signed Payload
+#### Signed Payload
 
 > See [API reference](https://finp2p-docs.ownera.io/reference/transfertoken) in
 > **BUYERTRANSFERSIGNATURE** and
@@ -267,7 +357,7 @@ hashGroups = hash('BLAKE2B', [AHG, SHG]);
 Signature = sign(sender private secp256k1 key, hashGroups)
 
 
-###### Asset Hash Group (AHG) structure
+##### Asset Hash Group (AHG) structure
 
 AHG = hash('BLAKE2B', [fields by order]);
 
@@ -283,7 +373,7 @@ AHG = hash('BLAKE2B', [fields by order]);
 | 8 | dstAccount      | utf8 string  | destination account finId address  |
 | 9 | amount          | utf8 string  | hex representation of the transfer amount |
 
-###### Settlement Hash Group (SHG) structure
+##### Settlement Hash Group (SHG) structure
 
 SHG = hash('BLAKE2B', [fields by order]);
 
@@ -325,13 +415,21 @@ The entry point performs the following:
      existing operations).
 5. Check that the encoded message was signed by the public key `src_account`
    (of the SHG) which corresponds to the **buyer**.
-6. Depending on the asset, either:
-   - Call the `hold` entry point of the FA2 contract, or
-   - Transfer the FA2 tokens to the **Escrow** contract (by calling the
-     `tranfer` entry point)
-     **TODO**: This may require a additional bookkeeping transaction
-   
+6. Perform the adequate calls for either [a native hold](#native-hold) or a
+   [hold through escrow](#hold-through-escrow).
+     
+#### Native Hold
 
+1. Retrieve the next FA2 hold id and associate it with the finp2p hold id.
+2. Call the `hold` entry point of the FA2 contract.
+
+#### Hold through Escrow
+
+1. Store hold information in `holds` table.
+2. Call the `transfer` entry point of the FA2 contract to transfer the amount on
+   hold for the buyer to the Proxy contract. The proxy contract also plays the
+   role of an escrow contract as shown in the [section on
+   escrow](#escrow-of-external-tokens).
 
 ### `execute_hold`
 
@@ -378,7 +476,9 @@ resides in an external **Escrow** contract.
 
 ##### Execute Hold by Escrow
 
-**TODO**
+1. Remove `hold_id` association from storage.
+2. Call the `transfer` entry point of the FA2 to transfer the tokens in escrow
+from the proxy contract to the corresponding destination. 
 
 
 ### `release_hold`
@@ -423,4 +523,6 @@ resides in an external **Escrow** contract.
 
 ##### Release Hold by Escrow
 
-**TODO**
+1. Remove `hold_id` association from storage.
+2. Call the `transfer` entry point of the FA2 to transfer the tokens in escrow
+from the proxy contract back to the original owner. 
