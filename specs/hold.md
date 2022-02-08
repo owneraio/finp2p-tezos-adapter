@@ -332,12 +332,22 @@ type hold_tokens_param = {
   hold_id : finp2p_hold_id; (* = boxed bytes *)
   asset_id : asset_id; (* = boxed bytes *)
   amount : token_amount;
-  src_account : public_key;
-  dst_account : public_key option;
+  owner_account : public_key;
+  lock_receipient : bool;
   expiration : timestamp;
+  (* information to reconstruct AHG *)
   nonce : { nonce :bytes; (* 24 bytes *)
             timestamp : timestamp };
-  ahg_wo_nonce : bytes;
+  ahg_asset_id : bytes;
+  ahg_src_account : public_key;
+  ahg_amount : bytes;
+  (* information to reconstruct SHG *)
+  shg_asset_type : bytes;
+  shg_src_account_type : bytes;
+  shg_src_account : bytes;
+  shg_dst_account_type : bytes;
+  shg_dst_account : bytes;
+  (* finp2p signature*)
   signature : signature;
 }
 
@@ -363,14 +373,14 @@ AHG = hash('BLAKE2B', [fields by order]);
 
 | order | value | type | comment |
 |--|--|--|--|
-| 1 | nonce           | []byte  |  |
+| 1 | **nonce**       | []byte  |  24 bytes + timestamp on 8 bytes |
 | 2 | operation       | utf8 string  | "transfer" |
 | 3 | assetType       | utf8 string  | "finp2p" |
 | 4 | assetId         | utf8 string  | unique identifier of the asset |
 | 5 | srcAccountType  | utf8 string  | "finId" |
-| 6 | srcAccount      | utf8 string  | source account finId address  |
+| 6 | **srcAccount**  | utf8 string  | source account finId address  |
 | 7 | dstAccountType  | utf8 string  | "finId" |
-| 8 | dstAccount      | utf8 string  | destination account finId address  |
+| 8 | **dstAccount**  | utf8 string  | destination account finId address  |
 | 9 | amount          | utf8 string  | hex representation of the transfer amount |
 
 ##### Settlement Hash Group (SHG) structure
@@ -379,44 +389,58 @@ SHG = hash('BLAKE2B', [fields by order]);
 
 | order | value | type | comment |
 |--|--|--|--|
-| 1 | assetType       | utf8 string  | "finp2p", ~~"fiat", "cryptocurrency"~~ |
-| 2 | assetId         | utf8 string  | unique identifier of the asset |
-| 3 | srcAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow" **TODO?**|
+| 1 | assetType       | utf8 string  | "finp2p", "fiat", "cryptocurrency" |
+| 2 | **assetId**     | utf8 string  | unique identifier of the asset |
+| 3 | srcAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow"|
 | 4 | srcAccount      | utf8 string  | source account of the asset  |
-| 5 | dstAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow" **TODO?**|
+| 5 | dstAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow"|
 | 6 | dstAccount      | utf8 string  | destination account for the asset  |
-| 7 | amount          | utf8 string  | hex representation of the settlement amount |
-| 8	| expiry          | utf8 string  | hex representation of the escrow hold expiry value |
+| 7 | **amount**      | utf8 string  | hex representation of the settlement amount |
+| 8	| **expiry**      | utf8 string  | hex representation of the escrow hold expiry value |
+
+In **bold** we give the fields that need to undergo validation in order to check
+the signature and correctly put on hold the tokens. This is described in the
+next subsection.
 
 #### Verifying hold signatures
 
-To verify a hold operation signature, one needs only to check the _settlement
-hash group_ as it contains all the necessary information to put the tokens on
-hold. **However, to prevent replay attacks on this hold operation one must also
-extract the timestamp from the nonce of the _asset hash group_ in order to know
-the operation's live status.**
+To verify a hold operation signature, one could in principle only to check the
+_settlement hash group_. **However, to prevent replay attacks on this hold
+operation one must also extract the timestamp from the nonce of the _asset hash
+group_ in order to know the operation's live status.**
+
+The `srcAccount` and `dstAccount` in the AHG currently represent a finId account
+or wallet. In the SHG there is a notion of other account types, one of those is
+an escrow account id, which abstract the underlying account/wallet where the
+payment asset (or assets) is been managed. This means that the aforementioned
+fields are not necessarily related in the AHG and SHG because of this
+abstraction barrier that is internal to the FinP2P system. However, for our
+case of settlement with assets or currency on Tezos, the signature must be
+produced by the _buyer, i.e._ the `dstAccount` of the transfer in the AHG.
 
 This is why the AHG cannot be given _as is_ to the entry point `hold_tokens` but
-instead it expects to get both the nonce and the rest of the asset group payload
-(`ahg_wo_nonce`) in bytes form.
+we need to at least extract the nonce and the destination account. The rest of
+the fields (which do not need validation but are required to reconstruct the
+signed message) are given in bytes form.
 
 The entry point performs the following:
 1. Check that the operation is still **live**, _i.e._ check that the `timestamp`
    plus the constant `operation_ttl` is still in the future and that the
    `timestamp` is in the past.
-2. Encode the parameters (without the signature, nor nonce) in bytes to recover
-   the SHG
-3. Encode the nonce + `ahg_wo_nonce` in bytes to recover the AHG
-4. Hash the produced bytes (this is in fact the `hashGroup`) and ensure that it
+3. Recover the AHG by encoding (and hashing) the nonce and the src and owner
+   account together with the extra bytes fields.
+2. Recover the SHG by encoding (and hashing) the `amount`, `expiration` and
+   `asset_id` with the other extra bytes fields.
+4. Hash the AHG+SHG (this is in fact the `hashGroup`) and ensure that it
    is not in our `live_operations` table.
 4. Register the hash -> timestamp in the `live_operations` table.
    - We store the timestamp rather than the expiry date so that in case the
      `operation_ttl` is updated, the new ttl takes effect immediately (even for
      existing operations).
-5. Check that the encoded message was signed by the public key `src_account`
-   (of the SHG) which corresponds to the **buyer**.
+5. Check that the encoded message was signed by the public key `owner_account`
+   (also the field dstAccount of the AHG) which corresponds to the **buyer**.
 6. Perform the adequate calls for either [a native hold](#native-hold) or a
-   [hold through escrow](#hold-through-escrow).
+   [hold through escrow](#hold-through-escrow) (see below).
      
 #### Native Hold
 
@@ -430,6 +454,7 @@ The entry point performs the following:
    hold for the buyer to the Proxy contract. The proxy contract also plays the
    role of an escrow contract as shown in the [section on
    escrow](#escrow-of-external-tokens).
+
 
 ### `execute_hold`
 
@@ -446,7 +471,6 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage = 
 ```
 
 This Tezos operation must be signed/injected by an administrator.
-
 
 #### Spec for Execute Hold
 
