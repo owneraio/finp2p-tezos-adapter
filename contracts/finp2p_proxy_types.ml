@@ -56,11 +56,21 @@ type hold_tokens_param = {
   ht_hold_id : finp2p_hold_id;
   ht_asset_id : asset_id;
   ht_amount : token_amount;
-  ht_src_account : key;
-  ht_dst_account : key option;
+  ht_owner_account : key;
+  ht_lock_receipient : bool;
   ht_expiration : timestamp;
+  (* information to reconstruct AHG *)
   ht_nonce : finp2p_nonce;
-  ht_ahg_wo_nonce : bytes;
+  ht_ahg_asset_id : bytes;
+  ht_ahg_src_account : key;
+  ht_ahg_amount : bytes;
+  (* information to reconstruct SHG *)
+  ht_shg_asset_type : bytes;
+  ht_shg_src_account_type : bytes;
+  ht_shg_src_account : bytes;
+  ht_shg_dst_account_type : bytes;
+  ht_shg_dst_account : bytes;
+  (* finp2p signature*)
   ht_signature : signature;
 }
 [@@comb] [@@param Hold_tokens]

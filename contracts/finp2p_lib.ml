@@ -246,11 +246,20 @@ let encode_hold_tokens_payload (p : hold_tokens_param) =
     ht_hold_id = _;
     ht_asset_id;
     ht_amount;
-    ht_src_account;
-    ht_dst_account;
+    ht_owner_account;
+    ht_lock_receipient = _;
     ht_expiration;
+    (* information to reconstruct AHG *)
     ht_nonce;
-    ht_ahg_wo_nonce;
+    ht_ahg_asset_id;
+    ht_ahg_src_account;
+    ht_ahg_amount;
+    (* information to reconstruct SHG *)
+    ht_shg_asset_type;
+    ht_shg_src_account_type;
+    ht_shg_src_account;
+    ht_shg_dst_account_type;
+    ht_shg_dst_account;
     ht_signature = _;
   } =
     p
@@ -261,33 +270,39 @@ let encode_hold_tokens_payload (p : hold_tokens_param) =
       ht_nonce.nonce
       (timestamp_to_uint64_big_endian ht_nonce.timestamp)
   in
-  let asset_bytes_group = Bytes.concat nonce ht_ahg_wo_nonce in
+  let finp2p = string_to_bytes "finp2p" in
+  let finId = string_to_bytes "finId" in
+  let asset_bytes_group =
+    concat_bytes
+      [
+        nonce;
+        string_to_bytes "transfer";
+        finp2p;
+        ht_ahg_asset_id;
+        finId;
+        public_key_to_hex_string_bytes ht_ahg_src_account;
+        finId;
+        public_key_to_hex_string_bytes ht_owner_account;
+        (* destination must be owner of hold *)
+        ht_ahg_amount;
+      ]
+  in
   let ahg = Crypto.blake2b asset_bytes_group in
   (* SHG *)
-  let assetType = string_to_bytes "finp2p" in
   let assetId = match ht_asset_id with Asset_id id -> id in
-  let accountType = string_to_bytes "finId" in
-  let srcAccountType = accountType in
-  let srcAccount = public_key_to_hex_string_bytes ht_src_account in
   let amount_ = amount_to_bytes ht_amount in
   let expiry = string_to_bytes (timestamp_0x_hex_big_endian ht_expiration) in
-
-  let dst_info =
-    match ht_dst_account with
-    | None ->
-        (* Cannot write empty bytes 0x in mligo *)
-        [%Michelson ({|{ DROP; PUSH bytes 0x }|} : unit -> bytes)] ()
-    | Some dst_account ->
-        let dstAccountType = accountType in
-        (* XXX escrow, wallet ? *)
-        let dstAccount = public_key_to_hex_string_bytes dst_account in
-        Bytes.concat dstAccountType dstAccount
-  in
-
   let settlement_bytes_group =
     concat_bytes
       [
-        assetType; assetId; srcAccountType; srcAccount; dst_info; amount_; expiry;
+        ht_shg_asset_type;
+        assetId;
+        ht_shg_src_account_type;
+        ht_shg_src_account;
+        ht_shg_dst_account_type;
+        ht_shg_dst_account;
+        amount_;
+        expiry;
       ]
   in
   let shg = Crypto.blake2b settlement_bytes_group in
@@ -319,6 +334,6 @@ let check_redeem_tokens_signature (p : redeem_tokens_param) : operation_hash =
 
 let check_hold_tokens_signature (p : hold_tokens_param) : operation_hash =
   let payload = encode_hold_tokens_payload p in
-  if not (Crypto.check p.ht_src_account p.ht_signature payload) then
+  if not (Crypto.check p.ht_owner_account p.ht_signature payload) then
     (failwith invalid_signature : operation_hash)
   else OpHash (Crypto.blake2b payload)

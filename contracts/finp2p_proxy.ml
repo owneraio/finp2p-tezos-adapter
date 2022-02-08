@@ -189,15 +189,16 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
         in
         let hold_info = FA2_hold {fa2_hold_id; held_token = fa2_token} in
         let ho_dst =
-          match p.ht_dst_account with
-          | None -> None
-          | Some dst -> Some (address_of_key dst fa2_token s)
+          if p.ht_lock_receipient then
+            (* Lock the hold to the seller, i.e. the src account in the AHG *)
+            Some (address_of_key p.ht_ahg_src_account fa2_token s)
+          else (None : address option)
         in
         let fa2_hold =
           {
             ho_token_id = fa2_token.id;
             ho_amount = p.ht_amount;
-            ho_src = address_of_key p.ht_src_account fa2_token s;
+            ho_src = address_of_key p.ht_owner_account fa2_token s;
             ho_dst;
           }
         in
@@ -216,14 +217,16 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
             {
               es_held_token = fa2_token;
               es_amount = p.ht_amount;
-              es_src_account = p.ht_src_account;
-              es_dst_account = p.ht_dst_account;
+              es_src_account = p.ht_owner_account;
+              es_dst_account =
+                (if p.ht_lock_receipient then Some p.ht_ahg_src_account
+                else (None : key option));
             }
         in
         (* Register total on hold *)
         let total_in_escrow =
           match
-            Big_map.find_opt (p.ht_src_account, fa2_token) s.escrow_totals
+            Big_map.find_opt (p.ht_owner_account, fa2_token) s.escrow_totals
           with
           | None -> p.ht_amount
           | Some total -> add_amount total p.ht_amount
@@ -233,7 +236,7 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
             s with
             escrow_totals =
               Big_map.add
-                (p.ht_src_account, fa2_token)
+                (p.ht_owner_account, fa2_token)
                 total_in_escrow
                 s.escrow_totals;
           }
@@ -243,7 +246,7 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
            for the given FA2 token. *)
         let fa2_transfer_to_escrow =
           {
-            tr_src = address_of_key p.ht_src_account fa2_token s;
+            tr_src = address_of_key p.ht_owner_account fa2_token s;
             tr_txs =
               [
                 {
@@ -271,9 +274,6 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
   in
   let s = {s with live_operations; holds} in
   (op, s)
-
-(* Local type to differentiate between escrow and hold *)
-type hold_kind = Escrow_kind | Hold_kind
 
 let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
     (amount_ : token_amount option) (s : storage) : storage * hold_info =
