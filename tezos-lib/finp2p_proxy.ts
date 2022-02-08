@@ -109,11 +109,21 @@ export interface HoldTokensParam {
   hold_id : Finp2pHoldId;
   asset_id : AssetId;
   amount : TokenAmount;
-  src_account : Key;
-  dst_account? : Key;
+  owner_account : Key;
+  lock_receipient : boolean;
   expiration : Timestamp;
+  // information to reconstruct AHG
   nonce : Finp2pNonce;
-  ahg_wo_nonce : Bytes;
+  ahg_asset_id : Bytes;
+  ahg_src_account : Key;
+  ahg_amount : Bytes;
+  // information to reconstruct SHG
+  shg_asset_type : Bytes;
+  shg_src_account_type : Bytes;
+  shg_src_account : Bytes;
+  shg_dst_account_type : Bytes;
+  shg_dst_account : Bytes;
+  // finp2p signature
   signature : Signature;
 }
 
@@ -269,6 +279,12 @@ export namespace Michelson {
     };
   }
 
+  export function boolean(b: boolean): MichelsonV1Expression {
+    return {
+      prim: b ? 'True' : 'False',
+    };
+  }
+
   export function createFa2Token(token: CreateFA2Token): MichelsonV1Expression {
     let id =
       mkOpt(token.id,
@@ -368,20 +384,24 @@ export namespace Michelson {
   }
 
   export function holdTokensParam(ht: HoldTokensParam): MichelsonV1Expression {
-    let dstAccount =
-      mkOpt(ht.dst_account,
-        (s => { return maybeBytes(s); }));
     return {
       prim: 'Pair',
       args: [
         { /* hold_id */ bytes: bytesToHex(ht.hold_id) },
         { /* asset_id */ bytes: bytesToHex(ht.asset_id) },
         { /* amount */ int: ht.amount.toString() },
-        /* src_account */ maybeBytes(ht.src_account),
-        /* dst_account */ dstAccount,
+        /* owner_account */ maybeBytes(ht.owner_account),
+        /* lock_receipient */ boolean(ht.lock_receipient),
         { /* expiration */ string: ht.expiration.toISOString() },
         /* nonce */ finp2pNonce(ht.nonce),
-        { /* ahg_wo_nonce */ bytes: bytesToHex(ht.ahg_wo_nonce) },
+        { /* ahg_asset_id */ bytes: bytesToHex(ht.ahg_asset_id) },
+        /* ahg_src_account */ maybeBytes(ht.ahg_src_account),
+        { /* ahg_amount */ bytes: bytesToHex(ht.ahg_amount) },
+        { /* shg_asset_type */ bytes: bytesToHex(ht.shg_asset_type) },
+        { /* shg_src_account_type */ bytes: bytesToHex(ht.shg_src_account_type) },
+        { /* shg_src_account */ bytes: bytesToHex(ht.shg_src_account) },
+        { /* shg_dst_account_type */ bytes: bytesToHex(ht.shg_dst_account_type) },
+        { /* shg_dst_account */ bytes: bytesToHex(ht.shg_dst_account) },
         /* signature */ maybeBytes(ht.signature),
       ],
     };

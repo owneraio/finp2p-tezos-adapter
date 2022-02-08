@@ -610,39 +610,58 @@ async function redeem_tokens(i : {
   return await FinP2PTezos.redeemTokens(param, i.options)
 }
 
+function rand(n : number) : number {
+  return Math.floor(Math.random() * n)
+}
+
+function pick_rand<T>(a : T[]) : T {
+  return a[rand(a.length)];
+}
+
 async function mk_hold_tokens(i : {
   hold_id : string,
   asset_id : string,
   amount : number | bigint,
   src : finp2p_account,
-  dst? : Buffer,
+  dst : Buffer,
+  lock_receipient? : boolean,
   expiration : Date,
   signer? : finp2p_account}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
-  let ahg_wo_nonce = crypto.randomBytes(55)
+  let ahg_asset_id = crypto.randomBytes(25)
+  let ahg_src_account = i.dst.toString('hex')
+  let ahg_dst_account = i.src.pubKey.toString('hex')
+  let ahg_amount = rand(9999999999).toString(16)
   let assetGroup = [
-    nonce_bytes, ahg_wo_nonce
+    nonce_bytes,
+    'transfer',
+    'finp2p',
+    ahg_asset_id,
+    'finId',
+    ahg_src_account,
+    'finId',
+    ahg_dst_account,
+    ahg_amount,
   ]
   log_hashgroup(assetGroup)
   let assetHashGroup = await hashValues(assetGroup);
   log('AHG:', assetHashGroup.toString('hex'))
+  let shg_asset_type = pick_rand(["finp2p", "fiat", "cryptocurrency"])
+  let shg_src_account_type = pick_rand(["finId", "cryptoWallet", "escrow"])
+  let shg_dst_account_type = pick_rand(["finId", "cryptoWallet", "escrow"])
+  let shg_src_account = crypto.randomBytes(70)
+  let shg_dst_account = crypto.randomBytes(70)
   let settlementGroup = [
-    'finp2p',
+    shg_asset_type,
     i.asset_id,
-    'finId',
-    i.src.pubKey.toString('hex'),
-  ]
-  if (i.dst !== undefined) {
-    settlementGroup = settlementGroup.concat([
-      'finId',
-      i.dst.toString('hex'),
-    ])
-  }
-  settlementGroup = settlementGroup.concat([
+    shg_src_account_type,
+    shg_src_account,
+    shg_dst_account_type,
+    shg_dst_account,
     '0x' + i.amount.toString(16),
     '0x' + (dateToSec(i.expiration)).toString(16)
-  ])
+  ]
   let settlementHashGroup = await hashValues(settlementGroup);
   log('SHG:', settlementHashGroup.toString('hex'))
   let digest = await hashValues([assetHashGroup, settlementHashGroup])
@@ -653,12 +672,19 @@ async function mk_hold_tokens(i : {
   let param: Finp2pProxy.HoldTokensParam = {
     hold_id : utf8.encode(i.hold_id),
     asset_id : utf8.encode(i.asset_id),
-    src_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
-    dst_account : (i.dst === undefined) ? undefined : pubkey_to_tezos_secp256k1(i.dst),
+    owner_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
+    lock_receipient: i.lock_receipient,
     amount: BigInt(i.amount),
     expiration : i.expiration,
     nonce,
-    ahg_wo_nonce,
+    ahg_asset_id,
+    ahg_src_account : pubkey_to_tezos_secp256k1(i.dst),
+    ahg_amount : utf8.encode(ahg_amount),
+    shg_asset_type : utf8.encode(shg_asset_type),
+    shg_src_account_type : utf8.encode(shg_src_account_type),
+    shg_src_account,
+    shg_dst_account_type : utf8.encode(shg_dst_account_type),
+    shg_dst_account,
     signature: '0x' + (Buffer.from(signature)).toString('hex'),
   }
 
@@ -670,7 +696,8 @@ async function hold_tokens(i : {
   asset_id : string,
   amount : number | bigint,
   src : finp2p_account,
-  dst? : Buffer,
+  dst : Buffer,
+  lock_receipient? : boolean,
   expiration : Date,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
@@ -1540,6 +1567,7 @@ describe('Hold / Execute / Release',  () => {
             asset_id : asset_id1,
             src : accounts[0],
             dst : accounts[0].pubKey,
+            lock_receipient : true,
             amount : b0 + 1,
             expiration,
           })
@@ -1559,6 +1587,7 @@ describe('Hold / Execute / Release',  () => {
         asset_id : asset_id1,
         src : accounts[0],
         dst : accounts[1].pubKey,
+        lock_receipient : true,
         amount : 50,
         expiration,
       })
@@ -1584,6 +1613,7 @@ describe('Hold / Execute / Release',  () => {
             asset_id : asset_id1,
             src : accounts[0],
             dst : accounts[1].pubKey,
+            lock_receipient : true,
             amount : 1,
             expiration,
             signer : accounts[1]
@@ -1602,6 +1632,7 @@ describe('Hold / Execute / Release',  () => {
             asset_id : asset_id1,
             src : accounts[0],
             dst : accounts[1].pubKey,
+            lock_receipient : true,
             amount : 1,
             expiration,
           })
@@ -1617,6 +1648,7 @@ describe('Hold / Execute / Release',  () => {
         asset_id : asset_id1,
         src : accounts[0],
         dst : accounts[2].pubKey,
+        lock_receipient : true,
         amount : 1,
         expiration,
       })
@@ -1694,6 +1726,7 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0003",
         asset_id : asset_id1,
         src : accounts[2],
+        dst : accounts[0].pubKey,
         amount : 1,
         expiration,
       })
@@ -1717,6 +1750,7 @@ describe('Hold / Execute / Release',  () => {
         asset_id : asset_id1,
         src : accounts[2],
         dst : accounts[1].pubKey,
+        lock_receipient : true,
         amount : 20,
         expiration,
       })
@@ -1740,6 +1774,7 @@ describe('Hold / Execute / Release',  () => {
         asset_id : asset_id1,
         src : accounts[2],
         dst : accounts[2].pubKey,
+        lock_receipient : true,
         amount : 10,
         expiration,
       })
