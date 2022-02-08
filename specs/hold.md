@@ -63,7 +63,7 @@ assets on Tezos (like stable coins) will be held in an escrow contract whereas
 FinP2P assets tokens will be held with a _built-in_ hold and release mechanism
 in the FA2 smart contract.
 
-**TODO**: Schema
+![FinP2P Hold](images/finp2p_hold.svg)
 
 
 ## Native Hold in FA2 Asset Contract
