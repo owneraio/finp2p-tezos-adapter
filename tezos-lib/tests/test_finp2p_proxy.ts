@@ -1,7 +1,7 @@
 import 'mocha'
 import { MichelsonMap } from "@taquito/taquito"
 import { InMemorySigner } from '@taquito/signer'
-import { getPkhfromPk, b58cencode, encodeKey, prefix } from '@taquito/utils';
+import { getPkhfromPk, b58cencode, b58cdecode, encodeKey, prefix } from '@taquito/utils';
 
 import * as secp256k1 from 'secp256k1';
 import * as crypto from 'crypto';
@@ -402,6 +402,16 @@ function pubkey_to_tezos_secp256k1(pubKey : Buffer) : string {
   return ('0x01' /* secp256k1 */ + pubKey.toString('hex'))
 }
 
+function pkh_to_bytes(pkh : string) : Uint8Array {
+  const b = b58cdecode(pkh, prefix.tz1);
+  switch (pkh.slice(0,3)) {
+    case 'tz1': return new Uint8Array([...[0], ...b]);
+    case 'tz2': return new Uint8Array([...[1], ...b]);
+    case 'tz3': return new Uint8Array([...[2], ...b]);
+    default: throw undefined;
+  }
+}
+
 function generateNonce(): Finp2pProxy.Finp2pNonce {
   return {
     nonce : crypto.randomBytes(24) ,
@@ -618,50 +628,71 @@ function pick_rand<T>(a : T[]) : T {
   return a[rand(a.length)];
 }
 
+type hold_dst =
+  { kind: 'finId', dst: Buffer } |
+  { kind: 'cryptoWallet', dst: string } |
+  { kind: 'escrow', dst: Buffer }
+
 async function mk_hold_tokens(i : {
   hold_id : string,
   asset_id : string,
   amount : number | bigint,
   src : finp2p_account,
-  dst : Buffer,
-  lock_receipient? : boolean,
+  dst? : hold_dst,
   expiration : Date,
   signer? : finp2p_account}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
   let ahg_asset_id = crypto.randomBytes(25)
-  let ahg_src_account = i.dst.toString('hex')
-  let ahg_dst_account = i.src.pubKey.toString('hex')
-  let ahg_amount = rand(9999999999).toString(16)
+  let ahg_src_account : Buffer =
+    (i.dst === undefined || i.dst.kind == 'finId' || i.dst.kind == 'cryptoWallet') ?
+    gen_finp2p_account().pubKey : // dummy value
+    i.dst.dst
+  let ahg_dst_account = i.src.pubKey
+  let ahg_amount = '0x' + rand(9999999999).toString(16)
   let assetGroup = [
     nonce_bytes,
     'transfer',
     'finp2p',
     ahg_asset_id,
     'finId',
-    ahg_src_account,
+    ahg_src_account.toString('hex'),
     'finId',
-    ahg_dst_account,
+    ahg_dst_account.toString('hex'),
     ahg_amount,
   ]
   log_hashgroup(assetGroup)
   let assetHashGroup = await hashValues(assetGroup);
   log('AHG:', assetHashGroup.toString('hex'))
-  let shg_asset_type = pick_rand(["finp2p", "fiat", "cryptocurrency"])
+  let asset_type = pick_rand(["finp2p", "fiat", "cryptocurrency"])
   let shg_src_account_type = pick_rand(["finId", "cryptoWallet", "escrow"])
-  let shg_dst_account_type = pick_rand(["finId", "cryptoWallet", "escrow"])
-  let shg_src_account = crypto.randomBytes(70)
-  let shg_dst_account = crypto.randomBytes(70)
+  let shg_src_account = crypto.randomBytes(30)
+  let shg_dst_account_type = (i.dst === undefined) ? undefined : i.dst.kind
+  let shg_dst_account : string | Buffer | undefined = undefined
+  if (i.dst !== undefined) {
+    switch (i.dst.kind) {
+      case 'finId':
+      case 'escrow':
+        shg_dst_account = i.dst.dst.toString('hex');
+        break;
+      case 'cryptoWallet':
+        shg_dst_account = Buffer.from(pkh_to_bytes(i.dst.dst));
+        break;
+    }
+  }
   let settlementGroup = [
-    shg_asset_type,
+    asset_type,
     i.asset_id,
     shg_src_account_type,
-    shg_src_account,
-    shg_dst_account_type,
-    shg_dst_account,
-    '0x' + i.amount.toString(16),
-    '0x' + (dateToSec(i.expiration)).toString(16)
+    shg_src_account
   ]
+
+  if (shg_dst_account_type !== undefined) { settlementGroup.push(shg_dst_account_type) }
+  if (shg_dst_account !== undefined) { settlementGroup.push(shg_dst_account) }
+  settlementGroup.push(
+    '0x' + i.amount.toString(16),
+    '0x' + (dateToSec(i.expiration)).toString(16),
+  )
   let settlementHashGroup = await hashValues(settlementGroup);
   log('SHG:', settlementHashGroup.toString('hex'))
   let digest = await hashValues([assetHashGroup, settlementHashGroup])
@@ -669,22 +700,53 @@ async function mk_hold_tokens(i : {
   let privKey = (i.signer === undefined) ? i.src.privKey : i.signer.privKey
   let signature = secp256k1.ecdsaSign(digest, privKey).signature;
 
-  let param: Finp2pProxy.HoldTokensParam = {
-    hold_id : utf8.encode(i.hold_id),
+  let ahg : Finp2pProxy.HoldAHG = {
+    nonce,
+    asset_id : new Uint8Array(ahg_asset_id),
+    src_account : pubkey_to_tezos_secp256k1(ahg_src_account),
+    dst_account : pubkey_to_tezos_secp256k1(ahg_dst_account),
+    amount : utf8.encode(ahg_amount)
+  }
+
+  let dst_account : (Finp2pProxy.HoldDst | undefined) = undefined
+  if (i.dst !== undefined) {
+    switch (i.dst.kind) {
+      case 'finId':
+        dst_account = {
+          kind: 'FinId',
+          key: pubkey_to_tezos_secp256k1(i.dst.dst),
+        }
+        break;
+      case 'escrow':
+        dst_account = {
+          kind: 'Other',
+          dst: new Uint8Array(i.dst.dst),
+        }
+        break;
+      case 'cryptoWallet':
+        dst_account = {
+          kind: 'Tezos',
+          pkh: i.dst.dst,
+        }
+        break;
+    }
+  }
+
+  let shg : Finp2pProxy.HoldSHG = {
+    asset_type,
     asset_id : utf8.encode(i.asset_id),
-    owner_account : pubkey_to_tezos_secp256k1(i.src.pubKey),
-    lock_receipient: i.lock_receipient,
+    src_account_type : utf8.encode(shg_src_account_type),
+    src_account : new Uint8Array(shg_src_account),
+    dst_account_type : shg_dst_account_type,
+    dst_account,
     amount: BigInt(i.amount),
     expiration : i.expiration,
-    nonce,
-    ahg_asset_id,
-    ahg_src_account : pubkey_to_tezos_secp256k1(i.dst),
-    ahg_amount : utf8.encode(ahg_amount),
-    shg_asset_type : utf8.encode(shg_asset_type),
-    shg_src_account_type : utf8.encode(shg_src_account_type),
-    shg_src_account,
-    shg_dst_account_type : utf8.encode(shg_dst_account_type),
-    shg_dst_account,
+  }
+
+  let param: Finp2pProxy.HoldTokensParam = {
+    hold_id : utf8.encode(i.hold_id),
+    ahg,
+    shg,
     signature: '0x' + (Buffer.from(signature)).toString('hex'),
   }
 
@@ -696,8 +758,7 @@ async function hold_tokens(i : {
   asset_id : string,
   amount : number | bigint,
   src : finp2p_account,
-  dst : Buffer,
-  lock_receipient? : boolean,
+  dst? : hold_dst,
   expiration : Date,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
@@ -712,14 +773,32 @@ async function mk_execute_hold(i : {
   asset_id? : string,
   amount? : number | bigint,
   src? : Buffer,
-  dst? : Buffer,
+  dst? : hold_dst,
 }) {
+  let dst : (Finp2pProxy.SupportedHoldDst | undefined) = undefined
+  if (i.dst !== undefined) {
+    switch (i.dst.kind) {
+      case 'finId':
+        dst = {
+          kind: 'FinId',
+          key: pubkey_to_tezos_secp256k1(i.dst.dst),
+        }
+        break;
+      case 'cryptoWallet':
+        dst = {
+          kind: 'Tezos',
+          pkh: i.dst.dst,
+        }
+        break;
+      default: throw Error("unsuppored execute hold destination")
+    }
+  }
   let param: Finp2pProxy.ExecuteHoldParam = {
     hold_id : utf8.encode(i.hold_id),
     asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
     amount : (i.amount === undefined)? undefined : BigInt(i.amount),
     src_account : (i.src === undefined)? undefined : pubkey_to_tezos_secp256k1(i.src),
-    dst_account : (i.dst === undefined)? undefined : pubkey_to_tezos_secp256k1(i.dst),
+    dst,
   }
 
   return param
@@ -730,7 +809,7 @@ async function execute_hold(i : {
   asset_id? : string,
   amount? : number | bigint,
   src? : Buffer,
-  dst? : Buffer,
+  dst? : hold_dst,
   options? : Finp2pProxy.CallOptions,
 }) {
   let param = await mk_execute_hold(i)
@@ -1566,8 +1645,7 @@ describe('Hold / Execute / Release',  () => {
           { hold_id: "HOLD-ID-0001",
             asset_id : asset_id1,
             src : accounts[0],
-            dst : accounts[0].pubKey,
-            lock_receipient : true,
+            dst : { kind: 'finId', dst: accounts[0].pubKey } ,
             amount : b0 + 1,
             expiration,
           })
@@ -1586,8 +1664,7 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0001",
         asset_id : asset_id1,
         src : accounts[0],
-        dst : accounts[1].pubKey,
-        lock_receipient : true,
+        dst : { kind: 'finId', dst: accounts[1].pubKey },
         amount : 50,
         expiration,
       })
@@ -1612,8 +1689,7 @@ describe('Hold / Execute / Release',  () => {
           { hold_id: "HOLD-ID-0001",
             asset_id : asset_id1,
             src : accounts[0],
-            dst : accounts[1].pubKey,
-            lock_receipient : true,
+            dst : { kind: 'finId', dst: accounts[1].pubKey },
             amount : 1,
             expiration,
             signer : accounts[1]
@@ -1631,8 +1707,7 @@ describe('Hold / Execute / Release',  () => {
           { hold_id: "HOLD-ID-0001",
             asset_id : asset_id1,
             src : accounts[0],
-            dst : accounts[1].pubKey,
-            lock_receipient : true,
+            dst : { kind: 'finId', dst: accounts[1].pubKey },
             amount : 1,
             expiration,
           })
@@ -1647,8 +1722,7 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0002",
         asset_id : asset_id1,
         src : accounts[0],
-        dst : accounts[2].pubKey,
-        lock_receipient : true,
+        dst : { kind: 'finId', dst: accounts[2].pubKey },
         amount : 1,
         expiration,
       })
@@ -1726,7 +1800,6 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0003",
         asset_id : asset_id1,
         src : accounts[2],
-        dst : accounts[0].pubKey,
         amount : 1,
         expiration,
       })
@@ -1749,8 +1822,7 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0004",
         asset_id : asset_id1,
         src : accounts[2],
-        dst : accounts[1].pubKey,
-        lock_receipient : true,
+        dst : { kind: 'finId', dst: accounts[1].pubKey },
         amount : 20,
         expiration,
       })
@@ -1773,8 +1845,7 @@ describe('Hold / Execute / Release',  () => {
       { hold_id: "HOLD-ID-0005",
         asset_id : asset_id1,
         src : accounts[2],
-        dst : accounts[2].pubKey,
-        lock_receipient : true,
+        dst : { kind: 'finId', dst: accounts[2].pubKey },
         amount : 10,
         expiration,
       })
@@ -1842,7 +1913,7 @@ describe('Hold / Execute / Release',  () => {
       async () => {
         await execute_hold(
           { hold_id: "HOLD-ID-0001",
-            dst: accounts[0].pubKey
+            dst : { kind: 'finId', dst: accounts[0].pubKey },
           }
         )
       },
