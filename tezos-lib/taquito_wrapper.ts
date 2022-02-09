@@ -332,6 +332,8 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns injection result
    */
   async batchTransactions(transfersParams: Array<TransferParams>): Promise<OperationResult> {
+    transfersParams.map(t =>
+      this.debug('Calling', t.parameter?.entrypoint, 'with', t.parameter?.value));
     let estimates = this.estimate.batch(
       transfersParams.map((transferParams) => {
         return { ...transferParams,

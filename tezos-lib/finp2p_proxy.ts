@@ -35,6 +35,7 @@ export type Timestamp = Date;
 export type Signature = string;
 export type Finp2pHoldId = Bytes;
 export type FA2HoldId = Nat;
+export type Opaque = Bytes;
 
 let utf8 = new TextEncoder();
 let utf8dec = new TextDecoder();
@@ -105,25 +106,47 @@ export interface RedeemTokensParam {
   signature: Signature;
 }
 
+export interface FinIdHoldDst {
+  kind: 'FinId',
+  key: Key,
+}
+
+export interface TezosHoldDst {
+  kind : 'Tezos',
+  pkh : string,
+}
+
+export interface OtherHoldDst {
+  kind : 'Other',
+  dst : Opaque,
+}
+
+export type SupportedHoldDst = FinIdHoldDst | TezosHoldDst;
+export type HoldDst = SupportedHoldDst | OtherHoldDst;
+
+export interface HoldAHG {
+  nonce : Finp2pNonce;
+  asset_id : Bytes;
+  src_account : Key;
+  dst_account : Key;
+  amount : Opaque;
+}
+
+export interface HoldSHG {
+  asset_type : string;
+  asset_id : Bytes;
+  src_account_type : Opaque;
+  src_account : Opaque;
+  dst_account_type? : string;
+  dst_account? : HoldDst;
+  amount : TokenAmount;
+  expiration : Timestamp;
+}
+
 export interface HoldTokensParam {
   hold_id : Finp2pHoldId;
-  asset_id : AssetId;
-  amount : TokenAmount;
-  owner_account : Key;
-  lock_receipient : boolean;
-  expiration : Timestamp;
-  // information to reconstruct AHG
-  nonce : Finp2pNonce;
-  ahg_asset_id : Bytes;
-  ahg_src_account : Key;
-  ahg_amount : Bytes;
-  // information to reconstruct SHG
-  shg_asset_type : Bytes;
-  shg_src_account_type : Bytes;
-  shg_src_account : Bytes;
-  shg_dst_account_type : Bytes;
-  shg_dst_account : Bytes;
-  // finp2p signature
+  ahg : HoldAHG;
+  shg : HoldSHG;
   signature : Signature;
 }
 
@@ -132,7 +155,7 @@ export interface ExecuteHoldParam {
   asset_id? : AssetId;
   amount? : TokenAmount;
   src_account? : Key;
-  dst_account? : Key;
+  dst? : SupportedHoldDst;
 }
 
 export interface ReleaseHoldParam {
@@ -383,25 +406,72 @@ export namespace Michelson {
     };
   }
 
+  export function supportedHoldDst(dst: SupportedHoldDst): MichelsonV1Expression {
+    switch (dst.kind) {
+      case 'FinId':
+        return { prim: 'Left', args: [maybeBytes(dst.key)] };
+      case 'Tezos':
+        return { prim: 'Right', args: [maybeBytes(dst.pkh)] };
+    }
+  }
+
+  export function holdDst(dst: HoldDst): MichelsonV1Expression {
+    switch (dst.kind) {
+      case 'Other' :
+        return {
+          prim: 'Right',
+          args: [{ bytes: bytesToHex(dst.dst) }],
+        };
+      default:
+        return {
+          prim: 'Left',
+          args: [supportedHoldDst(dst)],
+        };
+    }
+  }
+
+  export function holdAHG(ahg: HoldAHG): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        /* nonce */ finp2pNonce(ahg.nonce),
+        { /* asset_id */ bytes: bytesToHex(ahg.asset_id) },
+        /* src_account */ maybeBytes(ahg.src_account),
+        /* dst_account */ maybeBytes(ahg.dst_account),
+        { /* amount */ bytes: bytesToHex(ahg.amount) },
+      ],
+    };
+  }
+
+  export function holdSHG(shg: HoldSHG): MichelsonV1Expression {
+    let dstAccountType =
+      mkOpt(shg.dst_account_type,
+        (s => { return  { string: s }; }));
+    let dstAccount =
+      mkOpt(shg.dst_account,
+        (dst => { return holdDst(dst); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* asset_type */ string: shg.asset_type },
+        { /* asset_id */ bytes: bytesToHex(shg.asset_id) },
+        { /* src_account_type */ bytes: bytesToHex(shg.src_account_type) },
+        { /* src_account */ bytes: bytesToHex(shg.src_account) },
+        dstAccountType,
+        dstAccount,
+        { /* amount */ int: shg.amount.toString() },
+        { /* expiration */ string: shg.expiration.toISOString() },
+      ],
+    };
+  }
+
   export function holdTokensParam(ht: HoldTokensParam): MichelsonV1Expression {
     return {
       prim: 'Pair',
       args: [
         { /* hold_id */ bytes: bytesToHex(ht.hold_id) },
-        { /* asset_id */ bytes: bytesToHex(ht.asset_id) },
-        { /* amount */ int: ht.amount.toString() },
-        /* owner_account */ maybeBytes(ht.owner_account),
-        /* lock_receipient */ boolean(ht.lock_receipient),
-        { /* expiration */ string: ht.expiration.toISOString() },
-        /* nonce */ finp2pNonce(ht.nonce),
-        { /* ahg_asset_id */ bytes: bytesToHex(ht.ahg_asset_id) },
-        /* ahg_src_account */ maybeBytes(ht.ahg_src_account),
-        { /* ahg_amount */ bytes: bytesToHex(ht.ahg_amount) },
-        { /* shg_asset_type */ bytes: bytesToHex(ht.shg_asset_type) },
-        { /* shg_src_account_type */ bytes: bytesToHex(ht.shg_src_account_type) },
-        { /* shg_src_account */ bytes: bytesToHex(ht.shg_src_account) },
-        { /* shg_dst_account_type */ bytes: bytesToHex(ht.shg_dst_account_type) },
-        { /* shg_dst_account */ bytes: bytesToHex(ht.shg_dst_account) },
+        /* ahg */ holdAHG(ht.ahg),
+        /* shg */ holdSHG(ht.shg),
         /* signature */ maybeBytes(ht.signature),
       ],
     };
@@ -411,7 +481,7 @@ export namespace Michelson {
     let assetId = mkOpt(eh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
     let amount = mkOpt(eh.amount, (s => { return { int : s.toString() }; }));
     let srcAccount = mkOpt(eh.src_account, (s => { return maybeBytes(s); }));
-    let dstAccount = mkOpt(eh.dst_account, (s => { return maybeBytes(s); }));
+    let dstAccount = mkOpt(eh.dst, (d => { return supportedHoldDst(d); }));
     return {
       prim: 'Pair',
       args: [
