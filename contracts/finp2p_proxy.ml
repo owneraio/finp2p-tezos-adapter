@@ -162,18 +162,52 @@ let redeem_tokens (p : redeem_tokens_param) (s : storage) : operation * storage
   (relay_op, s)
 
 let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
+  let nonce_timestamp = p.ht_ahg.ahg_nonce.timestamp in
+  (* Asset on hold is asset of settlement *)
+  let asset_id = p.ht_shg.shg_asset_id in
+  (* Amount on hold is amount of settlement *)
+  let amount_ = p.ht_shg.shg_amount in
+  let shg_dst_account_type = p.ht_shg.shg_dst_account_type in
+  let shg_dst_account = p.ht_shg.shg_dst_account in
+  let seller = p.ht_ahg.ahg_src_account in
+  let buyer = p.ht_ahg.ahg_dst_account in
   let () =
-    if not (is_operation_live p.ht_nonce.timestamp s) then
+    if not (is_operation_live nonce_timestamp s) then
       (failwith op_not_live : unit)
   in
   let oph = check_hold_tokens_signature p in
-  let live_operations =
-    Big_map.add oph p.ht_nonce.timestamp s.live_operations
-  in
+  let live_operations = Big_map.add oph nonce_timestamp s.live_operations in
   let fa2_token =
-    match Big_map.find_opt p.ht_asset_id s.finp2p_assets with
+    match Big_map.find_opt asset_id s.finp2p_assets with
     | None -> (failwith unknown_asset_id : fa2_token)
     | Some fa2_token -> fa2_token
+  in
+  let hold_dst =
+    match shg_dst_account_type with
+    | None ->
+        (* This is a settlement with no preset destination, the destination will
+           be decided on hold execution. *)
+        (None : supported_hold_dst option)
+    | Some shg_dst_account_type ->
+        if
+          shg_dst_account_type = "finId"
+          || shg_dst_account_type = "cryptoWallet"
+        then
+          (* We support settlements to finIds or cryptoWallet *)
+          match shg_dst_account with
+          | None ->
+              (* This is a also settlement with no preset destination. *)
+              (None : supported_hold_dst option)
+          | Some (Supported dst) -> Some dst
+          | Some (Other _) ->
+              (* Should not happen (e.g. address of account on another ledger) *)
+              Some (FinId seller)
+        else
+          (* shg_dst_account_type = "escrow" and shg_dst_account = Other _
+             In this case, the holds should be executed by sending the tokens
+             to the seller.
+          *)
+          Some (FinId seller)
   in
   let (op, hold_info, s) =
     match get_hold_entrypoint_opt fa2_token.address with
@@ -189,16 +223,16 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
         in
         let hold_info = FA2_hold {fa2_hold_id; held_token = fa2_token} in
         let ho_dst =
-          if p.ht_lock_receipient then
-            (* Lock the hold to the seller, i.e. the src account in the AHG *)
-            Some (address_of_key p.ht_ahg_src_account fa2_token s)
-          else (None : address option)
+          match hold_dst with
+          | None -> (None : address option)
+          | Some (Tezos pkh) -> Some (implicit_address pkh)
+          | Some (FinId k) -> Some (address_of_key k fa2_token s)
         in
         let fa2_hold =
           {
             ho_token_id = fa2_token.id;
-            ho_amount = p.ht_amount;
-            ho_src = address_of_key p.ht_owner_account fa2_token s;
+            ho_amount = amount_;
+            ho_src = address_of_key buyer fa2_token s;
             ho_dst;
           }
         in
@@ -216,29 +250,22 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
           Escrow
             {
               es_held_token = fa2_token;
-              es_amount = p.ht_amount;
-              es_src_account = p.ht_owner_account;
-              es_dst_account =
-                (if p.ht_lock_receipient then Some p.ht_ahg_src_account
-                else (None : key option));
+              es_amount = amount_;
+              es_src_account = buyer;
+              es_dst = hold_dst;
             }
         in
         (* Register total on hold *)
         let total_in_escrow =
-          match
-            Big_map.find_opt (p.ht_owner_account, fa2_token) s.escrow_totals
-          with
-          | None -> p.ht_amount
-          | Some total -> add_amount total p.ht_amount
+          match Big_map.find_opt (buyer, fa2_token) s.escrow_totals with
+          | None -> amount_
+          | Some total -> add_amount total amount_
         in
         let s =
           {
             s with
             escrow_totals =
-              Big_map.add
-                (p.ht_owner_account, fa2_token)
-                total_in_escrow
-                s.escrow_totals;
+              Big_map.add (buyer, fa2_token) total_in_escrow s.escrow_totals;
           }
         in
         (* Escrow funds to proxy contract.
@@ -246,13 +273,13 @@ let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage =
            for the given FA2 token. *)
         let fa2_transfer_to_escrow =
           {
-            tr_src = address_of_key p.ht_owner_account fa2_token s;
+            tr_src = address_of_key buyer fa2_token s;
             tr_txs =
               [
                 {
                   tr_dst = Tezos.self_address None;
                   tr_token_id = fa2_token.id;
-                  tr_amount = p.ht_amount;
+                  tr_amount = amount_;
                 };
               ];
           }
@@ -354,13 +381,20 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
   let s = {s with holds; escrow_totals} in
   (s, hold_info)
 
+let[@inline] address_of_dst (dst : supported_hold_dst option)
+    (token : fa2_token) (s : storage) : address option =
+  match dst with
+  | None -> None
+  | Some (Tezos pkh) -> Some (implicit_address pkh)
+  | Some (FinId k) -> Some (address_of_key k token s)
+
 let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
   let {
     eh_hold_id = hold_id;
     eh_asset_id = asset_id;
     eh_amount = amount_;
     eh_src_account = src_account;
-    eh_dst_account = dst_account;
+    eh_dst = dst;
   } =
     p
   in
@@ -375,11 +409,7 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
           | None -> None
           | Some k -> Some (address_of_key k held_token s)
         in
-        let e_dst =
-          match dst_account with
-          | None -> None
-          | Some k -> Some (address_of_key k held_token s)
-        in
+        let e_dst = address_of_dst dst held_token s in
         Tezos.transaction
           None
           {
@@ -391,19 +421,20 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
           }
           0t
           execute_ep
-    | Escrow {es_held_token; es_amount; es_src_account = _; es_dst_account} ->
-        let tr_dst_acc =
-          match (dst_account, es_dst_account) with
-          | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : key)
+    | Escrow {es_held_token; es_amount; es_src_account = _; es_dst} ->
+        let dst_address = address_of_dst dst es_held_token s in
+        let es_dst_address = address_of_dst es_dst es_held_token s in
+        let tr_dst =
+          match (dst_address, es_dst_address) with
+          | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
           | (Some dst, None) -> dst
           | (None, Some dst) -> dst
           | (Some dst, Some escrow_dst) ->
               if dst <> escrow_dst then
-                (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : key)
+                (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
               else dst
         in
         let tr_src = Tezos.self_address None in
-        let tr_dst = address_of_key tr_dst_acc es_held_token s in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in
         let tr_token_id = es_held_token.id in
         let execute_transfer =
@@ -444,7 +475,7 @@ let release_hold (p : release_hold_param) (s : storage) : operation * storage =
           }
           0t
           release_ep
-    | Escrow {es_held_token; es_amount; es_src_account; es_dst_account = _} ->
+    | Escrow {es_held_token; es_amount; es_src_account; es_dst = _} ->
         let tr_src = Tezos.self_address None in
         let tr_dst = address_of_key es_src_account es_held_token s in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in

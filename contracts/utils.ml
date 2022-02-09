@@ -37,3 +37,6 @@ let[@inline] rev (l : operation list) : operation list =
     (fun ((acc : operation list), (x : operation)) -> x :: acc)
     ([] : operation list)
     l
+
+let[@inline] implicit_address (pkh : key_hash) : address =
+  Tezos.address (Tezos.implicit_account None pkh)

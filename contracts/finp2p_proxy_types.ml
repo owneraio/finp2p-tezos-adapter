@@ -8,6 +8,8 @@ type asset_id = Asset_id of bytes
 
 type finp2p_hold_id = Finp2p_hold_id of bytes
 
+type opaque = Opaque of bytes
+
 type finp2p_nonce = {nonce : bytes; (* 24 *) timestamp : timestamp} [@@comb]
 
 type token_metadata = (string, bytes) map
@@ -52,25 +54,35 @@ type redeem_tokens_param = {
 }
 [@@comb] [@@param Redeem_tokens]
 
+type hold_ahg = {
+  ahg_nonce : finp2p_nonce;
+  ahg_asset_id : asset_id;
+  ahg_src_account : key;
+  ahg_dst_account : key;
+  ahg_amount : opaque;
+}
+[@@comb]
+
+type supported_hold_dst = FinId of key | Tezos of key_hash [@@comb]
+
+type hold_dst = Supported of supported_hold_dst | Other of opaque [@@comb]
+
+type hold_shg = {
+  shg_asset_type : string;
+  shg_asset_id : asset_id;
+  shg_src_account_type : opaque;
+  shg_src_account : opaque;
+  shg_dst_account_type : string option;
+  shg_dst_account : hold_dst option;
+  shg_amount : token_amount;
+  shg_expiration : timestamp;
+}
+[@@comb]
+
 type hold_tokens_param = {
   ht_hold_id : finp2p_hold_id;
-  ht_asset_id : asset_id;
-  ht_amount : token_amount;
-  ht_owner_account : key;
-  ht_lock_receipient : bool;
-  ht_expiration : timestamp;
-  (* information to reconstruct AHG *)
-  ht_nonce : finp2p_nonce;
-  ht_ahg_asset_id : bytes;
-  ht_ahg_src_account : key;
-  ht_ahg_amount : bytes;
-  (* information to reconstruct SHG *)
-  ht_shg_asset_type : bytes;
-  ht_shg_src_account_type : bytes;
-  ht_shg_src_account : bytes;
-  ht_shg_dst_account_type : bytes;
-  ht_shg_dst_account : bytes;
-  (* finp2p signature*)
+  ht_ahg : hold_ahg;
+  ht_shg : hold_shg;
   ht_signature : signature;
 }
 [@@comb] [@@param Hold_tokens]
@@ -80,7 +92,7 @@ type execute_hold_param = {
   eh_asset_id : asset_id option;
   eh_amount : token_amount option;
   eh_src_account : key option;
-  eh_dst_account : key option;
+  eh_dst : supported_hold_dst option;
 }
 [@@comb] [@@param Execute_hold]
 
@@ -136,7 +148,7 @@ type escrow_hold_info = {
   es_held_token : fa2_token;
   es_amount : token_amount;
   es_src_account : key;
-  es_dst_account : key option;
+  es_dst : supported_hold_dst option;
 }
 [@@comb]
 
