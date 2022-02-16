@@ -3,6 +3,8 @@ include Fa2_sig
 include Finp2p_proxy_types
 include Finp2p_lib
 
+let[@inline] return_storage (s : storage) = (([] : operation list), s)
+
 let fail_not_admin (s : storage) =
   if not (Set.mem (Tezos.sender None) s.admins) then
     (failwith unauthorized : unit)
@@ -591,18 +593,36 @@ let cleanup (ops : operation_hash list) (s : storage) : storage =
   in
   {s with live_operations}
 
+let fa2_transfer (p : fa2_transfer_param) (s : storage) :
+    operation list * storage =
+  let transfer =
+    {
+      tr_src = Tezos.self_address None;
+      tr_txs =
+        [
+          {
+            tr_dst = p.ftr_dst;
+            tr_token_id = p.ftr_token.id;
+            tr_amount = p.ftr_amount;
+          };
+        ];
+    }
+  in
+  let transfer_ep = get_transfer_entrypoint p.ftr_token.address in
+  let op = Tezos.transaction None [transfer] 0t transfer_ep in
+  ([op], s)
+
 let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
     operation list * storage =
-  let s =
-    match p with
-    | Update_operation_ttl p -> update_operation_ttl p s
-    | Update_admins p -> update_admins p s
-    | Add_admins p -> add_admins p s
-    | Remove_admins p -> remove_admins p s
-    | Update_fa2_token p -> update_fa2_token p s
-    | Register_external_address p -> register_external_address p s
-  in
-  (([] : operation list), s)
+  match p with
+  | Update_operation_ttl p -> return_storage (update_operation_ttl p s)
+  | Update_admins p -> return_storage (update_admins p s)
+  | Add_admins p -> return_storage (add_admins p s)
+  | Remove_admins p -> return_storage (remove_admins p s)
+  | Update_fa2_token p -> return_storage (update_fa2_token p s)
+  | Register_external_address p ->
+      return_storage (register_external_address p s)
+  | Fa2_transfer p -> fa2_transfer p s
 
 let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
     =

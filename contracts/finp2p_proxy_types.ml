@@ -125,6 +125,13 @@ type operation_ttl = {
 type register_external_param = key * fa2_token * address option
 [@@param Register_external_address]
 
+type fa2_transfer_param = {
+  ftr_token : fa2_token;
+  ftr_dst : address;
+  ftr_amount : token_amount;
+}
+[@@comb] [@@param Register_external_address]
+
 type finp2p_proxy_admin_param =
   | Update_operation_ttl of operation_ttl
   | Update_admins of address set
@@ -132,6 +139,7 @@ type finp2p_proxy_admin_param =
   | Remove_admins of address list
   | Update_fa2_token of update_fa2_token_param
   | Register_external_address of register_external_param
+  | Fa2_transfer of fa2_transfer_param
 [@@param Finp2p_asset]
 
 type finp2p_proxy_param =
