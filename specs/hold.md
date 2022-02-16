@@ -328,33 +328,52 @@ for a given user.
 ### `hold_tokens`
 
 ```ocaml
+type supported_hold_dst = 
+  | FinId of key
+  | Tezos of key_hash
+
+type hold_dst = 
+  | Supported of supported_hold_dst 
+  | Other of opaque  (* = bytes *)
+
+type hold_ahg = {
+  nonce : finp2p_nonce;
+  asset_id : asset_id;
+  src_account : key;
+  dst_account : key;
+  amount : opaque;
+}
+
+type hold_shg = {
+  asset_type : string;
+  asset_id : asset_id;
+  src_account_type : opaque;
+  src_account : opaque;
+  dst_account_type : string option;
+  dst_account : hold_dst option;
+  amount : token_amount;
+  expiration : timestamp;
+}
+
 type hold_tokens_param = {
   hold_id : finp2p_hold_id; (* = boxed bytes *)
-  asset_id : asset_id; (* = boxed bytes *)
-  amount : token_amount;
-  owner_account : public_key;
-  lock_receipient : bool;
-  expiration : timestamp;
-  (* information to reconstruct AHG *)
-  nonce : { nonce :bytes; (* 24 bytes *)
-            timestamp : timestamp };
-  ahg_asset_id : bytes;
-  ahg_src_account : public_key;
-  ahg_amount : bytes;
-  (* information to reconstruct SHG *)
-  shg_asset_type : bytes;
-  shg_src_account_type : bytes;
-  shg_src_account : bytes;
-  shg_dst_account_type : bytes;
-  shg_dst_account : bytes;
-  (* finp2p signature*)
-  signature : signature;
+  ahg : hold_ahg;
+  shg : hold_shg;
+  signature : signature option;
 }
 
 let hold_tokens (p : hold_tokens_param) (s : storage) : operation * storage = ...
 ```
 
-This Tezos operation must be signed/injected by an administrator.
+This Tezos operation can be signed/injected by :
+1. an administrator: in which case, the signature must be provided,
+2. the buyer directly: in which case, no signature is needed but the sender must
+   correspond to `ahg.dst_account`.
+   
+> We allow direct calls to the `hold_tokens` entry point because it allows users
+> of an external FA2 token to hold tokens and it does not compromise the
+> restrictions put in place. In this case, the proxy contract effectively acts
+> as an escrow.
 
 #### Signed Payload
 
@@ -364,7 +383,7 @@ This Tezos operation must be signed/injected by an administrator.
 
 hashGroups = hash('BLAKE2B', [AHG, SHG]);
 
-Signature = sign(sender private secp256k1 key, hashGroups)
+Signature = sign(buyer private secp256k1 key, hashGroups)
 
 
 ##### Asset Hash Group (AHG) structure
@@ -393,14 +412,19 @@ SHG = hash('BLAKE2B', [fields by order]);
 | 2 | **assetId**     | utf8 string  | unique identifier of the asset |
 | 3 | srcAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow"|
 | 4 | srcAccount      | utf8 string  | source account of the asset  |
-| 5 | dstAccountType  | utf8 string  | "finId", "cryptoWallet", "escrow"|
-| 6 | dstAccount      | utf8 string  | destination account for the asset  |
+| 5 | **dstAccountType**  | utf8 string **(OPTIONAL)** | "finId", "cryptoWallet", "escrow"|
+| 6 | **dstAccount**      | utf8 string **(OPTIONAL)** | destination account for the asset  |
 | 7 | **amount**      | utf8 string  | hex representation of the settlement amount |
 | 8	| **expiry**      | utf8 string  | hex representation of the escrow hold expiry value |
 
 In **bold** we give the fields that need to undergo validation in order to check
 the signature and correctly put on hold the tokens. This is described in the
 next subsection.
+
+Note that we assume that `dstAccountType` and `dstAccount` are optional, meaning
+that they can be absent from the SHG, in the case where the hold has no set
+destination (the buyer signs the fact that the hold has no preset
+destination). Release operations for such holds must specify a destination. 
 
 #### Verifying hold signatures
 
@@ -441,6 +465,24 @@ The entry point performs the following:
    (also the field dstAccount of the AHG) which corresponds to the **buyer**.
 6. Perform the adequate calls for either [a native hold](#native-hold) or a
    [hold through escrow](#hold-through-escrow) (see below).
+     
+The destination of the hold is computed as follows:
+- If there are no `dstAccount` field in the SHG, the hold has **no
+  destination**.
+- If the `dstAccountType` of the SHG is supported by the Tezos ledger, the
+  destination is `dstAccount` of the SHG:
+  - When the type is "finId", the destination is the secp256k1 public key.
+  - When the type is "cryptoWallet" the destination is the public key hash
+    contained in `dstAccount`. This is a Tezos account address on chain. For the
+    purpose of the signature the key hash is the _raw bytes_ (size 20) of the
+    public key hash with a prefix of size one for the curve (`01` for
+    secp256k1). **TODO:** decide a format. (If the `dstAccount` contains
+    something that is not a Tezos address, the hold will fail).
+- If the `dstAccountType` of the SHG is "escrow" then the funds are held in a
+  special FinP2P escrow account, and the destination for the hold is the seller,
+  _i.e._ `srcAccount` in the _AHG_.
+
+This is directly reflected in the type `hold_dst` of the `hold_tokens` parameter.
      
 #### Native Hold
 
@@ -550,3 +592,12 @@ resides in an external **Escrow** contract.
 1. Remove `hold_id` association from storage.
 2. Call the `transfer` entry point of the FA2 to transfer the tokens in escrow
 from the proxy contract back to the original owner. 
+
+
+### Special `fa2_transfer` entry point
+
+It is possible for someone to send FA2 tokens erroneously to the proxy contract
+(for instance if the user tries to do an escrow without going through the
+proxy). To return the funds, we add a new entry point which can send out _any_
+FA2 tokens held by the proxy contract. This action can of course only be
+performed by an administrator of the proxy contract.
