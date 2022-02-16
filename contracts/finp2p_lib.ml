@@ -376,8 +376,16 @@ let check_redeem_tokens_signature (p : redeem_tokens_param) : operation_hash =
   else OpHash (Crypto.blake2b payload)
 
 let check_hold_tokens_signature (p : hold_tokens_param) : operation_hash =
-  let payload = encode_hold_tokens_payload p in
   let buyer = p.ht_ahg.ahg_dst_account in
-  if not (Crypto.check buyer p.ht_signature payload) then
-    (failwith invalid_signature : operation_hash)
-  else OpHash (Crypto.blake2b payload)
+  let payload = encode_hold_tokens_payload p in
+  let () =
+    match p.ht_signature with
+    | None ->
+        (* If no signature provided, the operation must be sent by the buyer *)
+        if Tezos.sender None <> implicit_address (Crypto.hash_key buyer) then
+          (failwith unauthorized : unit)
+    | Some signature ->
+        if not (Crypto.check buyer signature payload) then
+          (failwith invalid_signature : unit)
+  in
+  OpHash (Crypto.blake2b payload)

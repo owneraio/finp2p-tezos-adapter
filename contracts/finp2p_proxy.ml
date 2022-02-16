@@ -497,7 +497,7 @@ let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) :
   | Create_asset p -> create_asset p s
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
-  | Hold_tokens p -> hold_tokens p s
+  (* | Hold_tokens p -> hold_tokens p s *)
   | Execute_hold p -> execute_hold p s
   | Release_hold p -> release_hold p s
 
@@ -624,6 +624,22 @@ let finp2p_admin (p : finp2p_proxy_admin_param) (s : storage) :
       return_storage (register_external_address p s)
   | Fa2_transfer p -> fa2_transfer p s
 
+let finp2p_public (p : finp2p_public_param) (s : storage) :
+    operation list * storage =
+  match p with
+  | Cleanup ops ->
+      let s = cleanup ops s in
+      (([] : operation list), s)
+  | Hold_tokens p ->
+      let buyer = p.ht_ahg.ahg_dst_account in
+      let () =
+        (* Allow call by admin or by buyer directly *)
+        if Tezos.sender None <> implicit_address (Crypto.hash_key buyer) then
+          fail_not_admin s
+      in
+      let (op, s) = hold_tokens p s in
+      ([op], s)
+
 let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
     =
   match param with
@@ -637,9 +653,7 @@ let main ((param, s) : finp2p_proxy_param * storage) : operation list * storage
   | Finp2p_admin p ->
       let () = fail_not_admin s in
       finp2p_admin p s
-  | Cleanup ops ->
-      let s = cleanup ops s in
-      (([] : operation list), s)
+  | Finp2p_public p -> finp2p_public p s
 
 (* Views *)
 

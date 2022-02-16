@@ -147,7 +147,7 @@ export interface HoldTokensParam {
   hold_id : Finp2pHoldId;
   ahg : HoldAHG;
   shg : HoldSHG;
-  signature : Signature;
+  signature? : Signature;
 }
 
 export interface ExecuteHoldParam {
@@ -466,13 +466,16 @@ export namespace Michelson {
   }
 
   export function holdTokensParam(ht: HoldTokensParam): MichelsonV1Expression {
+    let michSignature =
+      mkOpt(ht.signature,
+        (s => { return maybeBytes(s); }));
     return {
       prim: 'Pair',
       args: [
         { /* hold_id */ bytes: bytesToHex(ht.hold_id) },
         /* ahg */ holdAHG(ht.ahg),
         /* shg */ holdSHG(ht.shg),
-        /* signature */ maybeBytes(ht.signature),
+        /* signature */ michSignature,
       ],
     };
   }

@@ -83,7 +83,7 @@ type hold_tokens_param = {
   ht_hold_id : finp2p_hold_id;
   ht_ahg : hold_ahg;
   ht_shg : hold_shg;
-  ht_signature : signature;
+  ht_signature : signature option;
 }
 [@@comb] [@@param Hold_tokens]
 
@@ -109,7 +109,6 @@ type finp2p_proxy_asset_param =
   | Create_asset of create_asset_param
   | Issue_tokens of issue_tokens_param
   | Redeem_tokens of redeem_tokens_param
-  | Hold_tokens of hold_tokens_param
   | Execute_hold of execute_hold_param
   | Release_hold of release_hold_param
 [@@param Finp2p_asset]
@@ -142,11 +141,16 @@ type finp2p_proxy_admin_param =
   | Fa2_transfer of fa2_transfer_param
 [@@param Finp2p_asset]
 
+type finp2p_public_param =
+  | Cleanup of operation_hash list
+  | Hold_tokens of hold_tokens_param
+[@@param Finp2p_public]
+
 type finp2p_proxy_param =
   | Finp2p_asset of finp2p_proxy_asset_param
   | Finp2p_batch_asset of finp2p_proxy_asset_param list
   | Finp2p_admin of finp2p_proxy_admin_param
-  | Cleanup of operation_hash list
+  | Finp2p_public of finp2p_public_param
 [@@param Main]
 
 type fa2_native_hold_info = {fa2_hold_id : hold_id; held_token : fa2_token}
