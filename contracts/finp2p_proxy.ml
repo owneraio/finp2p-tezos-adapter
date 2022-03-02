@@ -433,7 +433,7 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
           }
           0t
           execute_ep
-    | Escrow {es_held_token; es_amount; es_src_account = _; es_dst} ->
+    | Escrow {es_held_token; es_amount; es_src_account; es_dst} ->
         let dst_address = address_of_dst dst es_held_token s in
         let es_dst_address = address_of_dst es_dst es_held_token s in
         let tr_dst =
@@ -445,6 +445,12 @@ let execute_hold (p : execute_hold_param) (s : storage) : operation * storage =
               if dst <> escrow_dst then
                 (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
               else dst
+        in
+        let () =
+          match src_account with
+          | None -> ()
+          | Some src ->
+              if src <> es_src_account then failwith "UNEXPECTED_HOLD_SOURCE"
         in
         let tr_src = Tezos.self_address None in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in
@@ -488,6 +494,12 @@ let release_hold (p : release_hold_param) (s : storage) : operation * storage =
           0t
           release_ep
     | Escrow {es_held_token; es_amount; es_src_account; es_dst = _} ->
+        let () =
+          match src_account with
+          | None -> ()
+          | Some src ->
+              if src <> es_src_account then failwith "UNEXPECTED_HOLD_SOURCE"
+        in
         let tr_src = Tezos.self_address None in
         let tr_dst = address_of_key es_src_account es_held_token s in
         let tr_amount = match amount_ with None -> es_amount | Some a -> a in
