@@ -1360,7 +1360,7 @@ export class FinP2PTezos {
     }
   }
 
-  async getFinP2PAssetBalance(
+  private async getFinP2PAssetBalance(
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<bigint> {
@@ -1370,7 +1370,7 @@ export class FinP2PTezos {
     return (BigInt((balance || new BigNumber(0)).toString()));
   }
 
-  async getExternalAssetBalance(
+  private async getExternalAssetBalance(
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<bigint> {
@@ -1380,20 +1380,17 @@ export class FinP2PTezos {
     }
     let proxyStorage = await this.getProxyStorage(kt1);
     let fa2TokenP = proxyStorage.finp2p_assets.get<FA2Token>(Michelson.bytesToHex(assetId));
-    let ownerP = proxyStorage.external_addresses.get<Address>(pk)
-      .then(addr => {
-        if (addr === undefined) {
-          return getPkhfromPk(pk);
-        } else {
-          return addr;
-        }
-      });
+    // TODO: issue with big map retieval below
+    let ownerP = proxyStorage.external_addresses.get<Address>(pk);
     let fa2Token = await fa2TokenP;
     if (fa2Token === undefined) {
       throw (new Error('FINP2P_UNKNOWN_ASSET_ID'));
     }
     let ledger = await this.getFA2Ledger(fa2Token.address);
     let owner = await ownerP;
+    if (owner === undefined) {
+      owner = getPkhfromPk(pk);
+    }
     // Retrieve balance for different kinds of assets, see
     // https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md#token-balance-updates
     //
@@ -1403,6 +1400,8 @@ export class FinP2PTezos {
     //   amount of tokens owned.
     async function getBalanceMulti() {
       if (fa2Token === undefined) { return (null as never) ; }
+      // TODO: does not work. Taquito only supports big map keys string, int or
+      // bool
       const balance = await ledger.get<BigNumber>([owner, fa2Token.id]);
       return (BigInt((balance || new BigNumber(0)).toString()));
     }
@@ -1411,6 +1410,7 @@ export class FinP2PTezos {
     //   where key is the owner's address and value is the amount of tokens
     //   owned.
     async function getBalanceSingle() {
+      if (owner === undefined) { return (null as never) ; }
       const balance = await ledger.get<BigNumber>(owner);
       return (BigInt((balance || new BigNumber(0)).toString()));
     }
@@ -1432,17 +1432,7 @@ export class FinP2PTezos {
       .catch(getBalanceNFT);
   }
 
-  /**
-   * @description Retrieve balance of account in a given asset
-   * @param publicKey: the public key of the account for which to lookup the balance
-   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
-   * representation of the key with the curve prefix and starting with `0x`)
-   * @param assetId: the finId of the asset (encoded)
-   * @returns a bigint representing the balance
-   * @throws `Error` if the asset id is not known by the contract or if the
-   * FA2 is an external FA2 (this last case needs to be implemented)
-   */
-  async getAssetBalance(
+  private async getAssetFA2Balance(
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<bigint> {
@@ -1482,7 +1472,7 @@ export class FinP2PTezos {
 
 
 
-  async getFinP2PAssetBalanceInfo(
+  private async getFinP2PAssetBalanceInfo(
     publicKey : Key,
     assetId : AssetId,
     kt1?: Address) : Promise<BalanceInfo> {
@@ -1519,13 +1509,14 @@ export class FinP2PTezos {
     } catch (e : any) {
       if (e.message == 'NOT_FINP2P_FA2') {
         // If this view fails, it is an external asset
-        let [balance, hold] =
-          await Promise.all([
-            this.getExternalAssetBalance(publicKey, assetId, kt1),
-            this.getAssetHold(publicKey, assetId, kt1),
-          ]);
+        // TODO: getExternalAssetBalance does not work
+        // let balanceP = this.getExternalAssetBalance(publicKey, assetId, kt1)
+        let balanceP = this.getAssetFA2Balance(publicKey, assetId, kt1);
+        let holdP = this.getAssetHold(publicKey, assetId, kt1);
+        let balance = await balanceP;
+        let hold = await holdP;
         return {
-          balance,
+          balance : balance + hold,
           on_hold : hold,
         };
       } else {
@@ -1553,6 +1544,26 @@ export class FinP2PTezos {
     const info =
       await this.getAssetBalanceInfo(publicKey, assetId, kt1);
     return (info.balance - info.on_hold);
+  }
+
+  /**
+   * @description Retrieve balance of account in a given asset
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address,
+  ) : Promise<bigint> {
+    const info =
+      await this.getAssetBalanceInfo(publicKey, assetId, kt1);
+    return info.balance;
   }
 
   async getTzktReceipt(op : OperationResult,
