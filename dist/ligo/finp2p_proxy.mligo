@@ -267,7 +267,19 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option) (amount_ 
   let holds =
     match amount_ with
     | None -> cleaned_holds
-    | Some a -> if a = hold_amount then cleaned_holds else s.holds in
+    | Some a ->
+      if a = hold_amount
+      then cleaned_holds
+      else
+        (match hold_info with
+         | FA2_hold _ -> s.holds
+         | Escrow e ->
+           let new_amount =
+             match sub_amount e.amount a with
+             | None -> (failwith fa2_insufficient_hold : token_amount)
+             | Some a -> a in
+           let hold_info = Escrow { e with amount = new_amount } in
+           Big_map.add hold_id hold_info s.holds) in
   let escrow_totals =
     match hold_info with
     | FA2_hold _ -> s.escrow_totals
@@ -317,8 +329,8 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
           dst = e_dst 
         } 0tez execute_ep
     | Escrow
-        { held_token = es_held_token; amount = es_amount; src_account = _;
-          dst = es_dst }
+        { held_token = es_held_token; amount = es_amount;
+          src_account = es_src_account; dst = es_dst }
       ->
       let dst_address = address_of_dst dst es_held_token s in
       let es_dst_address = address_of_dst es_dst es_held_token s in
@@ -331,6 +343,11 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
           if dst <> escrow_dst
           then (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
           else dst in
+      let () =
+        match src_account with
+        | None -> ()
+        | Some src ->
+          if src <> es_src_account then failwith "UNEXPECTED_HOLD_SOURCE" in
       let tr_src = Tezos.self_address in
       let tr_amount = match amount_ with | None -> es_amount | Some a -> a in
       let tr_token_id = es_held_token.id in
@@ -366,6 +383,11 @@ let release_hold (p : release_hold_param) (s : storage) : (operation * storage) 
         { held_token = es_held_token; amount = es_amount;
           src_account = es_src_account; dst = _ }
       ->
+      let () =
+        match src_account with
+        | None -> ()
+        | Some src ->
+          if src <> es_src_account then failwith "UNEXPECTED_HOLD_SOURCE" in
       let tr_src = Tezos.self_address in
       let tr_dst = address_of_key es_src_account es_held_token s in
       let tr_amount = match amount_ with | None -> es_amount | Some a -> a in

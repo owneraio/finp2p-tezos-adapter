@@ -1024,17 +1024,17 @@
              GET 13 ;
              NONE (or (pair (pair address nat) (pair nat (pair key (option (or key key_hash)))))
                       (pair nat (pair address nat))) ;
-             DIG 2 ;
+             DUP 3 ;
              GET_AND_UPDATE ;
              IF_NONE { PUSH string "FINP2P_UNKNOWN_HOLD_ID" ; FAILWITH } {} ;
-             DIG 2 ;
+             DIG 3 ;
              IF_NONE
-               { DIG 5 ; DROP ; UNIT }
-               { DUP 5 ;
+               { DIG 6 ; DROP ; UNIT }
+               { DUP 6 ;
                  GET 5 ;
                  SWAP ;
                  GET ;
-                 IF_NONE { DIG 5 ; FAILWITH } { DIG 6 ; DROP } ;
+                 IF_NONE { DIG 6 ; FAILWITH } { DIG 7 ; DROP } ;
                  SWAP ;
                  DUP ;
                  DUG 2 ;
@@ -1045,7 +1045,7 @@
              DROP ;
              DUP ;
              IF_LEFT
-               { DIG 5 ; DROP ; GET 3 }
+               { DIG 6 ; DROP ; GET 3 }
                { UNPAIR ;
                  SWAP ;
                  CAR ;
@@ -1054,15 +1054,47 @@
                       (option
                          (pair (nat %token_id) (pair (nat %amount) (pair (address %src) (option %dst address))))) ;
                  IF_NONE
-                   { DIG 4 ; FAILWITH }
-                   { IF_NONE { DIG 4 ; FAILWITH } { DIG 5 ; DROP ; GET 3 } } } ;
-             SWAP ;
-             DUP ;
-             DUG 2 ;
+                   { DIG 5 ; FAILWITH }
+                   { IF_NONE { DIG 5 ; FAILWITH } { DIG 6 ; DROP ; GET 3 } } } ;
+             DUP 5 ;
+             IF_NONE
+               { DIG 3 ; DROP ; DIG 2 }
+               { SWAP ;
+                 DUP ;
+                 DUG 2 ;
+                 SWAP ;
+                 DUP ;
+                 DUG 2 ;
+                 COMPARE ;
+                 EQ ;
+                 IF { DIG 4 ; DROP 2 ; DIG 2 }
+                    { DIG 3 ;
+                      DROP ;
+                      DUP 3 ;
+                      IF_LEFT
+                        { DUP ;
+                          DUG 2 ;
+                          GET 3 ;
+                          SUB ;
+                          ISNAT ;
+                          IF_NONE { NONE nat } { SOME } ;
+                          IF_NONE { PUSH string "FA2_INSUFFICIENT_HOLD" ; FAILWITH } {} ;
+                          DUP 7 ;
+                          GET 13 ;
+                          DUG 2 ;
+                          UPDATE 3 ;
+                          LEFT (pair nat (pair address nat)) ;
+                          DIG 4 ;
+                          SWAP ;
+                          SOME ;
+                          SWAP ;
+                          UPDATE }
+                        { SWAP ; DIG 4 ; DROP 3 ; DUP 4 ; GET 13 } } } ;
+             DUP 3 ;
              IF_LEFT
-               { DUP 5 ;
-                 IF_NONE { SWAP ; DUP ; DUG 2 } {} ;
-                 DUP 7 ;
+               { DIG 4 ;
+                 IF_NONE { DIG 2 } { DIG 3 ; DROP } ;
+                 DUP 5 ;
                  GET 14 ;
                  DUP 3 ;
                  CAR ;
@@ -1083,7 +1115,7 @@
                      COMPARE ;
                      EQ ;
                      IF { DROP ; NONE nat } { SOME } } ;
-                 DUP 7 ;
+                 DUP 5 ;
                  GET 14 ;
                  SWAP ;
                  DUP 3 ;
@@ -1092,17 +1124,10 @@
                  GET 5 ;
                  PAIR ;
                  UPDATE }
-               { DROP ; DUP 5 ; GET 14 } ;
+               { DIG 2 ; DIG 4 ; DROP 3 ; DUP 3 ; GET 14 } ;
              DIG 2 ;
-             DUP 6 ;
-             DIG 5 ;
-             IF_NONE
-               { DIG 3 ; DIG 5 ; DROP 2 ; DIG 3 }
-               { DIG 4 ;
-                 SWAP ;
-                 COMPARE ;
-                 EQ ;
-                 IF { DIG 4 ; DROP ; DIG 3 } { DIG 3 ; DROP ; DIG 3 ; GET 13 } } ;
+             DIG 3 ;
+             DIG 3 ;
              UPDATE 13 ;
              DIG 2 ;
              UPDATE 14 ;
@@ -1323,23 +1348,19 @@
                          UNPAIR ;
                          SWAP ;
                          IF_LEFT
-                           { DIG 3 ;
-                             DROP ;
-                             UNPAIR 4 ;
-                             DIG 2 ;
-                             DROP ;
-                             DIG 5 ;
+                           { UNPAIR 4 ;
+                             DIG 7 ;
                              IF_NONE
                                { NONE address }
                                { IF_LEFT
-                                   { DUP 5 ; DUP 3 ; DIG 2 ; PAIR 3 ; DUP 7 ; SWAP ; EXEC ; SOME }
+                                   { DUP 6 ; DUP 3 ; DIG 2 ; PAIR 3 ; DUP 9 ; SWAP ; EXEC ; SOME }
                                    { IMPLICIT_ACCOUNT ; ADDRESS ; SOME } } ;
-                             DIG 3 ;
+                             DIG 4 ;
                              IF_NONE
-                               { DIG 5 ; DROP ; NONE address }
+                               { DIG 7 ; DROP ; NONE address }
                                { IF_LEFT
-                                   { DUP 5 ; DUP 4 ; DIG 2 ; PAIR 3 ; DIG 6 ; SWAP ; EXEC ; SOME }
-                                   { DIG 6 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } } ;
+                                   { DUP 6 ; DUP 4 ; DIG 2 ; PAIR 3 ; DIG 8 ; SWAP ; EXEC ; SOME }
+                                   { DIG 8 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } } ;
                              SWAP ;
                              IF_NONE
                                { IF_NONE { PUSH string "NO_DESTINATION_EXECUTE_HOLD" ; FAILWITH } {} }
@@ -1353,6 +1374,15 @@
                                      NEQ ;
                                      IF { DROP ; PUSH string "UNEXPECTED_EXECUTE_HOLD_DESTINATION" ; FAILWITH }
                                         {} } } ;
+                             DIG 6 ;
+                             IF_NONE
+                               { DIG 3 ; DROP ; UNIT }
+                               { DIG 4 ;
+                                 SWAP ;
+                                 COMPARE ;
+                                 NEQ ;
+                                 IF { PUSH string "UNEXPECTED_HOLD_SOURCE" ; FAILWITH } { UNIT } } ;
+                             DROP ;
                              SELF_ADDRESS ;
                              DUP 3 ;
                              CAR ;
@@ -1668,10 +1698,17 @@
                      UNPAIR ;
                      SWAP ;
                      IF_LEFT
-                       { DIG 3 ;
-                         DROP ;
-                         UNPAIR 4 ;
+                       { UNPAIR 4 ;
                          DIG 3 ;
+                         DROP ;
+                         DIG 5 ;
+                         IF_NONE
+                           { UNIT }
+                           { DUP 4 ;
+                             SWAP ;
+                             COMPARE ;
+                             NEQ ;
+                             IF { PUSH string "UNEXPECTED_HOLD_SOURCE" ; FAILWITH } { UNIT } } ;
                          DROP ;
                          SELF_ADDRESS ;
                          DUP 5 ;
