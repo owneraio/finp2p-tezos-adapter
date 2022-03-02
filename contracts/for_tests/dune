@@ -1,0 +1,69 @@
+
+(library
+ (name test_fa2)
+ (modules errors utils fa2_params fa2_types fa2_common assets admin manager fa2)
+ (libraries base)
+ (preprocess
+  (pps mligo.ppx))
+ (flags
+  (:standard -open Mligo)))
+
+(rule
+ (alias ligo)
+ (deps (glob_files *.ml))
+ (targets
+  errors.mligo
+  fa2_params.mligo
+  fa2_types.mligo
+  fa2_common.mligo
+  utils.mligo
+  assets.mligo
+  admin.mligo
+  manager.mligo
+  fa2.mligo
+)
+ (action
+  (progn
+   (run to_mligo fa2.ml))))
+
+(rule
+ (alias michelson)
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   fa2_common.mligo
+   utils.mligo
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+)
+(targets fa2.tz)
+(action
+ (progn
+  (with-stdout-to
+    fa2.tz
+   (run ligo compile contract fa2.mligo -p hangzhou))
+)))
+
+(rule
+ (alias michelson-json)
+ (deps
+   errors.mligo
+   fa2_params.mligo
+   fa2_types.mligo
+   fa2_common.mligo
+   utils.mligo
+   assets.mligo
+   admin.mligo
+   manager.mligo
+   fa2.mligo
+)
+(targets fa2.json)
+(action
+ (progn
+  (with-stdout-to
+    fa2.json
+   (run ligo compile contract fa2.mligo --michelson-format json -p hangzhou))
+)))
