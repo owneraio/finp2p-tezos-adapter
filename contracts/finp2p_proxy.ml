@@ -350,11 +350,21 @@ let unhold_aux (hold_id : finp2p_hold_id) (asset_id : asset_id option)
     | None ->
         (* Full hold release/execution *)
         cleaned_holds
-    | Some a ->
+    | Some a -> (
         if a = hold_amount then (* Full hold release/execution *)
           cleaned_holds
-        else (* Partial hold release/execution *)
-          s.holds
+        else
+          (* Partial hold release/execution, decrease value of escrow *)
+          match hold_info with
+          | FA2_hold _ -> s.holds
+          | Escrow e ->
+              let new_amount =
+                match sub_amount e.es_amount a with
+                | None -> (failwith fa2_insufficient_hold : token_amount)
+                | Some a -> a
+              in
+              let hold_info = Escrow {e with es_amount = new_amount} in
+              Big_map.add hold_id hold_info s.holds)
   in
   let escrow_totals =
     match hold_info with
