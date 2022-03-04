@@ -677,12 +677,31 @@ export class FinP2PTezos {
   }
 
   /**
-   * @description Re-export `waitInclusion` for ease of use.
-   * By default, waits for the number of confirmations in the `config`.
+   * @description Re-export `waitInclusion` for ease of use and check that it
+   * is successful. * By default, waits for the number of confirmations in the
+   * `config`.
    * @see TaquitoWrapper.waitInclusion for details
   */
-  waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
-    return this.taquito.waitInclusion(op, confirmations);
+  async waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
+    const result = await this.taquito.waitInclusion(op, confirmations);
+    const [blockOp,,] = result;
+    blockOp.contents.map(o => {
+      if (!hasOwnProperty(o, 'metadata')
+        || o.metadata === undefined
+        || !hasOwnProperty(o.metadata, 'operation_result')
+        || o.metadata.operation_result === undefined ) {
+        // Not a manager operation, or the metadata is not available in the node (unlikely)
+        // Consider operation as successful.
+        return;
+      }
+      if (o.metadata.operation_result.status === 'applied') {
+        return;
+      }
+      throw new Error(
+        `Operation is included as ${o.metadata.operation_result.status}, ` +
+          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
+    });
+    return result;
   }
 
   async init(p : { operationTTL : OperationTTL,
