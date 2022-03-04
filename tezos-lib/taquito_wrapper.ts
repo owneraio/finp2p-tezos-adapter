@@ -7,7 +7,7 @@ import {
   createRevealOperation,
   Signer,
 } from '@taquito/taquito';
-import { BlockResponse, MichelsonV1Expression, RpcClientInterface } from '@taquito/rpc';
+import { BlockResponse, MichelsonV1Expression, OperationEntry, RpcClientInterface } from '@taquito/rpc';
 import { localForger, LocalForger } from '@taquito/local-forging';
 import { encodeOpHash, b58cdecode, b58cencode, prefix, getPkhfromPk } from '@taquito/utils';
 import { XMLHttpRequest } from 'xhr2-cookies';
@@ -169,13 +169,14 @@ export class TaquitoWrapper extends TezosToolkit {
     });
   }
 
-  private inBlock(block : BlockResponse, op : OperationResult) : boolean {
+  private findInBlock(block : BlockResponse, op : OperationResult) : OperationEntry | undefined {
     const r = block.operations.find((l) => {
       return l.find((blockOp) => {
         return (blockOp.hash === op.hash);
       });
     });
-    return (r !== undefined);
+    if (r === undefined) { return; }
+    return r[0];
   }
 
   private async checkInMainChain(
@@ -194,14 +195,15 @@ export class TaquitoWrapper extends TezosToolkit {
     nb = 5,
     blockHash? : string,
     head? : BlockResponse,
-  ) : Promise<[BlockResponse, number] | undefined> {
+  ) : Promise<[OperationEntry, BlockResponse, number] | undefined> {
     if (nb == 0) { return undefined; }
     const block = await this.rpc.getBlock({ block: (blockHash || 'head') });
     if (head === undefined) { head = block; }
-    if (this.inBlock(block, op)) {
+    const blockOp = this.findInBlock(block, op);
+    if (blockOp !== undefined) {
       const confirmations = block.header.level - head.header.level;
       await this.checkInMainChain(block.hash, head.hash, confirmations);
-      return ([block, confirmations]);
+      return ([blockOp, block, confirmations]);
     }
     return this.inPrevBlocks(
       op, nb - 1, block.header.predecessor, head,
@@ -217,22 +219,23 @@ export class TaquitoWrapper extends TezosToolkit {
    * returning (by default 0, i.e. returns as soon as the operation is
    * included in a block)
    * @param max : the maximum number of blocks to wait before bailing (default 10)
-   * @returns information about inclusion, such as the inclusion block, the
+   * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  waitInclusion(op : OperationResult, confirmations? : number, max = 10) : Promise<[BlockResponse, number]> {
-    var foundBlock : BlockResponse;
+  waitInclusion(op : OperationResult, confirmations? : number, max = 10) :
+  Promise<[OperationEntry, BlockResponse, number]> {
+    var foundRes : [OperationEntry, BlockResponse];
     const taquito = this;
     var count = 0;
     return new Promise(function (resolve, reject) {
       // start looking in the previous blocks
       taquito.inPrevBlocks(op).then(blockAndConf => {
         if (blockAndConf !== undefined) {
-          const [block, blockConfirmations] = blockAndConf;
-          foundBlock = block;
+          const [blockOp, block, blockConfirmations] = blockAndConf;
+          foundRes = [blockOp, block];
           if (confirmations === undefined
             || confirmations <= blockConfirmations) {
-            return resolve([foundBlock, blockConfirmations]);
+            return resolve([blockOp, block, blockConfirmations]);
           }
         }
       });
@@ -246,23 +249,25 @@ export class TaquitoWrapper extends TezosToolkit {
             return reject(new Error(`Did not see operation for ${max} blocks`));
           }
           const block = await taquito.rpc.getBlock({ block: hash });
-          if (foundBlock === undefined) {
-            if (taquito.inBlock(block, op)) {
-              foundBlock = block;
+          if (foundRes === undefined) {
+            const blockOp = taquito.findInBlock(block, op);
+            if (blockOp !== undefined) {
+              foundRes = [blockOp, block];
               if (confirmations === undefined || confirmations === 0) {
                 xhr.abort();
-                return resolve([foundBlock, 0]);
+                return resolve([blockOp, block, 0]);
               }
             }
           } else {
             // already found
+            const [foundOp, foundBlock] = foundRes;
             let obtainedConfirmations = block.header.level - foundBlock.header.level;
             if (confirmations === undefined
               || confirmations <= obtainedConfirmations) {
               xhr.abort();
               await taquito.checkInMainChain(
                 foundBlock.hash, block.hash, obtainedConfirmations);
-              return resolve([foundBlock, obtainedConfirmations]);
+              return resolve([foundOp, foundBlock, obtainedConfirmations]);
             }
           }
         });
