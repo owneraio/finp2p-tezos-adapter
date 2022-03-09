@@ -79,7 +79,7 @@ type hold_shg = [@layout:comb]  {
     dst_account_type: string option ;
     dst_account: hold_dst option ;
     amount: token_amount ;
-    expiration: timestamp }
+    expiration: nat }
 
 type hold_tokens_param = [@layout:comb]  {
     hold_id: finp2p_hold_id ;

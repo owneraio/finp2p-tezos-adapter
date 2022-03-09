@@ -103,9 +103,6 @@ let timestamp_to_seconds_since_epoch (timestamp : timestamp) : nat =
 let timestamp_to_uint64_big_endian (timestamp : timestamp) : bytes =
   nat_to_uint64_big_endian (timestamp_to_seconds_since_epoch timestamp)
 
-let timestamp_0x_hex_big_endian (timestamp : timestamp) : string =
-  nat_to_0x_hex_big_endian (timestamp_to_seconds_since_epoch timestamp)
-
 let drop_n_first_bytes (b : bytes) (n : nat) : bytes =
   let len = Bytes.length b in
   let rem_len =
@@ -256,7 +253,7 @@ let encode_hold_tokens_payload (p : hold_tokens_param) =
       | Some (Supported (FinId k)) -> public_key_to_hex_string_bytes k
       | Some (Supported (Tezos pkh)) -> key_hash_to_bytes pkh in
     let amount_ = amount_to_bytes shg_amount in
-    let expiry = string_to_bytes (timestamp_0x_hex_big_endian shg_expiration) in
+    let expiry = string_to_bytes (nat_to_0x_hex_big_endian shg_expiration) in
     concat_bytes
       [assetType;
        assetId;
