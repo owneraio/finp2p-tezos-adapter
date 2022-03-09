@@ -440,11 +440,11 @@ function log_hashgroup (hg : any[]) {
   log("Hash group:")
   hg.forEach((h) => {
     if (h instanceof Buffer) {
-      h.toString('hex')
+      log(h.toString('hex'))
     } else if (h instanceof Uint8Array) {
       log(to_hex(h))
     } else if (typeof h === 'string') {
-      log(to_hex(utf8.encode(h)))
+      log(to_hex(utf8.encode(h)) + " = " + h)
     } else {
       log(h)
     }
@@ -642,7 +642,7 @@ async function mk_hold_tokens(i : {
   amount : number | bigint,
   src : finp2p_account,
   dst? : hold_dst,
-  expiration : Date,
+  expiration : number | bigint ,
   signer? : finp2p_account}) {
   let nonce = generateNonce()
   let nonce_bytes = nonce_to_bytes(nonce)
@@ -694,7 +694,7 @@ async function mk_hold_tokens(i : {
   if (shg_dst_account !== undefined) { settlementGroup.push(shg_dst_account) }
   settlementGroup.push(
     '0x' + i.amount.toString(16),
-    '0x' + (dateToSec(i.expiration)).toString(16),
+    '0x' + i.expiration.toString(16),
   )
   let settlementHashGroup = await hashValues(settlementGroup);
   log('SHG:', settlementHashGroup.toString('hex'))
@@ -743,7 +743,7 @@ async function mk_hold_tokens(i : {
     dst_account_type : shg_dst_account_type,
     dst_account,
     amount: BigInt(i.amount),
-    expiration : i.expiration,
+    expiration : BigInt(i.expiration),
   }
 
   let param: Finp2pProxy.HoldTokensParam = {
@@ -762,7 +762,7 @@ async function hold_tokens(i : {
   amount : number | bigint,
   src : finp2p_account,
   dst? : hold_dst,
-  expiration : Date,
+  expiration : number | bigint ,
   signer? : finp2p_account,
   options? : Finp2pProxy.CallOptions,
 }) {
@@ -1665,8 +1665,7 @@ describe('Hold / Execute / Release',  () => {
       owner : accounts[0].pubKey,
       asset_id : asset_id1 })
     assert.equal(b0, 100)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -1686,8 +1685,7 @@ describe('Hold / Execute / Release',  () => {
       owner : accounts[0].pubKey,
       asset_id : asset_id1 })
     assert.equal(b0, 100)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "HOLD-ID-0001",
         asset_id : asset_id1,
@@ -1709,8 +1707,7 @@ describe('Hold / Execute / Release',  () => {
   })
 
   it("Hold wrong signature", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -1727,8 +1724,7 @@ describe('Hold / Execute / Release',  () => {
   })
 
   it("Hold duplicate id", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -1744,8 +1740,7 @@ describe('Hold / Execute / Release',  () => {
   })
 
   it("Hold on same token", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "HOLD-ID-0002",
         asset_id : asset_id1,
@@ -1822,8 +1817,7 @@ describe('Hold / Execute / Release',  () => {
       owner : accounts[2].pubKey,
       asset_id : asset_id1 })
     assert.equal(b2, 49)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "HOLD-ID-0003",
         asset_id : asset_id1,
@@ -1844,8 +1838,7 @@ describe('Hold / Execute / Release',  () => {
   })
 
   it("Hold with date in the past", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() - 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "HOLD-ID-0004",
         asset_id : asset_id1,
@@ -1867,8 +1860,7 @@ describe('Hold / Execute / Release',  () => {
   })
 
   it("Hold for self", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "HOLD-ID-0005",
         asset_id : asset_id1,
@@ -2079,8 +2071,7 @@ describe('External FA2 Escrow',  () => {
       owner : accounts[0].pubKey,
       asset_id : ext_asset_id })
     assert.equal(b0, 100)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -2100,8 +2091,7 @@ describe('External FA2 Escrow',  () => {
       owner : accounts[0].pubKey,
       asset_id : ext_asset_id })
     assert.equal(b0, 100)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "EXT-HOLD-ID-0001",
         asset_id : ext_asset_id,
@@ -2123,8 +2113,7 @@ describe('External FA2 Escrow',  () => {
   })
 
   it("Hold wrong signature", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -2141,8 +2130,7 @@ describe('External FA2 Escrow',  () => {
   })
 
   it("Hold duplicate id", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     await assert.rejects(
       async () => {
         await hold_tokens(
@@ -2158,8 +2146,7 @@ describe('External FA2 Escrow',  () => {
   })
 
   it("Hold on same token", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "EXT-HOLD-ID-0002",
         asset_id : ext_asset_id,
@@ -2236,8 +2223,7 @@ describe('External FA2 Escrow',  () => {
       owner : accounts[2].pubKey,
       asset_id : ext_asset_id })
     assert.equal(b2, 49)
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "EXT-HOLD-ID-0003",
         asset_id : ext_asset_id,
@@ -2258,8 +2244,7 @@ describe('External FA2 Escrow',  () => {
   })
 
   it("Hold with date in the past", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() - 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "EXT-HOLD-ID-0004",
         asset_id : ext_asset_id,
@@ -2281,8 +2266,7 @@ describe('External FA2 Escrow',  () => {
   })
 
   it("Hold for self", async () => {
-    const expiration = new Date()
-    expiration.setSeconds(expiration.getSeconds() + 3600);
+    const expiration = 3600n;
     let op = await hold_tokens(
       { hold_id: "EXT-HOLD-ID-0005",
         asset_id : ext_asset_id,
