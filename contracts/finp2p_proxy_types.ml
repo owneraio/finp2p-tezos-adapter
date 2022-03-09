@@ -75,7 +75,7 @@ type hold_shg = {
   shg_dst_account_type : string option;
   shg_dst_account : hold_dst option;
   shg_amount : token_amount;
-  shg_expiration : timestamp;
+  shg_expiration : nat; (* timespan in seconds *)
 }
 [@@comb]
 

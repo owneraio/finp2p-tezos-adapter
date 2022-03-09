@@ -140,7 +140,7 @@ export interface HoldSHG {
   dst_account_type? : string;
   dst_account? : HoldDst;
   amount : TokenAmount;
-  expiration : Timestamp;
+  expiration : Nat;
 }
 
 export interface HoldTokensParam {
@@ -460,7 +460,7 @@ export namespace Michelson {
         dstAccountType,
         dstAccount,
         { /* amount */ int: shg.amount.toString() },
-        { /* expiration */ string: shg.expiration.toISOString() },
+        { /* expiration */ int : shg.expiration.toString() },
       ],
     };
   }
