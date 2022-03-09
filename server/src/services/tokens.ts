@@ -182,7 +182,7 @@ export class TokenService {
         source:
             (r.srcAccount === undefined) ? undefined : { finId: r.srcAccount.toString('hex') } as Components.Schemas.Source,
         destination:
-            (r.dstAccount === undefined) ? undefined : { finId: r.dstAccount.toString('hex') } as Components.Schemas.Source,
+            (r.dstAccount === undefined) ? undefined : { type: 'finId', finId: r.dstAccount.toString('hex') } as Components.Schemas.FinIdAccount,
         quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
       } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
@@ -226,7 +226,7 @@ export class TokenService {
 
     let ahg : FINP2PProxy.HoldAHG = {
       nonce: { nonce: noncePre, timestamp: new Date(Number(nonceBytes.readBigInt64BE(24)) * 1000 ) },
-      asset_id: new Uint8Array(Buffer.from(ahgAssetIdField.value)), // utf8.encode(ahgAssetIdField.value),
+      asset_id: utf8.encode(ahgAssetIdField.value),
       src_account : pubkeyToTezosSecp256k1(ahgSourceField.value),
       dst_account : pubkeyToTezosSecp256k1(ahgDestinationField.value),
       amount : utf8.encode(ahgAmountField.value),
@@ -235,12 +235,12 @@ export class TokenService {
     let shg : FINP2PProxy.HoldSHG = {
       asset_type: request.asset.type,
       asset_id: utf8.encode(assetId),
-      src_account_type : utf8.encode('finp2p'),
-      src_account : new Uint8Array(Buffer.from(request.source.finId)), //utf8.encode(request.source.finId),
+      src_account_type : utf8.encode('finId'),
+      src_account : utf8.encode(request.source.finId),
       dst_account_type : request.destination?.type,
       dst_account : dstAccount,
       amount: BigInt(request.quantity),
-      expiration : new Date(request.expiry),
+      expiration : BigInt(request.expiry),
     };
 
     let params: FINP2PProxy.HoldTokensParam = {
@@ -266,7 +266,7 @@ export class TokenService {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
-      src_account : request.source.finId,
+      src_account : pubkeyToTezosSecp256k1(request.source.finId),
       dst: dstAccount,
     };
 
@@ -274,6 +274,13 @@ export class TokenService {
     await this.tezosClient.waitInclusion(op);
     return {
       isCompleted: true,
+      response: {
+        id: op.hash,
+        asset: request.asset,
+        source: request.source,
+        destination: request.destination,
+        quantity: request.quantity,
+      } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -285,12 +292,19 @@ export class TokenService {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
-      src_account : request.source.finId,
+      src_account : pubkeyToTezosSecp256k1(request.source.finId),
     };
     const op = await this.tezosClient.releaseHold(params);
     await this.tezosClient.waitInclusion(op);
     return {
       isCompleted: true,
+      response: {
+        id: op.hash,
+        asset: request.asset,
+        source: request.source,
+        destination: { type: 'finId', finId: request.source.finId } as Components.Schemas.FinIdAccount,
+        quantity: request.quantity,
+      } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
   }
 
