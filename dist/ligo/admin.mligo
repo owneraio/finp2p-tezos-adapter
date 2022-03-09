@@ -15,7 +15,7 @@ let pause (s : storage) (paused : bool) : storage =
 let fail_if_paused (a : storage) : unit =
   if a.paused then failwith "PAUSED" else ()
 
-let update_token_metadata (token_id : nat) (metadata : (string, bytes) map) (s : storage) : storage =
+let update_token_metadata (token_id : token_id) (metadata : (string, bytes) map) (s : storage) : storage =
   let (old_metadata, token_metadata) =
     Big_map.get_and_update token_id (Some (token_id, metadata))
       s.token_metadata in

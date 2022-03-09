@@ -1,5 +1,10 @@
 include Errors
 include Admin
+include Fa2_params
+
+let[@inline] check_token_exists (id : token_id) (s : storage) : unit =
+  if not (Big_map.mem id s.token_metadata) then
+    (failwith fa2_token_undefined : unit)
 
 let mint (p : mint_param) (s : storage) : storage =
   let token_id = p.mi_token_id in
@@ -7,9 +12,8 @@ let mint (p : mint_param) (s : storage) : storage =
     match p.mi_token_info with
     | None ->
         (* Existing token *)
-        if not (Big_map.mem token_id s.token_metadata) then
-          (failwith fa2_token_undefined : token_metadata_storage)
-        else s.token_metadata
+        let () = check_token_exists token_id s in
+        s.token_metadata
     | Some info -> (
         (* New token *)
         let (old_metadata, token_metadata) =
@@ -24,20 +28,20 @@ let mint (p : mint_param) (s : storage) : storage =
   in
   let supply =
     match Big_map.find_opt token_id s.total_supply with
-    | None -> 0n
+    | None -> Amount 0n
     | Some supply -> supply
   in
   let (ledger, supply) =
     List.fold_left
       (fun (((ledger, supply), (owner, mint_amount)) :
-             (ledger * nat) * (address * nat)) ->
+             (ledger * token_amount) * (address * token_amount)) ->
         let new_balance =
           match Big_map.find_opt (owner, token_id) ledger with
           | None -> mint_amount
-          | Some old_balance -> old_balance + mint_amount
+          | Some old_balance -> add_amount old_balance mint_amount
         in
         let ledger = Big_map.add (owner, token_id) new_balance ledger in
-        let supply = supply + mint_amount in
+        let supply = add_amount supply mint_amount in
         (ledger, supply))
       (s.ledger, supply)
       p.mi_owners
@@ -50,24 +54,25 @@ let mint (p : mint_param) (s : storage) : storage =
 
 let burn (p : burn_param) (s : storage) : storage =
   let id = p.bu_token_id in
+  let () = check_token_exists id s in
   let (ledger, burnt) =
     List.fold_left
       (fun (((ledger, burnt), (owner, burn_amount)) :
-             (ledger * nat) * (address * nat)) ->
+             (ledger * token_amount) * (address * token_amount)) ->
         let old_balance =
           match Big_map.find_opt (owner, id) ledger with
-          | None -> 0n
+          | None -> Amount 0n
           | Some old_balance -> old_balance
         in
-        match is_nat (old_balance - burn_amount) with
-        | None -> (failwith fa2_insufficient_balance : ledger * nat)
+        match sub_amount old_balance burn_amount with
+        | None -> (failwith fa2_insufficient_balance : ledger * token_amount)
         | Some new_balance ->
             let ledger =
-              if new_balance = 0n then Big_map.remove (owner, id) ledger
+              if new_balance = Amount 0n then Big_map.remove (owner, id) ledger
               else Big_map.add (owner, id) new_balance ledger
             in
-            (ledger, burnt + burn_amount))
-      (s.ledger, 0n)
+            (ledger, add_amount burnt burn_amount))
+      (s.ledger, Amount 0n)
       p.bu_owners
   in
   let total_supply =
@@ -75,9 +80,9 @@ let burn (p : burn_param) (s : storage) : storage =
     | None -> s.total_supply
     | Some supply ->
         let supply =
-          match is_nat (supply - burnt) with
+          match sub_amount supply burnt with
           | None -> (* Should not happen *) None
-          | Some sup -> if sup = 0n then None else Some sup
+          | Some (Amount sup) -> if sup = 0n then None else Some (Amount sup)
         in
         Big_map.update id supply s.total_supply
   in

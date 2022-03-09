@@ -87,19 +87,19 @@
                                CDR ;
                                MEM ;
                                NOT ;
-                               IF { DROP ; DUP 4 ; FAILWITH }
-                                  { DUP ;
-                                    DUP 4 ;
-                                    GET 5 ;
-                                    DUP 3 ;
-                                    CDR ;
-                                    DIG 3 ;
-                                    CAR ;
-                                    PAIR ;
-                                    GET ;
-                                    IF_NONE { PUSH nat 0 } {} ;
-                                    SWAP ;
-                                    PAIR } } ;
+                               IF { DUP 5 ; FAILWITH } {} ;
+                               DUP ;
+                               DUP 4 ;
+                               GET 5 ;
+                               DUP 3 ;
+                               CDR ;
+                               DIG 3 ;
+                               CAR ;
+                               PAIR ;
+                               GET ;
+                               IF_NONE { PUSH nat 0 } {} ;
+                               SWAP ;
+                               PAIR } ;
                          DIG 4 ;
                          DROP ;
                          SWAP ;
@@ -112,9 +112,7 @@
                          DIG 2 ;
                          CONS ;
                          PAIR }
-                       { DIG 4 ;
-                         DROP ;
-                         SWAP ;
+                       { SWAP ;
                          DUP ;
                          DUG 2 ;
                          GET 5 ;
@@ -123,83 +121,80 @@
                                 DUG 2 ;
                                 CDR ;
                                 ITER { SWAP ;
-                                       DUP ;
+                                       DUP 4 ;
+                                       GET 9 ;
                                        DUP 3 ;
                                        GET 3 ;
-                                       DUP 5 ;
-                                       CAR ;
-                                       PAIR ;
-                                       GET ;
-                                       IF_NONE
-                                         { DROP 2 ; DUP 4 ; FAILWITH }
-                                         { PUSH nat 0 ;
-                                           DUP 4 ;
-                                           GET 4 ;
-                                           COMPARE ;
-                                           EQ ;
-                                           IF { DIG 2 ; DROP 2 }
-                                              { DUP 3 ;
-                                                GET 4 ;
+                                       MEM ;
+                                       NOT ;
+                                       IF { DUP 7 ; FAILWITH } {} ;
+                                       SWAP ;
+                                       DUP ;
+                                       DUG 2 ;
+                                       GET 4 ;
+                                       PUSH nat 0 ;
+                                       SWAP ;
+                                       DUP ;
+                                       DUG 2 ;
+                                       COMPARE ;
+                                       EQ ;
+                                       IF { DIG 2 ; DROP 2 }
+                                          { SWAP ;
+                                            DUP ;
+                                            DUG 2 ;
+                                            DUP 4 ;
+                                            GET 3 ;
+                                            DUP 6 ;
+                                            CAR ;
+                                            PAIR ;
+                                            GET ;
+                                            IF_NONE { DUP 7 ; FAILWITH } {} ;
+                                            SWAP ;
+                                            DUP ;
+                                            DUG 2 ;
+                                            SWAP ;
+                                            SUB ;
+                                            ISNAT ;
+                                            IF_NONE { NONE nat } { SOME } ;
+                                            IF_NONE
+                                              { DUP 7 ; FAILWITH }
+                                              { PUSH nat 0 ;
                                                 SWAP ;
-                                                SUB ;
-                                                ISNAT ;
-                                                IF_NONE
-                                                  { DROP 2 ; DUP 4 ; FAILWITH }
-                                                  { PUSH nat 0 ;
-                                                    SWAP ;
-                                                    DUP ;
-                                                    DUG 2 ;
-                                                    COMPARE ;
-                                                    EQ ;
-                                                    IF { DROP ;
-                                                         SWAP ;
-                                                         DUP ;
-                                                         DUG 2 ;
-                                                         GET 3 ;
-                                                         DUP 4 ;
-                                                         CAR ;
-                                                         PAIR ;
-                                                         NONE nat ;
-                                                         SWAP ;
-                                                         UPDATE }
-                                                       { SOME ; DUP 3 ; GET 3 ; DUP 5 ; CAR ; PAIR ; UPDATE } ;
-                                                    DUP ;
-                                                    DUP 3 ;
-                                                    GET 3 ;
-                                                    DUP 4 ;
-                                                    CAR ;
-                                                    PAIR ;
-                                                    GET ;
-                                                    IF_NONE
-                                                      { SWAP ;
-                                                        DUP ;
-                                                        DUG 2 ;
-                                                        GET 4 ;
-                                                        DUP 3 ;
-                                                        GET 3 ;
-                                                        DIG 3 ;
-                                                        CAR ;
-                                                        PAIR ;
-                                                        SWAP ;
-                                                        SOME ;
-                                                        SWAP ;
-                                                        UPDATE }
-                                                      { SWAP ;
-                                                        DUP 3 ;
-                                                        GET 4 ;
-                                                        DIG 2 ;
-                                                        ADD ;
-                                                        SOME ;
-                                                        DUP 3 ;
-                                                        GET 3 ;
-                                                        DIG 3 ;
-                                                        CAR ;
-                                                        PAIR ;
-                                                        UPDATE } } } } } ;
+                                                DUP ;
+                                                DUG 2 ;
+                                                COMPARE ;
+                                                EQ ;
+                                                IF { DROP ; NONE nat } { SOME } } ;
+                                            DIG 2 ;
+                                            SWAP ;
+                                            DUP 4 ;
+                                            GET 3 ;
+                                            DUP 6 ;
+                                            CAR ;
+                                            PAIR ;
+                                            UPDATE ;
+                                            DUP ;
+                                            DUP 4 ;
+                                            GET 3 ;
+                                            DUP 5 ;
+                                            CAR ;
+                                            PAIR ;
+                                            GET ;
+                                            IF_NONE { SWAP } { DIG 2 ; ADD } ;
+                                            DUP 3 ;
+                                            GET 3 ;
+                                            DIG 3 ;
+                                            CAR ;
+                                            PAIR ;
+                                            SWAP ;
+                                            SOME ;
+                                            SWAP ;
+                                            UPDATE } } ;
                                 SWAP ;
                                 DROP } ;
                          DIG 3 ;
-                         DROP ;
+                         DIG 4 ;
+                         DROP 2 ;
                          UPDATE 5 ;
                          NIL operation ;
                          PAIR } }
@@ -252,10 +247,16 @@
            { DIG 2 ;
              SWAP ;
              IF_LEFT
-               { DIG 4 ;
-                 DROP ;
-                 DUP ;
+               { DUP ;
                  CAR ;
+                 DUP 3 ;
+                 GET 9 ;
+                 SWAP ;
+                 DUP ;
+                 DUG 2 ;
+                 MEM ;
+                 NOT ;
+                 IF { DIG 5 ; FAILWITH } { DIG 5 ; DROP } ;
                  PUSH nat 0 ;
                  DUP 4 ;
                  GET 5 ;
@@ -277,6 +278,7 @@
                         IF_NONE { PUSH nat 0 } {} ;
                         SUB ;
                         ISNAT ;
+                        IF_NONE { NONE nat } { SOME } ;
                         IF_NONE
                           { DROP 4 ; DUP 4 ; FAILWITH }
                           { DIG 2 ;
@@ -305,6 +307,7 @@
                      DUP 4 ;
                      GET 11 ;
                      SWAP ;
+                     IF_NONE { NONE nat } { SOME } ;
                      IF_NONE
                        { NONE nat }
                        { PUSH nat 0 ;
@@ -336,7 +339,9 @@
                      DUG 2 ;
                      MEM ;
                      NOT ;
-                     IF { DIG 4 ; FAILWITH } { DIG 4 ; DROP ; DUP 3 ; GET 9 } }
+                     IF { DIG 4 ; FAILWITH } { DIG 4 ; DROP } ;
+                     DUP 3 ;
+                     GET 9 }
                    { DIG 5 ;
                      DROP ;
                      DUP 4 ;

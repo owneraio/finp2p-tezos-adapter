@@ -27,7 +27,7 @@ let authorize (param : param) (s : storage) : operation =
     | Manager (Burn bu) ->
         [
           List.map
-            (fun ((owner : address), (_amount : nat)) ->
+            (fun ((owner : address), (_amount : token_amount)) ->
               Big_map.mem
                 (owner, (Tezos.sender None, bu.bu_token_id))
                 s.operators)
@@ -65,13 +65,13 @@ let main ((param, s) : param * storage) : operation list * storage =
 
 (* Views *)
 
-let[@view] get_balance (((owner, token_id) : address * nat), (s : storage)) :
-    nat =
+let[@view] get_balance (((owner, token_id) : address * token_id), (s : storage))
+    : token_amount =
   if not (Big_map.mem token_id s.token_metadata) then
-    (failwith fa2_token_undefined : nat)
+    (failwith fa2_token_undefined : token_amount)
   else
     match Big_map.find_opt (owner, token_id) s.ledger with
-    | None -> 0n
+    | None -> Amount 0n
     | Some b -> b
 
-let[@view] get_max_token_id ((), (s : storage)) : nat = s.max_token_id
+let[@view] get_max_token_id ((), (s : storage)) : token_id = s.max_token_id

@@ -1,12 +1,12 @@
-type fa2_token = {address : address; id : nat} [@@comb]
+include Fa2_params
+
+type fa2_token = {address : address; id : token_id} [@@comb]
 
 type operation_hash = OpHash of bytes (* 32 *)
 
 type asset_id = Asset_id of bytes
 
 type finp2p_nonce = {nonce : bytes; (* 24 *) timestamp : timestamp} [@@comb]
-
-type token_amount = Amount of nat
 
 type token_metadata = (string, bytes) map
 
@@ -22,7 +22,7 @@ type transfer_tokens_param = {
 }
 [@@comb] [@@param Transfer_tokens]
 
-type create_fa2_token = {ca_address : address; ca_id : nat option} [@@comb]
+type create_fa2_token = {ca_address : address; ca_id : token_id option} [@@comb]
 
 type create_asset_param = {
   ca_asset_id : asset_id;
@@ -83,6 +83,6 @@ type storage = {
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
   admins : address set;
-  next_token_ids : (address, nat) big_map;
+  next_token_ids : (address, token_id) big_map;
 }
 [@@comb] [@@store]

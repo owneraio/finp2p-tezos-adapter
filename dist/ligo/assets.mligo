@@ -3,46 +3,50 @@
 
 #include "errors.mligo"
 #include "fa2_types.mligo"
+[@inline]
+let check_token_exists (id : token_id) (s : storage) : unit =
+  if not (Big_map.mem id s.token_metadata)
+  then (failwith fa2_token_undefined : unit)
+
 let get_balance (p : balance_of_param) (s : storage) : operation =
   let to_balance (r : balance_of_request) =
-    if not (Big_map.mem r.token_id s.token_metadata)
-    then (failwith fa2_token_undefined : balance_of_response)
-    else
-      (let ba_balance =
-         match Big_map.find_opt (r.owner, r.token_id) s.ledger with
-         | None -> 0n
-         | Some ba_balance -> ba_balance in
-       { request = r; balance = ba_balance  }) in
+    let () = check_token_exists r.token_id s in
+    let ba_balance =
+      match Big_map.find_opt (r.owner, r.token_id) s.ledger with
+      | None -> Amount 0n
+      | Some ba_balance -> ba_balance in
+    { request = r; balance = ba_balance  } in
   let responses = List.map to_balance p.requests in
   Tezos.transaction responses 0mutez p.callback
 
 let transfer (txs : transfer list) (s : storage) : ledger =
   List.fold
-    (fun ((l, tx) : (ledger * transfer)) ->
+    (fun ((ledger, tx) : (ledger * transfer)) ->
        List.fold
-         (fun ((ll, dst) : (ledger * transfer_destination)) ->
-            match Big_map.find_opt (tx.from_, dst.token_id) ll with
-            | None -> (failwith fa2_insufficient_balance : ledger)
-            | Some am ->
-              if dst.amount = 0n
-              then ll
-              else
-                (match is_nat (am - dst.amount) with
-                 | None -> (failwith fa2_insufficient_balance : ledger)
-                 | Some diff ->
-                   let ll =
-                     if diff = 0n
-                     then Big_map.remove (tx.from_, dst.token_id) ll
-                     else
-                       Big_map.update (tx.from_, dst.token_id) (Some diff)
-                         ll in
-                   (match Big_map.find_opt (dst.to_, dst.token_id) ll with
-                    | None ->
-                      Big_map.add (dst.to_, dst.token_id) dst.amount ll
-                    | Some am ->
-                      Big_map.update (dst.to_, dst.token_id)
-                        (Some (am + dst.amount)) ll))) tx.txs l) txs
-    s.ledger
+         (fun ((ledger, dst) : (ledger * transfer_destination)) ->
+            let () = check_token_exists dst.token_id s in
+            let tr_amount = dst.amount in
+            if tr_amount = (Amount 0n)
+            then ledger
+            else
+              (let src_balance =
+                 match Big_map.find_opt (tx.from_, dst.token_id) ledger with
+                 | None -> (failwith fa2_insufficient_balance : token_amount)
+                 | Some b -> b in
+               let new_src_balance_opt =
+                 match sub_amount src_balance tr_amount with
+                 | None ->
+                   (failwith fa2_insufficient_balance : token_amount option)
+                 | Some b -> if b = (Amount 0n) then None else Some b in
+               let ledger =
+                 Big_map.update (tx.from_, dst.token_id) new_src_balance_opt
+                   ledger in
+               let new_dst_balance =
+                 match Big_map.find_opt (dst.to_, dst.token_id) ledger with
+                 | None -> tr_amount
+                 | Some b -> add_amount b tr_amount in
+               Big_map.add (dst.to_, dst.token_id) new_dst_balance ledger))
+         tx.txs ledger) txs s.ledger
 
 let update_operator (storage : operators_storage) (update : operator_update) : operators_storage =
   match update with
