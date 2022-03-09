@@ -98,7 +98,7 @@ the following addresses:
 
 Contract | Address
 ---|---
-FinP2P Proxy | [KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw](https://better-call.dev/hangzhou2net/KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw)
+FinP2P Proxy | [KT1Sc3yNWiUS9Arik5GaNM4GUyDFDop6FnCQ](https://better-call.dev/hangzhou2net/KT1Sc3yNWiUS9Arik5GaNM4GUyDFDop6FnCQ)
 FinP2P FA2 | [KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA](https://better-call.dev/hangzhou2net/KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA)
 Authorization contract | [KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw](https://better-call.dev/hangzhou2net/KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw)
 
