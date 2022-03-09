@@ -79,7 +79,7 @@
                                                    (pair (option %dst_account_type string)
                                                          (pair (option %dst_account
                                                                   (or (or %supported (key %finId) (key_hash %tezos)) (bytes %other)))
-                                                               (pair (nat %amount) (timestamp %expiration))))))))
+                                                               (pair (nat %amount) (nat %expiration))))))))
                               (option %signature signature))))))) ;
   storage
     (pair (pair %operation_ttl (nat %ttl) (nat %allowed_in_the_future))
@@ -2378,11 +2378,7 @@
                      DUP 18 ;
                      SWAP ;
                      EXEC ;
-                     PUSH timestamp 0 ;
-                     DIG 8 ;
-                     SUB ;
-                     ISNAT ;
-                     IF_NONE { PUSH string "" ; FAILWITH } {} ;
+                     DIG 7 ;
                      DIG 18 ;
                      SWAP ;
                      EXEC ;
