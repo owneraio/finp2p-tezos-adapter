@@ -46,7 +46,7 @@ $ make server
 The JavaScript code will be produced in the server/lib directory.
 
 ### Docker
-The prject can be built and baked using Docker in [dockerfile](build/Dockerfile)
+The project can be built and baked using Docker in [dockerfile](build/Dockerfile)
 
 ```bash
 $ make docker
@@ -71,7 +71,7 @@ The rest of this section gives the necessary steps to re-compile the contracts.
 ### Prerequisites for compilation of smart contracts
 
 - [Install Opam](https://opam.ocaml.org/doc/Install.html)
-- [Install Ligo](https://ligolang.org/docs/intro/installation)
+- [Install Ligo](https://ligolang.org/docs/intro/installation) version 0.34 or greater
 
 ### Installation and compilation
 
@@ -98,9 +98,9 @@ the following addresses:
 
 Contract | Address
 ---|---
-FinP2P Proxy | [KT1Q5d32TjMPpfvoKXPKuQ7Dr1f96XUzA6sR](https://better-call.dev/hangzhou2net/KT1Q5d32TjMPpfvoKXPKuQ7Dr1f96XUzA6sR)
-FinP2P FA2 | [KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL](https://better-call.dev/hangzhou2net/KT1WbSTtsza3Sb1yaBA651XBA8LRMRFQQaHL)
-Authorization contract | [KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC](https://better-call.dev/hangzhou2net/KT1QjrVNZrZEGrNfMUNrcQktbDUQnQqSa6xC)
+FinP2P Proxy | [KT1Sc3yNWiUS9Arik5GaNM4GUyDFDop6FnCQ](https://better-call.dev/hangzhou2net/KT1Sc3yNWiUS9Arik5GaNM4GUyDFDop6FnCQ)
+FinP2P FA2 | [KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA](https://better-call.dev/hangzhou2net/KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA)
+Authorization contract | [KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw](https://better-call.dev/hangzhou2net/KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw)
 
 The provided links to the BetterCallDev explorer allows to see the different
 operations and the tokens on the FA2 contract.

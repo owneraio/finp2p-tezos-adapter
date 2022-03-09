@@ -6,6 +6,10 @@ type operation_hash = OpHash of bytes (* 32 *)
 
 type asset_id = Asset_id of bytes
 
+type finp2p_hold_id = Finp2p_hold_id of bytes
+
+type opaque = Opaque of bytes
+
 type finp2p_nonce = {nonce : bytes; (* 24 *) timestamp : timestamp} [@@comb]
 
 type token_metadata = (string, bytes) map
@@ -50,17 +54,82 @@ type redeem_tokens_param = {
 }
 [@@comb] [@@param Redeem_tokens]
 
+type hold_ahg = {
+  ahg_nonce : finp2p_nonce;
+  ahg_asset_id : asset_id;
+  ahg_src_account : key;
+  ahg_dst_account : key;
+  ahg_amount : opaque;
+}
+[@@comb]
+
+type supported_hold_dst = FinId of key | Tezos of key_hash [@@comb]
+
+type hold_dst = Supported of supported_hold_dst | Other of opaque [@@comb]
+
+type hold_shg = {
+  shg_asset_type : string;
+  shg_asset_id : asset_id;
+  shg_src_account_type : opaque;
+  shg_src_account : opaque;
+  shg_dst_account_type : string option;
+  shg_dst_account : hold_dst option;
+  shg_amount : token_amount;
+  shg_expiration : nat; (* timespan in seconds *)
+}
+[@@comb]
+
+type hold_tokens_param = {
+  ht_hold_id : finp2p_hold_id;
+  ht_ahg : hold_ahg;
+  ht_shg : hold_shg;
+  ht_signature : signature option;
+}
+[@@comb] [@@param Hold_tokens]
+
+type execute_hold_param = {
+  eh_hold_id : finp2p_hold_id;
+  eh_asset_id : asset_id option;
+  eh_amount : token_amount option;
+  eh_src_account : key option;
+  eh_dst : supported_hold_dst option;
+}
+[@@comb] [@@param Execute_hold]
+
+type release_hold_param = {
+  rh_hold_id : finp2p_hold_id;
+  rh_asset_id : asset_id option;
+  rh_amount : token_amount option;
+  rh_src_account : key option;
+}
+[@@comb] [@@param Release_hold]
+
 type finp2p_proxy_asset_param =
   | Transfer_tokens of transfer_tokens_param
   | Create_asset of create_asset_param
   | Issue_tokens of issue_tokens_param
   | Redeem_tokens of redeem_tokens_param
+  | Execute_hold of execute_hold_param
+  | Release_hold of release_hold_param
 [@@param Finp2p_asset]
 
 type update_fa2_token_param = asset_id * fa2_token [@@param Update_fa2_token]
 
-type operation_ttl = {ttl : nat; allowed_in_the_future : nat}
+type operation_ttl = {
+  ttl : nat; (* in seconds *)
+  allowed_in_the_future : nat; (* in seconds *)
+}
 [@@comb] [@@param Update_operation_ttl]
+
+type register_external_param = key * fa2_token * address option
+[@@param Register_external_address]
+
+type fa2_transfer_param = {
+  ftr_token : fa2_token;
+  ftr_dst : address;
+  ftr_amount : token_amount;
+}
+[@@comb] [@@param Register_external_address]
 
 type finp2p_proxy_admin_param =
   | Update_operation_ttl of operation_ttl
@@ -68,21 +137,43 @@ type finp2p_proxy_admin_param =
   | Add_admins of address list
   | Remove_admins of address list
   | Update_fa2_token of update_fa2_token_param
+  | Register_external_address of register_external_param
+  | Fa2_transfer of fa2_transfer_param
 [@@param Finp2p_asset]
+
+type finp2p_public_param =
+  | Cleanup of operation_hash list
+  | Hold_tokens of hold_tokens_param
+[@@param Finp2p_public]
 
 type finp2p_proxy_param =
   | Finp2p_asset of finp2p_proxy_asset_param
   | Finp2p_batch_asset of finp2p_proxy_asset_param list
   | Finp2p_admin of finp2p_proxy_admin_param
-  | Cleanup of operation_hash list
+  | Finp2p_public of finp2p_public_param
 [@@param Main]
+
+type fa2_native_hold_info = {fa2_hold_id : hold_id; held_token : fa2_token}
+
+type escrow_hold_info = {
+  (* es_asset_id : asset_id; *)
+  es_held_token : fa2_token;
+  es_amount : token_amount;
+  es_src_account : key;
+  es_dst : supported_hold_dst option;
+}
+[@@comb]
+
+type hold_info = FA2_hold of fa2_native_hold_info | Escrow of escrow_hold_info
 
 type storage = {
   operation_ttl : operation_ttl;
-  (* in seconds *)
   live_operations : (operation_hash, timestamp) big_map;
   finp2p_assets : (asset_id, fa2_token) big_map;
   admins : address set;
+  external_addresses : (key * fa2_token, address) big_map;
   next_token_ids : (address, token_id) big_map;
+  holds : (finp2p_hold_id, hold_info) big_map;
+  escrow_totals : (key * fa2_token, token_amount) big_map;
 }
 [@@comb] [@@store]

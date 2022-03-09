@@ -1,7 +1,8 @@
 include Errors
 include Fa2_params
 
-let get_transfer_entrypoint (addr : address) : (transfer list, _) contract =
+let[@inline] get_transfer_entrypoint (addr : address) :
+    (transfer list, _) contract =
   match
     (Tezos.get_entrypoint_opt None "%transfer" addr
       : (transfer list, _) contract option)
@@ -9,7 +10,7 @@ let get_transfer_entrypoint (addr : address) : (transfer list, _) contract =
   | None -> (failwith invalid_fa2_contract : (transfer list, _) contract)
   | Some c -> c
 
-let get_mint_entrypoint (addr : address) : (mint_param, _) contract =
+let[@inline] get_mint_entrypoint (addr : address) : (mint_param, _) contract =
   match
     (Tezos.get_entrypoint_opt None "%mint" addr
       : (mint_param, _) contract option)
@@ -17,7 +18,7 @@ let get_mint_entrypoint (addr : address) : (mint_param, _) contract =
   | None -> (failwith invalid_fa2_contract : (mint_param, _) contract)
   | Some c -> c
 
-let get_burn_entrypoint (addr : address) : (burn_param, _) contract =
+let[@inline] get_burn_entrypoint (addr : address) : (burn_param, _) contract =
   match
     (Tezos.get_entrypoint_opt None "%burn" addr
       : (burn_param, _) contract option)
@@ -25,8 +26,35 @@ let get_burn_entrypoint (addr : address) : (burn_param, _) contract =
   | None -> (failwith invalid_fa2_contract : (burn_param, _) contract)
   | Some c -> c
 
+let[@inline] get_hold_entrypoint_opt (addr : address) :
+    (hold_param, _) contract option =
+  (Tezos.get_entrypoint_opt None "%hold" addr : (hold_param, _) contract option)
+
+let[@inline] get_hold_entrypoint (addr : address) : (hold_param, _) contract =
+  match get_hold_entrypoint_opt addr with
+  | None -> (failwith invalid_fa2_contract : (hold_param, _) contract)
+  | Some c -> c
+
+let[@inline] get_release_entrypoint (addr : address) :
+    (release_param, _) contract =
+  match
+    (Tezos.get_entrypoint_opt None "%release" addr
+      : (release_param, _) contract option)
+  with
+  | None -> (failwith invalid_fa2_contract : (release_param, _) contract)
+  | Some c -> c
+
+let[@inline] get_execute_entrypoint (addr : address) :
+    (execute_param, _) contract =
+  match
+    (Tezos.get_entrypoint_opt None "%execute" addr
+      : (execute_param, _) contract option)
+  with
+  | None -> (failwith invalid_fa2_contract : (execute_param, _) contract)
+  | Some c -> c
+
 (** Fails if the contract does not have at least the correct transfer
     entry-point *)
-let check_fa2_contract (addr : address) : unit =
+let[@inline] check_fa2_contract (addr : address) : unit =
   let _ = get_transfer_entrypoint addr in
   ()

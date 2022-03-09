@@ -3,6 +3,7 @@
 
 #include "errors.mligo"
 #include "fa2_types.mligo"
+#include "fa2_common.mligo"
 [@inline]
 let check_token_exists (id : token_id) (s : storage) : unit =
   if not (Big_map.mem id s.token_metadata)
@@ -37,7 +38,9 @@ let transfer (txs : transfer list) (s : storage) : ledger =
                  match sub_amount src_balance tr_amount with
                  | None ->
                    (failwith fa2_insufficient_balance : token_amount option)
-                 | Some b -> if b = (Amount 0n) then None else Some b in
+                 | Some b ->
+                   let () = check_hold tx.from_ dst.token_id b s in
+                   if b = (Amount 0n) then None else Some b in
                let ledger =
                  Big_map.update (tx.from_, dst.token_id) new_src_balance_opt
                    ledger in
@@ -66,7 +69,42 @@ let update_operators (storage : operators_storage) (ops : operator_update list) 
        let () = validate_update_operators_by_owner update Tezos.sender in
        update_operator storage update) ops storage
 
-let fa2 ((param, storage) : (fa2 * storage)) : (operation list * storage) =
+let hold (h : hold_param) (s : storage) : storage =
+  let { id; hold = h } = h in
+  let hold_id =
+    match id with
+    | None -> succ_hold_id s.max_hold_id
+    | Some id ->
+      if id <= s.max_hold_id
+      then (failwith fa2_hold_already_exists : hold_id)
+      else id in
+  let (already_hold, holds) = Big_map.get_and_update hold_id (Some h) s.holds in
+  let () =
+    match already_hold with
+    | None -> ()
+    | Some _ -> (failwith fa2_hold_already_exists : unit) in
+  let total_on_hold =
+    match Big_map.find_opt (h.src, h.token_id) s.holds_totals with
+    | None -> h.amount
+    | Some total -> add_amount total h.amount in
+  let balance_src =
+    match Big_map.find_opt (h.src, h.token_id) s.ledger with
+    | None -> Amount 0n
+    | Some b -> b in
+  let () =
+    if total_on_hold > balance_src
+    then (failwith fa2_insufficient_balance : unit) in
+  let holds_totals =
+    Big_map.add (h.src, h.token_id) total_on_hold s.holds_totals in
+  let max_hold_id = hold_id in
+  {
+    s with
+    holds = holds ;
+    holds_totals = holds_totals ;
+    max_hold_id = max_hold_id 
+  }
+
+let fa2 ((param, storage) : (assets_params * storage)) : (operation list * storage) =
   match param with
   | Transfer txs ->
     let ledger = transfer txs storage in
@@ -76,5 +114,6 @@ let fa2 ((param, storage) : (fa2 * storage)) : (operation list * storage) =
     let operators = update_operators storage.operators ops in
     let storage = { storage with operators = operators  } in
     (([] : operation list), storage)
+  | Hold p -> let storage = hold p storage in (([] : operation list), storage)
 
 #endif

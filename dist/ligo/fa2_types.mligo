@@ -13,6 +13,10 @@ type token_metadata_storage =
 
 type total_supply_storage = (token_id, token_amount) big_map
 
+type holds = (hold_id, hold) big_map
+
+type holds_totals = ((address * token_id), token_amount) big_map
+
 type storage = [@layout:comb]  {
     auth_contract: address ;
     paused: bool ;
@@ -21,7 +25,10 @@ type storage = [@layout:comb]  {
     token_metadata: token_metadata_storage ;
     total_supply: total_supply_storage ;
     max_token_id: token_id ;
-    metadata: (string, bytes) big_map }
+    metadata: (string, bytes) big_map ;
+    max_hold_id: hold_id ;
+    holds: holds ;
+    holds_totals: holds_totals }
 
 
 

@@ -1,4 +1,5 @@
 include Errors
+include Utils
 include Finp2p_proxy_types
 include Finp2p_conv_maps
 
@@ -14,6 +15,18 @@ let concat_bytes : bytes list -> bytes =
 
 let concat_string : string list -> string =
   [%Michelson ({| { CONCAT } |} : string list -> string)]
+
+(* Cannot write empty bytes 0x in mligo *)
+let[@inline] empty_bytes () : bytes =
+  [%Michelson ({|{ DROP; PUSH bytes 0x }|} : unit -> bytes)] ()
+
+let[@inline] unwrap_asset_id (id : asset_id) : bytes =
+  match id with Asset_id id -> id
+
+let[@inline] unwrap_finp2p_hold_id (id : finp2p_hold_id) : bytes =
+  match id with Finp2p_hold_id id -> id
+
+let[@inline] unwrap_opaque (o : opaque) : bytes = match o with Opaque o -> o
 
 (* For Debug
  * let failwith_bytes (b : bytes list) : bytes =
@@ -69,13 +82,13 @@ let rec nat_to_0x_hex_big_endian_rec ((number : nat), (acc : string)) : string =
 let nat_to_0x_hex_big_endian (number : nat) : string =
   if number = 0n then "0x0" else nat_to_0x_hex_big_endian_rec (number, "")
 
+let[@inline] timestamp_to_seconds_since_epoch (timestamp : timestamp) : nat =
+  match is_nat (timestamp - (0 : timestamp)) with
+  | None -> (failwith "" : nat)
+  | Some s -> s
+
 let timestamp_to_uint64_big_endian (timestamp : timestamp) : bytes =
-  let seconds_since_epoch =
-    match is_nat (timestamp - (0 : timestamp)) with
-    | None -> (failwith "" : nat)
-    | Some s -> s
-  in
-  nat_to_uint64_big_endian seconds_since_epoch
+  nat_to_uint64_big_endian (timestamp_to_seconds_since_epoch timestamp)
 
 let drop_n_first_bytes (b : bytes) (n : nat) : bytes =
   let len = Bytes.length b in
@@ -118,6 +131,26 @@ Packed key (as with Bytes.pack):
   0x05010000000646696e503250
 *)
 let string_to_bytes (s : string) : bytes = drop_n_first_bytes (Bytes.pack s) 6n
+
+(*
+Michelson encoding of publick key hash:
++---------------+------+-------------------------------------------+
+| Field         | Size | Value (example)
++---------------+------+-------------------------------------------+
+| Tag Micheline |    1 | 05
+| Tag bytes     |    1 | 0a
+| Size bytes    |    4 | 00000015
+| Bytes         |   21 | 012df062995efb728506f005bc5b4ac437291c722e
++---------------+------+-------------------------------------------+
+
+First byte (in Bytes field) is for curve:
+  - 00 -> tz1
+  - 01 -> tz2
+  - 02 -> tz3
+We keep it.
+*)
+let key_hash_to_bytes (k : key_hash) : bytes =
+  drop_n_first_bytes (Bytes.pack k) 6n
 
 (*
 Michelson encoding of public keys (secp256k1):
@@ -166,7 +199,7 @@ let encode_tranfer_tokens_payload (p : transfer_tokens_param) =
   in
   let operation = string_to_bytes "transfer" in
   let assetType = string_to_bytes "finp2p" in
-  let assetId = match tt_asset_id with Asset_id id -> id in
+  let assetId = unwrap_asset_id tt_asset_id in
   let accountType = string_to_bytes "finId" in
   let srcAccountType = accountType in
   let srcAccount = public_key_to_hex_string_bytes tt_src_account in
@@ -209,7 +242,7 @@ let encode_issue_tokens_payload (p : issue_tokens_param) =
   in
   let operation = string_to_bytes "issue" in
   let assetType = string_to_bytes "finp2p" in
-  let assetId = match it_asset_id with Asset_id id -> id in
+  let assetId = unwrap_asset_id it_asset_id in
   let dstAccountType = string_to_bytes "finId" in
   let dstAccount = public_key_to_hex_string_bytes it_dst_account in
   let amount_ = amount_to_bytes it_amount in
@@ -233,9 +266,87 @@ let encode_redeem_tokens_payload (p : redeem_tokens_param) =
       (timestamp_to_uint64_big_endian rt_nonce.timestamp)
   in
   let operation = string_to_bytes "redeem" in
-  let assetId = match rt_asset_id with Asset_id id -> id in
+  let assetId = unwrap_asset_id rt_asset_id in
   let quantity = amount_to_bytes rt_amount in
   concat_bytes [nonce; operation; assetId; quantity]
+
+let encode_hold_tokens_payload (p : hold_tokens_param) =
+  (* AHG *)
+  let asset_bytes_group =
+    let {ahg_nonce; ahg_asset_id; ahg_src_account; ahg_dst_account; ahg_amount}
+        =
+      p.ht_ahg
+    in
+    let nonce =
+      Bytes.concat
+        ahg_nonce.nonce
+        (timestamp_to_uint64_big_endian ahg_nonce.timestamp)
+    in
+    let assetId = unwrap_asset_id ahg_asset_id in
+    let finId = string_to_bytes "finId" in
+    let srcAccount = public_key_to_hex_string_bytes ahg_src_account in
+    let dstAccount = public_key_to_hex_string_bytes ahg_dst_account in
+    let amount_ = unwrap_opaque ahg_amount in
+    concat_bytes
+      [
+        nonce;
+        string_to_bytes "transfer";
+        string_to_bytes "finp2p";
+        assetId;
+        finId;
+        srcAccount;
+        finId;
+        dstAccount;
+        amount_;
+      ]
+  in
+  let ahg = Crypto.blake2b asset_bytes_group in
+  (* SHG *)
+  let settlement_bytes_group =
+    let {
+      shg_asset_type;
+      shg_asset_id;
+      shg_src_account_type;
+      shg_src_account;
+      shg_dst_account_type;
+      shg_dst_account;
+      shg_amount;
+      shg_expiration;
+    } =
+      p.ht_shg
+    in
+    let assetType = string_to_bytes shg_asset_type in
+    let assetId = unwrap_asset_id shg_asset_id in
+    let srcAccountType = unwrap_opaque shg_src_account_type in
+    let srcAccount = unwrap_opaque shg_src_account in
+    let dstAccountType =
+      match shg_dst_account_type with
+      | None -> empty_bytes ()
+      | Some t -> string_to_bytes t
+    in
+    let dstAccount =
+      match shg_dst_account with
+      | None -> empty_bytes ()
+      | Some (Other dst) -> unwrap_opaque dst
+      | Some (Supported (FinId k)) -> public_key_to_hex_string_bytes k
+      | Some (Supported (Tezos pkh)) -> key_hash_to_bytes pkh
+    in
+    let amount_ = amount_to_bytes shg_amount in
+    let expiry = string_to_bytes (nat_to_0x_hex_big_endian shg_expiration) in
+    concat_bytes
+      [
+        assetType;
+        assetId;
+        srcAccountType;
+        srcAccount;
+        dstAccountType;
+        dstAccount;
+        amount_;
+        expiry;
+      ]
+  in
+  let shg = Crypto.blake2b settlement_bytes_group in
+  Bytes.concat ahg shg
 
 let check_transfer_tokens_signature (p : transfer_tokens_param) : operation_hash
     =
@@ -260,3 +371,18 @@ let check_redeem_tokens_signature (p : redeem_tokens_param) : operation_hash =
   if not (Crypto.check p.rt_src_account p.rt_signature payload) then
     (failwith invalid_signature : operation_hash)
   else OpHash (Crypto.blake2b payload)
+
+let check_hold_tokens_signature (p : hold_tokens_param) : operation_hash =
+  let buyer = p.ht_ahg.ahg_dst_account in
+  let payload = encode_hold_tokens_payload p in
+  let () =
+    match p.ht_signature with
+    | None ->
+        (* If no signature provided, the operation must be sent by the buyer *)
+        if Tezos.sender None <> implicit_address (Crypto.hash_key buyer) then
+          (failwith unauthorized : unit)
+    | Some signature ->
+        if not (Crypto.check buyer signature payload) then
+          (failwith invalid_signature : unit)
+  in
+  OpHash (Crypto.blake2b payload)

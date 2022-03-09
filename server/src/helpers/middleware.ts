@@ -10,8 +10,13 @@ export const asyncMiddleware = (fn : RequestHandler) => (req: Request, res: Resp
     logger.error('validation failed', { errors: errors.array() });
     return res.status(422).json({ errors: errors.array() });
   }
-  Promise.resolve(fn(req, res, next)).catch((err) => {
-    logger.error('Server error', { err });
+  try {
+    Promise.resolve(fn(req, res, next)).catch((err) => {
+      logger.error('Server error', { error: err });
+      res.status(500).send({ error: err });
+    });
+  } catch (err) {
+    logger.error('Server error', { error: err });
     res.status(500).send({ error: err });
-  });
+  }
 };

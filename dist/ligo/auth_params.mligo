@@ -3,8 +3,8 @@
 
 #include "fa2_params.mligo"
 type authorizable_action = [@layout:comb] 
-  | Assets_action of fa2 
-  | Manage_action of manager 
+  | Assets_action of assets_params 
+  | Manage_action of manager_params 
   | Admin_action 
 
 type auth_param = [@layout:comb]  {

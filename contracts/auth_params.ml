@@ -1,8 +1,8 @@
 include Fa2_params
 
 type authorizable_action =
-  | Assets_action of fa2
-  | Manage_action of manager
+  | Assets_action of assets_params
+  | Manage_action of manager_params
   | Admin_action
 [@@comb] [@@param Authorize]
 

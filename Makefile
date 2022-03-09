@@ -11,10 +11,11 @@ copy: dist-dir
 	@cp -f $(BUILD)/contracts/*.mligo $(DIST)/ligo
 	@cp -f $(BUILD)/contracts/*.tz $(DIST)/michelson
 	@cp -f $(BUILD)/contracts/*.json $(DIST)/michelson
+	@cp -f $(BUILD)/contracts/for_tests/fa2.json $(DIST)/michelson/for_tests/test_fa2.json
 
 dist-dir:
 	@mkdir -p $(DIST)/ligo
-	@mkdir -p $(DIST)/michelson
+	@mkdir -p $(DIST)/michelson/for_tests
 
 .PHONY: build
 build:

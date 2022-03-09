@@ -15,10 +15,6 @@ type token_metadata_storage = (token_id, token_id * (string, bytes) map) big_map
 
 type total_supply_storage = (token_id, token_amount) big_map [@@param Store]
 
-type holds = (hold_id, hold) big_map [@@param Store]
-
-type holds_totals = (address * token_id, token_amount) big_map [@@param Store]
-
 type storage = {
   auth_contract : address;
   paused : bool;
@@ -28,8 +24,5 @@ type storage = {
   total_supply : total_supply_storage;
   max_token_id : token_id;
   metadata : (string, bytes) big_map;
-  max_hold_id : hold_id;
-  holds : holds;
-  holds_totals : holds_totals;
 }
 [@@comb]

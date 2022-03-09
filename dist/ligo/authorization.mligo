@@ -27,7 +27,18 @@ let auth_authorize ((param, s) : (auth_param * auth_storage)) : (operation list 
                    (fun (t : transfer) ->
                       if not (t.from_ = fa2_sender)
                       then (failwith unauthorized : unit)) l
-               | Update_operators _ -> ()
+               | Update_operators l ->
+                 List.iter
+                   (fun (u : operator_update) ->
+                      let operator_p =
+                        match u with
+                        | Add_operator p -> p
+                        | Remove_operator p -> p in
+                      if not (operator_p.owner = fa2_sender)
+                      then (failwith unauthorized : unit)) l
+               | Hold h ->
+                 if not (h.hold.src = fa2_sender)
+                 then (failwith unauthorized : unit)
                | Balance_of _ -> ())
             | _ -> (failwith unauthorized : unit))
          else (failwith unauthorized : unit)) in

@@ -11,7 +11,7 @@ import { encodeKey, validateContractAddress } from '@taquito/utils';
 import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
-import { b58cdecode, prefix } from '@taquito/utils';
+import { b58cdecode, prefix, getPkhfromPk } from '@taquito/utils';
 import { ParameterSchema } from '@taquito/michelson-encoder';
 const PromiseAny = require('promise-any');
 import { BigNumber } from 'bignumber.js';
@@ -33,6 +33,9 @@ export type Operationhash = Uint8Array;
 export type Nonce = Uint8Array;
 export type Timestamp = Date;
 export type Signature = string;
+export type Finp2pHoldId = Bytes;
+export type FA2HoldId = Nat;
+export type Opaque = Bytes;
 
 let utf8 = new TextEncoder();
 let utf8dec = new TextDecoder();
@@ -59,6 +62,16 @@ export interface CreateFA2Token {
 export interface Finp2pNonce {
   nonce: Nonce;
   timestamp: Timestamp;
+}
+
+export interface HoldInfo {
+  fa2_hold_id: FA2HoldId;
+  held_asset: AssetId;
+}
+
+export interface BalanceInfo {
+  balance: bigint;
+  on_hold: bigint;
 }
 
 export interface TransferTokensParam {
@@ -93,6 +106,65 @@ export interface RedeemTokensParam {
   signature: Signature;
 }
 
+export interface FinIdHoldDst {
+  kind: 'FinId',
+  key: Key,
+}
+
+export interface TezosHoldDst {
+  kind : 'Tezos',
+  pkh : string,
+}
+
+export interface OtherHoldDst {
+  kind : 'Other',
+  dst : Opaque,
+}
+
+export type SupportedHoldDst = FinIdHoldDst | TezosHoldDst;
+export type HoldDst = SupportedHoldDst | OtherHoldDst;
+
+export interface HoldAHG {
+  nonce : Finp2pNonce;
+  asset_id : Bytes;
+  src_account : Key;
+  dst_account : Key;
+  amount : Opaque;
+}
+
+export interface HoldSHG {
+  asset_type : string;
+  asset_id : Bytes;
+  src_account_type : Opaque;
+  src_account : Opaque;
+  dst_account_type? : string;
+  dst_account? : HoldDst;
+  amount : TokenAmount;
+  expiration : Nat;
+}
+
+export interface HoldTokensParam {
+  hold_id : Finp2pHoldId;
+  ahg : HoldAHG;
+  shg : HoldSHG;
+  signature? : Signature;
+}
+
+export interface ExecuteHoldParam {
+  hold_id : Finp2pHoldId;
+  asset_id? : AssetId;
+  amount? : TokenAmount;
+  src_account? : Key;
+  dst? : SupportedHoldDst;
+}
+
+export interface ReleaseHoldParam {
+  hold_id : Finp2pHoldId;
+  asset_id? : AssetId;
+  amount? : TokenAmount;
+  src_account? : Key;
+}
+
 type CleanupParam = string[] | undefined;
 
 type BatchEntryPoint =
@@ -100,6 +172,10 @@ type BatchEntryPoint =
   | 'create_asset'
   | 'issue_tokens'
   | 'redeem_tokens'
+  | 'hold_tokens'
+  | 'execute_hold'
+  | 'release_hold'
+  | 'hold_tokens'
   | 'cleanup'
   | 'update_admins'
   | 'add_admins'
@@ -112,6 +188,9 @@ type ProxyBatchParam =
   | CreateAssetParam
   | IssueTokensParam
   | RedeemTokensParam
+  | HoldTokensParam
+  | ExecuteHoldParam
+  | ReleaseHoldParam
   | CleanupParam
   | Address[]
   | Address[]
@@ -136,14 +215,20 @@ export interface ProxyStorage {
   finp2p_assets: BigMapAbstraction;
   admins: Address[];
   next_token_ids: BigMapAbstraction;
+  holds: BigMapAbstraction;
+  escrow_totals: BigMapAbstraction;
+  external_addresses: BigMapAbstraction;
 }
 
-interface InitialStorage {
+interface InitialProxyStorage {
   operation_ttl: OperationTTL; /* in seconds */
   live_operations: MichelsonMap<Bytes, Timestamp>;
   finp2p_assets: MichelsonMap<AssetId, FA2Token>;
   admins: Address[];
   next_token_ids: MichelsonMap<Address, Nat>;
+  holds: MichelsonMap<Finp2pHoldId, HoldInfo>;
+  escrow_totals: MichelsonMap<[Key, FA2Token], TokenAmount>;
+  external_addresses: MichelsonMap<Key, Address>;
 }
 
 export interface FA2Storage {
@@ -153,8 +238,11 @@ export interface FA2Storage {
   operators : BigMapAbstraction,
   token_metadata : BigMapAbstraction,
   total_supply : BigMapAbstraction,
-  max_token_id : bigint,
-  metadata: MichelsonMap<string, Bytes>
+  max_token_id : BigNumber,
+  metadata : BigMapAbstraction,
+  max_hold_id : BigNumber,
+  holds : BigMapAbstraction,
+  holds_totals : BigMapAbstraction,
 }
 
 type OpStatus =
@@ -211,6 +299,12 @@ export namespace Michelson {
         { /* address */ string: token.address },
         { /* id */ int: token.id.toString() },
       ],
+    };
+  }
+
+  export function boolean(b: boolean): MichelsonV1Expression {
+    return {
+      prim: b ? 'True' : 'False',
     };
   }
 
@@ -308,6 +402,112 @@ export namespace Michelson {
         /* src_account */ maybeBytes(rt.src_account),
         { /* amount */ int: rt.amount.toString() },
         /* signature */ maybeBytes(rt.signature),
+      ],
+    };
+  }
+
+  export function supportedHoldDst(dst: SupportedHoldDst): MichelsonV1Expression {
+    switch (dst.kind) {
+      case 'FinId':
+        return { prim: 'Left', args: [maybeBytes(dst.key)] };
+      case 'Tezos':
+        return { prim: 'Right', args: [maybeBytes(dst.pkh)] };
+    }
+  }
+
+  export function holdDst(dst: HoldDst): MichelsonV1Expression {
+    switch (dst.kind) {
+      case 'Other' :
+        return {
+          prim: 'Right',
+          args: [{ bytes: bytesToHex(dst.dst) }],
+        };
+      default:
+        return {
+          prim: 'Left',
+          args: [supportedHoldDst(dst)],
+        };
+    }
+  }
+
+  export function holdAHG(ahg: HoldAHG): MichelsonV1Expression {
+    return {
+      prim: 'Pair',
+      args: [
+        /* nonce */ finp2pNonce(ahg.nonce),
+        { /* asset_id */ bytes: bytesToHex(ahg.asset_id) },
+        /* src_account */ maybeBytes(ahg.src_account),
+        /* dst_account */ maybeBytes(ahg.dst_account),
+        { /* amount */ bytes: bytesToHex(ahg.amount) },
+      ],
+    };
+  }
+
+  export function holdSHG(shg: HoldSHG): MichelsonV1Expression {
+    let dstAccountType =
+      mkOpt(shg.dst_account_type,
+        (s => { return  { string: s }; }));
+    let dstAccount =
+      mkOpt(shg.dst_account,
+        (dst => { return holdDst(dst); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* asset_type */ string: shg.asset_type },
+        { /* asset_id */ bytes: bytesToHex(shg.asset_id) },
+        { /* src_account_type */ bytes: bytesToHex(shg.src_account_type) },
+        { /* src_account */ bytes: bytesToHex(shg.src_account) },
+        dstAccountType,
+        dstAccount,
+        { /* amount */ int: shg.amount.toString() },
+        { /* expiration */ int : shg.expiration.toString() },
+      ],
+    };
+  }
+
+  export function holdTokensParam(ht: HoldTokensParam): MichelsonV1Expression {
+    let michSignature =
+      mkOpt(ht.signature,
+        (s => { return maybeBytes(s); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(ht.hold_id) },
+        /* ahg */ holdAHG(ht.ahg),
+        /* shg */ holdSHG(ht.shg),
+        /* signature */ michSignature,
+      ],
+    };
+  }
+
+  export function executeHoldParam(eh: ExecuteHoldParam): MichelsonV1Expression {
+    let assetId = mkOpt(eh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
+    let amount = mkOpt(eh.amount, (s => { return { int : s.toString() }; }));
+    let srcAccount = mkOpt(eh.src_account, (s => { return maybeBytes(s); }));
+    let dstAccount = mkOpt(eh.dst, (d => { return supportedHoldDst(d); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(eh.hold_id) },
+        assetId,
+        amount,
+        srcAccount,
+        dstAccount,
+      ],
+    };
+  }
+
+  export function releaseHoldParam(rh: ReleaseHoldParam): MichelsonV1Expression {
+    let assetId = mkOpt(rh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
+    let amount = mkOpt(rh.amount, (s => { return { int : s.toString() }; }));
+    let srcAccount = mkOpt(rh.src_account, (s => { return maybeBytes(s); }));
+    return {
+      prim: 'Pair',
+      args: [
+        { /* hold_id */ bytes: bytesToHex(rh.hold_id) },
+        assetId,
+        amount,
+        srcAccount,
       ],
     };
   }
@@ -477,12 +677,31 @@ export class FinP2PTezos {
   }
 
   /**
-   * @description Re-export `waitInclusion` for ease of use.
-   * By default, waits for the number of confirmations in the `config`.
+   * @description Re-export `waitInclusion` for ease of use and check that it
+   * is successful. * By default, waits for the number of confirmations in the
+   * `config`.
    * @see TaquitoWrapper.waitInclusion for details
   */
-  waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
-    return this.taquito.waitInclusion(op, confirmations);
+  async waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
+    const result = await this.taquito.waitInclusion(op, confirmations);
+    const [blockOp,,] = result;
+    blockOp.contents.map(o => {
+      if (!hasOwnProperty(o, 'metadata')
+        || o.metadata === undefined
+        || !hasOwnProperty(o.metadata, 'operation_result')
+        || o.metadata.operation_result === undefined ) {
+        // Not a manager operation, or the metadata is not available in the node (unlikely)
+        // Consider operation as successful.
+        return;
+      }
+      if (o.metadata.operation_result.status === 'applied') {
+        return;
+      }
+      throw new Error(
+        `Operation is included as ${o.metadata.operation_result.status}, ` +
+          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
+    });
+    return result;
   }
 
   async init(p : { operationTTL : OperationTTL,
@@ -526,12 +745,15 @@ export class FinP2PTezos {
     operation_ttl : OperationTTL,
     admins = this.config.admins,
   ): Promise<OriginationOperation> {
-    let initialStorage: InitialStorage = {
+    let initialStorage: InitialProxyStorage = {
       operation_ttl,
       live_operations: new MichelsonMap(),
       finp2p_assets: new MichelsonMap(),
       admins,
       next_token_ids: new MichelsonMap(),
+      holds : new MichelsonMap(),
+      escrow_totals : new MichelsonMap(),
+      external_addresses : new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P Proxy smart contract');
     return this.taquito.contract.originate({
@@ -591,6 +813,9 @@ export class FinP2PTezos {
       total_supply : new MichelsonMap<Nat, Nat>(),
       max_token_id : BigInt(0),
       metadata: michMetadata,
+      max_hold_id : BigInt(0),
+      holds : new MichelsonMap(),
+      holds_totals : new MichelsonMap(),
     };
     this.taquito.debug('Deploying new FinP2P FA2 asset smart contract');
     return this.taquito.contract.originate({
@@ -746,6 +971,45 @@ export class FinP2PTezos {
   }
 
   /**
+   * @description Call the entry-point `hold_tokens` of the FinP2P proxy
+   * @param ht: the parameters of the hold
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async holdTokens(
+    ht: HoldTokensParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('hold_tokens', ht, options);
+  }
+
+  /**
+   * @description Call the entry-point `execute_hold` of the FinP2P proxy
+   * @param eh: the parameters of the execution
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async executeHold(
+    eh: ExecuteHoldParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('execute_hold', eh, options);
+  }
+
+  /**
+   * @description Call the entry-point `release_hold` of the FinP2P proxy
+   * @param rh: the parameters of the release
+   * @param options : options for the call, including contract address and cleanup
+   * @returns operation injection result
+   */
+  async releaseHold(
+    rh: ReleaseHoldParam,
+    options : CallOptions = this.defaultCallOptions)
+    : Promise<OperationResult> {
+    return this.cleanupAndCallProxy('release_hold', rh, options);
+  }
+
+  /**
    * @description Call the entry-point `update_admins` of the FinP2P proxy
    * @param newAdmins: the new set of administrators (addresses)
    * @param options : options for the call, including contract address and cleanup
@@ -841,6 +1105,19 @@ export class FinP2PTezos {
     const contract = await this.taquito.contract.at(addr);
     let storage = await contract.storage() as FA2Storage;
     return storage;
+  }
+
+  /**
+   * Retrieve the ledger big map of an FA2 contract
+   * @param addr : address of the FA2 contract
+   * @returns a promise with the big map abstraction
+   */
+  async getFA2Ledger(
+    addr: Address)
+    : Promise<BigMapAbstraction> {
+    const contract = await this.taquito.contract.at(addr);
+    let storage = await contract.storage() as any;
+    return storage.ledger as BigMapAbstraction;
   }
 
 
@@ -989,6 +1266,30 @@ export class FinP2PTezos {
             parameter : { entrypoint: bp.kind,
               value: Michelson.redeemTokensParam(vRt) },
           };
+        case 'hold_tokens':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.holdTokensParam(<HoldTokensParam>bp.param) },
+          };
+        case 'execute_hold':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.executeHoldParam(<ExecuteHoldParam>bp.param) },
+          };
+        case 'release_hold':
+          return {
+            source,
+            amount : 0,
+            to : finp2p.getProxyAddress(bp.kt1),
+            parameter : { entrypoint: bp.kind,
+              value: Michelson.releaseHoldParam(<ReleaseHoldParam>bp.param) },
+          };
         case 'cleanup':
           let vCl = <CleanupParam>bp.param;
           if (vCl === undefined) {
@@ -1054,6 +1355,216 @@ export class FinP2PTezos {
   }
 
 
+  private async callProxyView<T>(
+    viewMethod : string, // : (_ :[Key, AssetId]) => OnChainView,
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address,
+  ) : Promise<T | undefined> {
+    let addr = this.getProxyAddress(kt1);
+    const contract = await this.taquito.contract.at(addr);
+    let pk = publicKey;
+    if (publicKey.substring(0, 2) == '0x') {
+      pk = encodeKey(publicKey.substring(2));
+    }
+    try {
+      return await contract.contractViews[viewMethod](
+        [pk, assetId],
+      ).executeView({ viewCaller : addr }) as T | undefined;
+    } catch (e : any) {
+      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
+      if (matches) {
+        throw Error(matches[1]);
+      } else { throw e; }
+    }
+  }
+
+  private async getFinP2PAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let balance =
+      await this.callProxyView<BigNumber>(
+        'get_asset_balance', publicKey, assetId, kt1);
+    return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+  private async getExternalAssetBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let pk = publicKey;
+    if (publicKey.substring(0, 2) == '0x') {
+      pk = encodeKey(publicKey.substring(2));
+    }
+    let proxyStorage = await this.getProxyStorage(kt1);
+    let fa2TokenP = proxyStorage.finp2p_assets.get<FA2Token>(Michelson.bytesToHex(assetId));
+    // TODO: issue with big map retieval below
+    let ownerP = proxyStorage.external_addresses.get<Address>(pk);
+    let fa2Token = await fa2TokenP;
+    if (fa2Token === undefined) {
+      throw (new Error('FINP2P_UNKNOWN_ASSET_ID'));
+    }
+    let ledger = await this.getFA2Ledger(fa2Token.address);
+    let owner = await ownerP;
+    if (owner === undefined) {
+      owner = getPkhfromPk(pk);
+    }
+    // Retrieve balance for different kinds of assets, see
+    // https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md#token-balance-updates
+    //
+    // Multi asset contract
+    //   big_map %ledger (pair address nat) nat
+    //   where key is the pair [owner's address, token ID] and value is the
+    //   amount of tokens owned.
+    async function getBalanceMulti() {
+      if (fa2Token === undefined) { return (null as never) ; }
+      // TODO: does not work. Taquito only supports big map keys string, int or
+      // bool
+      const balance = await ledger.get<BigNumber>([owner, fa2Token.id]);
+      return (BigInt((balance || new BigNumber(0)).toString()));
+    }
+    // Single asset contract
+    //   big_map %ledger address nat
+    //   where key is the owner's address and value is the amount of tokens
+    //   owned.
+    async function getBalanceSingle() {
+      if (owner === undefined) { return (null as never) ; }
+      const balance = await ledger.get<BigNumber>(owner);
+      return (BigInt((balance || new BigNumber(0)).toString()));
+    }
+    // NFT asset contract
+    //    big_map %ledger nat address
+    //    where key is the token ID and value is owner's address.
+    async function getBalanceNFT() {
+      if (fa2Token === undefined) { return (null as never) ; }
+      const nftOwner = await ledger.get<Address>(Number(fa2Token.id)); // BigMapAbstraction only support number
+      if (nftOwner === undefined || nftOwner !== owner) {
+        return 0n;
+      } else {
+        return 1n;
+      }
+    }
+    // Try each of them successively
+    return getBalanceMulti()
+      .catch(getBalanceSingle)
+      .catch(getBalanceNFT);
+  }
+
+  private async getAssetFA2Balance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    try {
+      // External balance should work for all FA2 assets but is slower than
+      // retrieving the balance for a FinP2P asset
+      return await this.getFinP2PAssetBalance(publicKey, assetId, kt1);
+    } catch (e : any) {
+      if (e.message == 'NOT_FINP2P_FA2') {
+        return await this.getExternalAssetBalance(publicKey, assetId, kt1);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * @description Retrieve the total amount of tokens of a given asset on hold
+   * for an account
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetHold(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<bigint> {
+    let balance =
+      await this.callProxyView<BigNumber>(
+        'get_asset_hold', publicKey, assetId, kt1);
+    return (BigInt((balance || new BigNumber(0)).toString()));
+  }
+
+
+
+  private async getFinP2PAssetBalanceInfo(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address) : Promise<BalanceInfo> {
+    let info =
+      await this.callProxyView<{ balance : BigNumber, on_hold : BigNumber }>(
+        'get_asset_balance_info', publicKey, assetId, kt1);
+    if (info === undefined) {
+      return { balance : 0n, on_hold : 0n };
+    } else {
+      return {
+        balance : BigInt(info.balance.toString()),
+        on_hold : BigInt(info.on_hold.toString()),
+      };
+    }
+  }
+
+  /**
+   * @description Retrieve the balance and tokens on hold of account in a given asset
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetBalanceInfo(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address,
+  ) : Promise<BalanceInfo> {
+    try {
+      return await this.getFinP2PAssetBalanceInfo(publicKey, assetId, kt1);
+    } catch (e : any) {
+      if (e.message == 'NOT_FINP2P_FA2') {
+        // If this view fails, it is an external asset
+        // TODO: getExternalAssetBalance does not work
+        // let balanceP = this.getExternalAssetBalance(publicKey, assetId, kt1)
+        let balanceP = this.getAssetFA2Balance(publicKey, assetId, kt1);
+        let holdP = this.getAssetHold(publicKey, assetId, kt1);
+        let balance = await balanceP;
+        let hold = await holdP;
+        return {
+          balance : balance + hold,
+          on_hold : hold,
+        };
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * @description Retrieve the spendable balance of account in a given asset, i.e.
+   * the balance without the tokens on hold
+   * @param publicKey: the public key of the account for which to lookup the balance
+   * (either as a base58-check encoded string, e.g. 'sppk...' or an hexadecimal
+   * representation of the key with the curve prefix and starting with `0x`)
+   * @param assetId: the finId of the asset (encoded)
+   * @returns a bigint representing the balance
+   * @throws `Error` if the asset id is not known by the contract or if the
+   * FA2 is an external FA2 (this last case needs to be implemented)
+   */
+  async getAssetSpendableBalance(
+    publicKey : Key,
+    assetId : AssetId,
+    kt1?: Address,
+  ) : Promise<bigint> {
+    const info =
+      await this.getAssetBalanceInfo(publicKey, assetId, kt1);
+    return (info.balance - info.on_hold);
+  }
+
   /**
    * @description Retrieve balance of account in a given asset
    * @param publicKey: the public key of the account for which to lookup the balance
@@ -1067,25 +1578,11 @@ export class FinP2PTezos {
   async getAssetBalance(
     publicKey : Key,
     assetId : AssetId,
-    kt1?: Address) : Promise<bigint> {
-    let addr = this.getProxyAddress(kt1);
-    const contract = await this.taquito.contract.at(addr);
-    let pk = publicKey;
-    if (publicKey.substring(0, 2) == '0x') {
-      pk = encodeKey(publicKey.substring(2));
-    }
-    try {
-      let balance =
-        await contract.contractViews.get_asset_balance(
-          [pk, assetId],
-        ).executeView({ viewCaller : addr }) as BigNumber | undefined;
-      return (BigInt((balance || new BigNumber(0)).toString()));
-    } catch (e : any) {
-      const matches = e.message.match(/.*failed with: {\"string\":\"(\w+)\"}/);
-      if (matches) {
-        throw Error(matches[1]);
-      } else { throw e; }
-    }
+    kt1?: Address,
+  ) : Promise<bigint> {
+    const info =
+      await this.getAssetBalanceInfo(publicKey, assetId, kt1);
+    return info.balance;
   }
 
   async getTzktReceipt(op : OperationResult,
