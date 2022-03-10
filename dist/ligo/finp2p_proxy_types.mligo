@@ -92,7 +92,7 @@ type execute_hold_param = [@layout:comb]  {
     asset_id: asset_id option ;
     amount: token_amount option ;
     src_account: key option ;
-    dst: supported_hold_dst option }
+    dst: hold_dst option }
 
 type release_hold_param = [@layout:comb]  {
     hold_id: finp2p_hold_id ;
@@ -140,15 +140,18 @@ type finp2p_proxy_param =
   | Finp2p_admin of finp2p_proxy_admin_param 
   | Finp2p_public of finp2p_public_param 
 
-type fa2_native_hold_info = {
-  fa2_hold_id: hold_id ;
-  held_token: fa2_token }
+type fa2_native_hold_info =
+  {
+    fa2_hold_id: hold_id ;
+    held_token: fa2_token ;
+    fa2_fallback_dst: key }
 
 type escrow_hold_info = [@layout:comb]  {
     held_token: fa2_token ;
     amount: token_amount ;
     src_account: key ;
-    dst: supported_hold_dst option }
+    dst: supported_hold_dst option ;
+    fallback_dst: key }
 
 type hold_info =
   | FA2_hold of fa2_native_hold_info 
