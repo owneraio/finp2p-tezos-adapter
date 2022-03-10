@@ -36,11 +36,11 @@ function getEscrowAsset(asset: Components.Schemas.Asset) : string {
   return assetId;
 }
 
-function getEscrowDestination(destination: Components.Schemas.Destination | undefined) : FINP2PProxy.SupportedHoldDst | undefined{
-  let dstAccount : FINP2PProxy.SupportedHoldDst  | undefined;
+function getEscrowDestination(destination: Components.Schemas.Destination | undefined) : FINP2PProxy.HoldDst | undefined{
+  let dstAccount : FINP2PProxy.HoldDst  | undefined;
   if (destination){
-    if ( destination.type == 'escrow' ){ //TODO: should be other but not in SupportedHoldDst
-      dstAccount = { kind: 'FinId', key: pubkeyToTezosSecp256k1(destination.finId) } as FINP2PProxy.FinIdHoldDst;
+    if ( destination.type == 'escrow' ){
+      dstAccount = { kind: 'Other', dst: utf8.encode(destination.finId) } as FINP2PProxy.OtherHoldDst;
     } else if ( destination.type == 'cryptoWallet' ){
       dstAccount = { kind: 'Tezos', pkh: destination.address } as FINP2PProxy.TezosHoldDst;
     } else if ( destination.type == 'finId' ){
