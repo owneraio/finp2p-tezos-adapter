@@ -232,7 +232,7 @@ module Hangzhounet {
     admins : accounts.map(a => a.pkh),
     finp2pAuthAddress : 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
     finp2pFA2Address : 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
-    finp2pProxyAddress : 'KT1Sc3yNWiUS9Arik5GaNM4GUyDFDop6FnCQ',
+    finp2pProxyAddress : 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
     debug
   }
 
