@@ -830,9 +830,9 @@ export class FinP2PTezos {
         this.taquito.rpc.getNormalizedScript(kt1),
         this.taquito.rpc.getEntrypoints(kt1),
       ]);
-      this.contracts.addContract({
-        kt1: { script, entrypoints },
-      });
+      let contract : any = {};
+      contract[kt1] = { script, entrypoints };
+      this.contracts.addContract(contract);
     }
   }
 
