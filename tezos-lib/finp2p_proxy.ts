@@ -749,7 +749,7 @@ export class FinP2PTezos {
       operation_ttl,
       live_operations: new MichelsonMap(),
       finp2p_assets: new MichelsonMap(),
-      admins,
+      admins : [...admins], // clone admins because of reordering
       next_token_ids: new MichelsonMap(),
       holds : new MichelsonMap(),
       escrow_totals : new MichelsonMap(),
