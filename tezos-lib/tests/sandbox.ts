@@ -19,7 +19,31 @@ async function start () {
     },
     fa2Metadata : { name : "FinP2P FA2 assets",
                     description : "FinP2P assets for ORG" }
-  })
+  });
+
+  console.log("Top up admin accounts to 10 XTZ");
+  let op = await FinP2PTezos.topUpXTZ(FinP2PTezos.config.admins, 10, Net.account.pkh)
+  await FinP2PTezos.waitInclusion(op);
+
+  console.log("Reveal accounts ");
+  let ops = await Promise.all(Net.accounts.concat([Net.other_account]).map(async a => {
+    try {
+      return await FinP2PTezos.taquito.revealWallet(a.pk)
+    } catch (e) {
+      // console.error(e)
+      if (e.message == 'WalletAlreadyRevealed') {
+        return undefined
+      }
+      throw e
+    }
+  }));
+  ops = ops.filter(op => op !== undefined);
+  await Promise.all(ops.map(op => { return FinP2PTezos.waitInclusion(op)}));
+
+  console.log("Master admin:", Net.account);
+  console.log("All admins:", Net.accounts);
+  console.log("Configuration to use:");
+  console.log(FinP2PTezos.config);
 }
 
 (async () => {
