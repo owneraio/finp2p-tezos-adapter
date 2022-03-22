@@ -255,7 +255,7 @@ module Flextesa {
   export const account = flex_accounts.alice
   export const other_account = flex_accounts.bob
 
-  export const accounts = [account].concat(gen_tz_accounts(30))
+  export const accounts = [account].concat(extra_accounts)
 
   let flextesa_image = 'oxheadalpha/flextesa:20211221'
   let flexteas_script : string
