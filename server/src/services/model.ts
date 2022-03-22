@@ -1,19 +1,25 @@
 declare namespace Components {
   namespace Schemas {
     export type Asset = CryptocurrencyAsset | FiatAsset | Finp2pAsset;
+    /**
+         * Asset receipt details
+         */
+    export interface AssetReceiptDetails {
+      type: string;
+    }
     export interface Balance {
       asset: Asset;
       balance: string;
     }
     export interface CryptoWalletAccount {
-      type: 'cryptoWallet';
+      type: string;
       /**
              * address of the cryptocurrency wallet
              */
       address: string;
     }
     export interface CryptocurrencyAsset {
-      type: 'cryptocurrency';
+      type: string;
       /**
              * unique identifier symbol of the cryptocurrency
              */
@@ -58,7 +64,7 @@ declare namespace Components {
     export interface EmptyOperationErrorInformation {
     }
     export interface EscrowAccount {
-      type: 'escrow';
+      type: string;
       /**
              * FinID of the user
              */
@@ -69,14 +75,14 @@ declare namespace Components {
       escrowAccountId: string;
     }
     export interface FiatAccount {
-      type: 'fiatAccount';
+      type: string;
       /**
              * IBAN or other code to represent a fiat account
              */
       code: string;
     }
     export interface FiatAsset {
-      type: 'fiat';
+      type: string;
       /**
              * unique identifier code of the fiat currency - based on ISO-4217
              */
@@ -100,11 +106,11 @@ declare namespace Components {
       value: string;
     }
     export interface FinIdAccount {
-      type: 'finId';
+      type: string;
       finId: string;
     }
     export interface Finp2pAsset {
-      type: 'finp2p';
+      type: string;
       /**
              * unique resource ID of the FinP2P asset
              */
@@ -118,7 +124,21 @@ declare namespace Components {
       /**
              * list of fields by order they appear in the hash group
              */
-      fields?: /* describing a field in the hash group */ Field[];
+      fields: /* describing a field in the hash group */ Field[];
+    }
+    export interface Input {
+      /**
+             * transaction id of the input token
+             */
+      transactionId: string;
+      /**
+             * token input quantity
+             */
+      quantity: string;
+      /**
+             * index of the token in the transaction that created it
+             */
+      index: number; // uint32
     }
     export interface OperationBase {
       /**
@@ -134,6 +154,28 @@ declare namespace Components {
       type: 'receipt' | 'deposit' | 'empty';
       operation: DepositOperation | ReceiptOperation | EmptyOperation;
     }
+    export interface Output {
+      /**
+             * token output quantity
+             */
+      quantity: string;
+      /**
+             * toke destination hex representation of a secp256k1 public key 33 bytes compressed
+             */
+      publicKey: string;
+      /**
+             * index of the token in the transaction
+             */
+      index: number; // uint32
+    }
+    /**
+         * Payment receipt details
+         */
+    export interface PaymentReceiptDetails {
+      type: string;
+      source?: /* describes destination for remote operations operations */ Destination;
+      destination?: /* describes destination for remote operations operations */ Destination;
+    }
     export type PayoutAsset = CryptocurrencyAsset | FiatAsset;
     export interface Receipt {
       /**
@@ -148,15 +190,22 @@ declare namespace Components {
       /**
              * transaction timestamp
              */
-      timestamp?: number; // int64
-      source: Source;
-      destination: /* describes destination for remote operations operations */ Destination;
+      timestamp: number; // int64
       /**
-             * the id of related / counterpary operation
+             * FinId of the source user
              */
-      settlementRef?: string;
+      source: string;
+      /**
+             * FinId of the destination user
+             */
+      destination: string;
       transactionDetails?: /* Additional input and output details for UTXO supporting DLTs */ TransactionDetails;
+      details: /* Receipt details */ ReceiptDetails;
     }
+    /**
+         * Receipt details
+         */
+    export type ReceiptDetails = /* Receipt details */ /* Asset receipt details */ AssetReceiptDetails | /* Payment receipt details */ PaymentReceiptDetails;
     export interface ReceiptOperation {
       /**
              * unique correlation id which identify the operation
@@ -176,21 +225,22 @@ declare namespace Components {
     /**
          * represent a signature template information
          */
-    export interface SignatureTemplate {
+    export interface Signature {
       /**
              * hex representation of the signature
              */
       signature: string;
+      template: /* ordered list of hash groups */ SignatureTemplate;
+    }
+    /**
+         * ordered list of hash groups
+         */
+    export interface SignatureTemplate {
+      hashGroups: HashGroup[];
       /**
-             * ordered list of hash groups
+             * hex representation of the combined hash groups hash value
              */
-      template: {
-        hashGroups: HashGroup[];
-        /**
-                 * hex representation of the combined hash groups hash value
-                 */
-        hash: string;
-      };
+      hash: string;
     }
     export interface Source {
       /**
@@ -206,34 +256,12 @@ declare namespace Components {
          * Additional input and output details for UTXO supporting DLTs
          */
     export interface TransactionDetails {
-      inputs?: {
-        /**
-                 * transaction id of the input token
-                 */
-        transactionId: string;
-        /**
-                 * token input quantity
-                 */
-        quantity: string;
-        /**
-                 * index of the token in the transaction that created it
-                 */
-        index: number; // uint32
-      }[];
-      outputs?: {
-        /**
-                 * token output quantity
-                 */
-        quantity: string;
-        /**
-                 * toke destination hex representation of a secp256k1 public key 33 bytes compressed
-                 */
-        publicKey: string;
-        /**
-                 * index of the token in the transaction
-                 */
-        index: number; // uint32
-      }[];
+      /**
+             * Transaction id
+             */
+      transactionId: string;
+      inputs: Input[];
+      outputs: Output[];
     }
   }
 }
@@ -326,7 +354,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * expiry
              */
       expiry: number; // uint64
-      signature: /* represent a signature template information */ Components.Schemas.SignatureTemplate;
+      signature: /* represent a signature template information */ Components.Schemas.Signature;
     }
     namespace Responses {
       export type $200 = Components.Schemas.ReceiptOperation;
@@ -354,7 +382,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * referrence to the corresponding payment operation
              */
       settlementRef: string;
-      signature: /* represent a signature template information */ Components.Schemas.SignatureTemplate;
+      signature: /* represent a signature template information */ Components.Schemas.Signature;
     }
     namespace Responses {
       export type $200 = Components.Schemas.ReceiptOperation;
@@ -402,7 +430,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * referrence to the corresponding payment operation
              */
       settlementRef: string;
-      signature: /* represent a signature template information */ Components.Schemas.SignatureTemplate;
+      signature: /* represent a signature template information */ Components.Schemas.Signature;
     }
     namespace Responses {
       export type $200 = Components.Schemas.ReceiptOperation;
@@ -478,7 +506,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * referrence to the corresponding payment operation
              */
       settlementRef: string;
-      signature: /* represent a signature template information */ Components.Schemas.SignatureTemplate;
+      signature: /* represent a signature template information */ Components.Schemas.Signature;
     }
     namespace Responses {
       export type $200 = Components.Schemas.ReceiptOperation;
