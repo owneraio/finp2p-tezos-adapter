@@ -62,3 +62,9 @@ server:
 
 docker:
 	@docker build -f build/Dockerfile -t tezos-adapter:latest .
+
+start-sandbox-network:
+	@npx --prefix tezos-lib ts-node tezos-lib/tests/sandbox.ts start
+
+stop-sandbox-network:
+	@npx --prefix tezos-lib ts-node tezos-lib/tests/sandbox.ts stop
