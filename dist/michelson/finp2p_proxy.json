@@ -136,13 +136,22 @@
                                                                     "or",
                                                                     "args":
                                                                     [ { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "key",
                                                                     "annots":
                                                                     [ "%finId" ] },
                                                                     { "prim":
                                                                     "key_hash",
                                                                     "annots":
-                                                                    [ "%tezos" ] } ] } ],
+                                                                    [ "%tezos" ] } ],
+                                                                    "annots":
+                                                                    [ "%supported" ] },
+                                                                    { "prim":
+                                                                    "bytes",
+                                                                    "annots":
+                                                                    [ "%other" ] } ] } ],
                                                                 "annots":
                                                                   [ "%dst" ] } ] } ] } ] } ],
                                         "annots": [ "%execute_hold" ] } ] },
@@ -356,13 +365,22 @@
                                                                     "or",
                                                                     "args":
                                                                     [ { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "key",
                                                                     "annots":
                                                                     [ "%finId" ] },
                                                                     { "prim":
                                                                     "key_hash",
                                                                     "annots":
-                                                                    [ "%tezos" ] } ] } ],
+                                                                    [ "%tezos" ] } ],
+                                                                    "annots":
+                                                                    [ "%supported" ] },
+                                                                    { "prim":
+                                                                    "bytes",
+                                                                    "annots":
+                                                                    [ "%other" ] } ] } ],
                                                                     "annots":
                                                                     [ "%dst" ] } ] } ] } ] } ],
                                               "annots": [ "%execute_hold" ] } ] },
@@ -724,6 +742,9 @@
                                                                     "annots":
                                                                     [ "%src_account" ] },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -738,16 +759,27 @@
                                                                     "annots":
                                                                     [ "%tezos" ] } ] } ],
                                                                     "annots":
-                                                                    [ "%dst" ] } ] } ] } ],
+                                                                    [ "%dst" ] },
+                                                                    { "prim":
+                                                                    "key",
+                                                                    "annots":
+                                                                    [ "%fallback_dst" ] } ] } ] } ] } ],
                                                                 "annots":
                                                                   [ "%escrow" ] },
                                                               { "prim":
                                                                   "pair",
                                                                 "args":
                                                                   [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key",
+                                                                    "annots":
+                                                                    [ "%fa2_fallback_dst" ] },
+                                                                    { "prim":
                                                                     "nat",
                                                                     "annots":
-                                                                    [ "%fa2_hold_id" ] },
+                                                                    [ "%fa2_hold_id" ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -2335,6 +2367,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -2343,12 +2378,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -2467,6 +2509,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -2475,12 +2520,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -2610,6 +2662,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -2618,12 +2673,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -2737,6 +2799,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -2745,12 +2810,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -2887,6 +2959,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -2895,12 +2970,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -3054,6 +3136,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -3062,12 +3147,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -3174,6 +3266,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -3182,12 +3277,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -3226,16 +3328,23 @@
                                         { "prim": "pair",
                                           "args":
                                             [ { "prim": "key" },
-                                              { "prim": "option",
+                                              { "prim": "pair",
                                                 "args":
-                                                  [ { "prim": "or",
+                                                  [ { "prim": "option",
                                                       "args":
-                                                        [ { "prim": "key" },
-                                                          { "prim":
-                                                              "key_hash" } ] } ] } ] } ] } ] },
+                                                        [ { "prim": "or",
+                                                            "args":
+                                                              [ { "prim":
+                                                                    "key" },
+                                                                { "prim":
+                                                                    "key_hash" } ] } ] },
+                                                    { "prim": "key" } ] } ] } ] } ] },
                             { "prim": "pair",
                               "args":
-                                [ { "prim": "nat" },
+                                [ { "prim": "pair",
+                                    "args":
+                                      [ { "prim": "key" },
+                                        { "prim": "nat" } ] },
                                   { "prim": "pair",
                                     "args":
                                       [ { "prim": "address" },
@@ -3261,16 +3370,23 @@
                                           { "prim": "pair",
                                             "args":
                                               [ { "prim": "key" },
-                                                { "prim": "option",
+                                                { "prim": "pair",
                                                   "args":
-                                                    [ { "prim": "or",
+                                                    [ { "prim": "option",
                                                         "args":
-                                                          [ { "prim": "key" },
-                                                            { "prim":
-                                                                "key_hash" } ] } ] } ] } ] } ] },
+                                                          [ { "prim": "or",
+                                                              "args":
+                                                                [ { "prim":
+                                                                    "key" },
+                                                                  { "prim":
+                                                                    "key_hash" } ] } ] },
+                                                      { "prim": "key" } ] } ] } ] } ] },
                               { "prim": "pair",
                                 "args":
-                                  [ { "prim": "nat" },
+                                  [ { "prim": "pair",
+                                      "args":
+                                        [ { "prim": "key" },
+                                          { "prim": "nat" } ] },
                                     { "prim": "pair",
                                       "args":
                                         [ { "prim": "address" },
@@ -3322,8 +3438,9 @@
                       [ [ { "prim": "DIG", "args": [ { "int": "6" } ] },
                           { "prim": "DROP" },
                           { "prim": "GET", "args": [ { "int": "3" } ] } ],
-                        [ { "prim": "UNPAIR" }, { "prim": "SWAP" },
-                          { "prim": "CAR" }, { "prim": "SWAP" },
+                        [ { "prim": "UNPAIR" }, { "prim": "CDR" },
+                          { "prim": "SWAP" }, { "prim": "CAR" },
+                          { "prim": "SWAP" },
                           { "prim": "VIEW",
                             "args":
                               [ { "string": "get_hold" },
@@ -3423,7 +3540,10 @@
                                             "args":
                                               [ { "prim": "pair",
                                                   "args":
-                                                    [ { "prim": "nat" },
+                                                    [ { "prim": "pair",
+                                                        "args":
+                                                          [ { "prim": "key" },
+                                                            { "prim": "nat" } ] },
                                                       { "prim": "pair",
                                                         "args":
                                                           [ { "prim":
@@ -3648,6 +3768,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -3656,12 +3779,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -3783,6 +3913,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -3791,12 +3924,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -3837,18 +3977,26 @@
                                                               [ { "prim":
                                                                     "key" },
                                                                 { "prim":
-                                                                    "option",
+                                                                    "pair",
                                                                   "args":
+                                                                    [ { "prim":
+                                                                    "option",
+                                                                    "args":
                                                                     [ { "prim":
                                                                     "or",
                                                                     "args":
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                               { "prim": "pair",
                                                 "args":
-                                                  [ { "prim": "nat" },
+                                                  [ { "prim": "pair",
+                                                      "args":
+                                                        [ { "prim": "key" },
+                                                          { "prim": "nat" } ] },
                                                     { "prim": "pair",
                                                       "args":
                                                         [ { "prim": "address" },
@@ -3968,6 +4116,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -3976,12 +4127,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -4116,6 +4274,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -4124,12 +4285,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -4273,9 +4441,14 @@
                                                                     "or",
                                                                     "args":
                                                                     [ { "prim":
+                                                                    "or",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] },
+                                                                    { "prim":
+                                                                    "bytes" } ] } ] } ] } ] } ] } ] } ] },
                                         { "prim": "or",
                                           "args":
                                             [ { "prim": "pair",
@@ -4461,6 +4634,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -4469,12 +4645,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -4582,6 +4765,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -4590,12 +4776,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -4873,33 +5066,90 @@
                                             "args":
                                               [ [ { "prim": "UNPAIR",
                                                     "args":
-                                                      [ { "int": "4" } ] },
+                                                      [ { "int": "5" } ] },
                                                   { "prim": "DIG",
                                                     "args":
-                                                      [ { "int": "7" } ] },
+                                                      [ { "int": "8" } ] },
                                                   { "prim": "IF_NONE",
                                                     "args":
-                                                      [ [ { "prim": "NONE",
+                                                      [ [ { "prim": "DIG",
+                                                            "args":
+                                                              [ { "int": "4" } ] },
+                                                          { "prim": "DROP" },
+                                                          { "prim": "NONE",
                                                             "args":
                                                               [ { "prim":
                                                                     "address" } ] } ],
                                                         [ { "prim": "IF_LEFT",
                                                             "args":
                                                               [ [ { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "5" } ] },
+                                                                  { "prim":
+                                                                    "DROP" },
+                                                                  { "prim":
+                                                                    "IF_LEFT",
+                                                                    "args":
+                                                                    [ [ { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "6" } ] },
+                                                                    { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                    { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" } ] },
+                                                                    { "prim":
+                                                                    "PAIR",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                    { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "9" } ] },
+                                                                    { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "EXEC" },
+                                                                    { "prim":
+                                                                    "SOME" } ],
+                                                                    [ { "prim":
+                                                                    "IMPLICIT_ACCOUNT" },
+                                                                    { "prim":
+                                                                    "ADDRESS" },
+                                                                    { "prim":
+                                                                    "SOME" } ] ] } ],
+                                                                [ { "prim":
+                                                                    "DROP" },
+                                                                  { "prim":
                                                                     "DUP",
                                                                     "args":
                                                                     [ { "int":
                                                                     "6" } ] },
                                                                   { "prim":
-                                                                    "DUP",
+                                                                    "SWAP" },
+                                                                  { "prim":
+                                                                    "DUP" },
+                                                                  { "prim":
+                                                                    "DUG",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "3" } ] },
+                                                                    "2" } ] },
                                                                   { "prim":
                                                                     "DIG",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "2" } ] },
+                                                                    "6" } ] },
                                                                   { "prim":
                                                                     "PAIR",
                                                                     "args":
@@ -4914,12 +5164,6 @@
                                                                     "SWAP" },
                                                                   { "prim":
                                                                     "EXEC" },
-                                                                  { "prim":
-                                                                    "SOME" } ],
-                                                                [ { "prim":
-                                                                    "IMPLICIT_ACCOUNT" },
-                                                                  { "prim":
-                                                                    "ADDRESS" },
                                                                   { "prim":
                                                                     "SOME" } ] ] } ] ] },
                                                   { "prim": "DIG",
@@ -5177,11 +5421,10 @@
                                                   { "prim": "CONS" },
                                                   { "prim": "TRANSFER_TOKENS" } ],
                                                 [ { "prim": "UNPAIR" },
-                                                  { "prim": "SWAP" },
-                                                  { "prim": "DUP" },
-                                                  { "prim": "DUG",
+                                                  { "prim": "UNPAIR" },
+                                                  { "prim": "DUP",
                                                     "args":
-                                                      [ { "int": "2" } ] },
+                                                      [ { "int": "3" } ] },
                                                   { "prim": "CAR" },
                                                   { "prim": "CONTRACT",
                                                     "args":
@@ -5232,16 +5475,16 @@
                                                     "args":
                                                       [ [ { "prim": "DIG",
                                                             "args":
-                                                              [ { "int": "7" } ] },
+                                                              [ { "int": "8" } ] },
                                                           { "prim":
                                                               "FAILWITH" } ],
                                                         [ { "prim": "DIG",
                                                             "args":
-                                                              [ { "int": "8" } ] },
+                                                              [ { "int": "9" } ] },
                                                           { "prim": "DROP" } ] ] },
                                                   { "prim": "DIG",
                                                     "args":
-                                                      [ { "int": "5" } ] },
+                                                      [ { "int": "6" } ] },
                                                   { "prim": "IF_NONE",
                                                     "args":
                                                       [ [ { "prim": "NONE",
@@ -5250,10 +5493,10 @@
                                                                     "address" } ] } ],
                                                         [ { "prim": "DUP",
                                                             "args":
-                                                              [ { "int": "5" } ] },
+                                                              [ { "int": "6" } ] },
                                                           { "prim": "DUP",
                                                             "args":
-                                                              [ { "int": "5" } ] },
+                                                              [ { "int": "6" } ] },
                                                           { "prim": "DIG",
                                                             "args":
                                                               [ { "int": "2" } ] },
@@ -5262,19 +5505,24 @@
                                                               [ { "int": "3" } ] },
                                                           { "prim": "DUP",
                                                             "args":
-                                                              [ { "int": "8" } ] },
+                                                              [ { "int": "9" } ] },
                                                           { "prim": "SWAP" },
                                                           { "prim": "EXEC" },
                                                           { "prim": "SOME" } ] ] },
                                                   { "prim": "DIG",
                                                     "args":
-                                                      [ { "int": "6" } ] },
+                                                      [ { "int": "7" } ] },
                                                   { "prim": "IF_NONE",
                                                     "args":
                                                       [ [ { "prim": "DIG",
                                                             "args":
-                                                              [ { "int": "6" } ] },
-                                                          { "prim": "DROP" },
+                                                              [ { "int": "2" } ] },
+                                                          { "prim": "DIG",
+                                                            "args":
+                                                              [ { "int": "7" } ] },
+                                                          { "prim": "DROP",
+                                                            "args":
+                                                              [ { "int": "2" } ] },
                                                           { "prim": "NONE",
                                                             "args":
                                                               [ { "prim":
@@ -5282,6 +5530,62 @@
                                                         [ { "prim": "IF_LEFT",
                                                             "args":
                                                               [ [ { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                  { "prim":
+                                                                    "DROP" },
+                                                                  { "prim":
+                                                                    "IF_LEFT",
+                                                                    "args":
+                                                                    [ [ { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "6" } ] },
+                                                                    { "prim":
+                                                                    "DUP",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "6" } ] },
+                                                                    { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "2" } ] },
+                                                                    { "prim":
+                                                                    "PAIR",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "3" } ] },
+                                                                    { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "7" } ] },
+                                                                    { "prim":
+                                                                    "SWAP" },
+                                                                    { "prim":
+                                                                    "EXEC" },
+                                                                    { "prim":
+                                                                    "SOME" } ],
+                                                                    [ { "prim":
+                                                                    "DIG",
+                                                                    "args":
+                                                                    [ { "int":
+                                                                    "7" } ] },
+                                                                    { "prim":
+                                                                    "DROP" },
+                                                                    { "prim":
+                                                                    "IMPLICIT_ACCOUNT" },
+                                                                    { "prim":
+                                                                    "ADDRESS" },
+                                                                    { "prim":
+                                                                    "SOME" } ] ] } ],
+                                                                [ { "prim":
+                                                                    "DROP" },
+                                                                  { "prim":
                                                                     "DUP",
                                                                     "args":
                                                                     [ { "int":
@@ -5295,7 +5599,7 @@
                                                                     "DIG",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "2" } ] },
+                                                                    "4" } ] },
                                                                   { "prim":
                                                                     "PAIR",
                                                                     "args":
@@ -5310,19 +5614,6 @@
                                                                     "SWAP" },
                                                                   { "prim":
                                                                     "EXEC" },
-                                                                  { "prim":
-                                                                    "SOME" } ],
-                                                                [ { "prim":
-                                                                    "DIG",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "7" } ] },
-                                                                  { "prim":
-                                                                    "DROP" },
-                                                                  { "prim":
-                                                                    "IMPLICIT_ACCOUNT" },
-                                                                  { "prim":
-                                                                    "ADDRESS" },
                                                                   { "prim":
                                                                     "SOME" } ] ] } ] ] },
                                                   { "prim": "DIG",
@@ -5880,10 +6171,13 @@
                                   { "prim": "IF_LEFT",
                                     "args":
                                       [ [ { "prim": "UNPAIR",
-                                            "args": [ { "int": "4" } ] },
+                                            "args": [ { "int": "5" } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "3" } ] },
-                                          { "prim": "DROP" },
+                                          { "prim": "DIG",
+                                            "args": [ { "int": "4" } ] },
+                                          { "prim": "DROP",
+                                            "args": [ { "int": "2" } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "5" } ] },
                                           { "prim": "IF_NONE",
@@ -6022,6 +6316,7 @@
                                           { "prim": "CONS" },
                                           { "prim": "TRANSFER_TOKENS" } ],
                                         [ { "prim": "UNPAIR" },
+                                          { "prim": "CDR" },
                                           { "prim": "SWAP" },
                                           { "prim": "DUP" },
                                           { "prim": "DUG",
@@ -6456,6 +6751,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -6464,12 +6762,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -6567,6 +6872,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -6575,12 +6883,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -6955,6 +7270,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -6963,12 +7281,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -7097,6 +7422,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -7105,12 +7433,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -7347,6 +7682,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -7355,12 +7693,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -7489,6 +7834,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -7497,12 +7845,19 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
                                                                     [ { "prim":
-                                                                    "nat" },
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "key" },
+                                                                    { "prim":
+                                                                    "nat" } ] },
                                                                     { "prim":
                                                                     "pair",
                                                                     "args":
@@ -8192,10 +8547,7 @@
                                     "args": [ { "int": "9" } ] },
                                   { "prim": "IF_NONE",
                                     "args":
-                                      [ [ { "prim": "DIG",
-                                            "args": [ { "int": "3" } ] },
-                                          { "prim": "DROP" },
-                                          { "prim": "NONE",
+                                      [ [ { "prim": "NONE",
                                             "args":
                                               [ { "prim": "or",
                                                   "args":
@@ -8232,11 +8584,7 @@
                                                       [ { "int": "11" } ] },
                                                   { "prim": "IF_NONE",
                                                     "args":
-                                                      [ [ { "prim": "DIG",
-                                                            "args":
-                                                              [ { "int": "3" } ] },
-                                                          { "prim": "DROP" },
-                                                          { "prim": "NONE",
+                                                      [ [ { "prim": "NONE",
                                                             "args":
                                                               [ { "prim":
                                                                     "or",
@@ -8248,21 +8596,14 @@
                                                         [ { "prim": "IF_LEFT",
                                                             "args":
                                                               [ [ { "prim":
-                                                                    "DIG",
-                                                                    "args":
-                                                                    [ { "int":
-                                                                    "4" } ] },
-                                                                  { "prim":
-                                                                    "DROP" },
-                                                                  { "prim":
                                                                     "SOME" } ],
                                                                 [ { "prim":
                                                                     "DROP" },
                                                                   { "prim":
-                                                                    "DIG",
+                                                                    "DUP",
                                                                     "args":
                                                                     [ { "int":
-                                                                    "3" } ] },
+                                                                    "4" } ] },
                                                                   { "prim":
                                                                     "LEFT",
                                                                     "args":
@@ -8270,9 +8611,9 @@
                                                                     "key_hash" } ] },
                                                                   { "prim":
                                                                     "SOME" } ] ] } ] ] } ],
-                                                [ { "prim": "DIG",
+                                                [ { "prim": "DUP",
                                                     "args":
-                                                      [ { "int": "3" } ] },
+                                                      [ { "int": "4" } ] },
                                                   { "prim": "LEFT",
                                                     "args":
                                                       [ { "prim": "key_hash" } ] },
@@ -8316,7 +8657,7 @@
                                   { "prim": "IF_NONE",
                                     "args":
                                       [ [ { "prim": "DUP",
-                                            "args": [ { "int": "8" } ] },
+                                            "args": [ { "int": "9" } ] },
                                           { "prim": "GET",
                                             "args": [ { "int": "14" } ] },
                                           { "prim": "DUP",
@@ -8329,17 +8670,17 @@
                                             "args":
                                               [ [ { "prim": "DUP",
                                                     "args":
-                                                      [ { "int": "5" } ] } ],
+                                                      [ { "int": "6" } ] } ],
                                                 [ { "prim": "DUP",
                                                     "args":
-                                                      [ { "int": "6" } ] },
+                                                      [ { "int": "7" } ] },
                                                   { "prim": "ADD" } ] ] },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "8" } ] },
+                                            "args": [ { "int": "9" } ] },
                                           { "prim": "DUP" },
                                           { "prim": "DUP" },
                                           { "prim": "DUG",
-                                            "args": [ { "int": "10" } ] },
+                                            "args": [ { "int": "11" } ] },
                                           { "prim": "GET",
                                             "args": [ { "int": "14" } ] },
                                           { "prim": "DIG",
@@ -8365,7 +8706,7 @@
                                                           [ { "prim": "nat" },
                                                             { "prim": "nat" } ] } ] } ] },
                                           { "prim": "DUP",
-                                            "args": [ { "int": "7" } ] },
+                                            "args": [ { "int": "8" } ] },
                                           { "prim": "DUP",
                                             "args": [ { "int": "5" } ] },
                                           { "prim": "CDR" },
@@ -8384,7 +8725,7 @@
                                           { "prim": "PAIR",
                                             "args": [ { "int": "3" } ] },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "11" } ] },
+                                            "args": [ { "int": "12" } ] },
                                           { "prim": "SWAP" },
                                           { "prim": "EXEC" },
                                           { "prim": "PAIR" },
@@ -8428,11 +8769,11 @@
                                             "args":
                                               [ [ { "prim": "DIG",
                                                     "args":
-                                                      [ { "int": "10" } ] },
+                                                      [ { "int": "11" } ] },
                                                   { "prim": "FAILWITH" } ],
                                                 [ { "prim": "DIG",
                                                     "args":
-                                                      [ { "int": "11" } ] },
+                                                      [ { "int": "12" } ] },
                                                   { "prim": "DROP" } ] ] },
                                           { "prim": "PUSH",
                                             "args":
@@ -8462,20 +8803,25 @@
                                           { "prim": "TRANSFER_TOKENS" },
                                           { "prim": "SWAP" },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "2" } ] },
+                                            "args": [ { "int": "6" } ] },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "5" } ] },
+                                            "args": [ { "int": "3" } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "6" } ] },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "5" } ] },
+                                            "args": [ { "int": "7" } ] },
+                                          { "prim": "DIG",
+                                            "args": [ { "int": "6" } ] },
                                           { "prim": "PAIR",
-                                            "args": [ { "int": "4" } ] },
+                                            "args": [ { "int": "5" } ] },
                                           { "prim": "LEFT",
                                             "args":
                                               [ { "prim": "pair",
                                                   "args":
-                                                    [ { "prim": "nat" },
+                                                    [ { "prim": "pair",
+                                                        "args":
+                                                          [ { "prim": "key" },
+                                                            { "prim": "nat" } ] },
                                                       { "prim": "pair",
                                                         "args":
                                                           [ { "prim":
@@ -8486,7 +8832,7 @@
                                           { "prim": "PAIR" },
                                           { "prim": "PAIR" } ],
                                         [ { "prim": "DIG",
-                                            "args": [ { "int": "10" } ] },
+                                            "args": [ { "int": "11" } ] },
                                           { "prim": "DROP" },
                                           { "prim": "DUP",
                                             "args": [ { "int": "3" } ] },
@@ -8520,7 +8866,7 @@
                                                     "args":
                                                       [ [ { "prim": "DUP",
                                                             "args":
-                                                              [ { "int": "10" } ] },
+                                                              [ { "int": "11" } ] },
                                                           { "prim": "DUP",
                                                             "args":
                                                               [ { "int": "5" } ] },
@@ -8532,7 +8878,7 @@
                                                               [ { "int": "3" } ] },
                                                           { "prim": "DUP",
                                                             "args":
-                                                              [ { "int": "11" } ] },
+                                                              [ { "int": "12" } ] },
                                                           { "prim": "SWAP" },
                                                           { "prim": "EXEC" },
                                                           { "prim": "SOME" } ],
@@ -8541,7 +8887,7 @@
                                                           { "prim": "ADDRESS" },
                                                           { "prim": "SOME" } ] ] } ] ] },
                                           { "prim": "DUP",
-                                            "args": [ { "int": "10" } ] },
+                                            "args": [ { "int": "11" } ] },
                                           { "prim": "DUP",
                                             "args": [ { "int": "5" } ] },
                                           { "prim": "DIG",
@@ -8549,11 +8895,11 @@
                                           { "prim": "PAIR",
                                             "args": [ { "int": "3" } ] },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "10" } ] },
+                                            "args": [ { "int": "11" } ] },
                                           { "prim": "SWAP" },
                                           { "prim": "EXEC" },
                                           { "prim": "DIG",
-                                            "args": [ { "int": "6" } ] },
+                                            "args": [ { "int": "7" } ] },
                                           { "prim": "DUP",
                                             "args": [ { "int": "6" } ] },
                                           { "prim": "CDR" },
@@ -8573,11 +8919,14 @@
                                           { "prim": "PAIR" },
                                           { "prim": "TRANSFER_TOKENS" },
                                           { "prim": "DUP",
-                                            "args": [ { "int": "7" } ] },
+                                            "args": [ { "int": "8" } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "3" } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "3" } ] },
+                                          { "prim": "DIG",
+                                            "args": [ { "int": "5" } ] },
+                                          { "prim": "PAIR" },
                                           { "prim": "PAIR" },
                                           { "prim": "RIGHT",
                                             "args":
@@ -8596,6 +8945,9 @@
                                                                 [ { "prim":
                                                                     "key" },
                                                                   { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
                                                                     "option",
                                                                     "args":
                                                                     [ { "prim":
@@ -8604,7 +8956,9 @@
                                                                     [ { "prim":
                                                                     "key" },
                                                                     { "prim":
-                                                                    "key_hash" } ] } ] } ] } ] } ] } ] },
+                                                                    "key_hash" } ] } ] },
+                                                                    { "prim":
+                                                                    "key" } ] } ] } ] } ] } ] },
                                           { "prim": "DIG",
                                             "args": [ { "int": "2" } ] },
                                           { "prim": "PAIR" },

@@ -155,7 +155,7 @@ export interface ExecuteHoldParam {
   asset_id? : AssetId;
   amount? : TokenAmount;
   src_account? : Key;
-  dst? : SupportedHoldDst;
+  dst? : HoldDst;
 }
 
 export interface ReleaseHoldParam {
@@ -484,7 +484,7 @@ export namespace Michelson {
     let assetId = mkOpt(eh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
     let amount = mkOpt(eh.amount, (s => { return { int : s.toString() }; }));
     let srcAccount = mkOpt(eh.src_account, (s => { return maybeBytes(s); }));
-    let dstAccount = mkOpt(eh.dst, (d => { return supportedHoldDst(d); }));
+    let dstAccount = mkOpt(eh.dst, (d => { return holdDst(d); }));
     return {
       prim: 'Pair',
       args: [
