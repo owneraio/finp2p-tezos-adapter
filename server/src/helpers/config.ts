@@ -1,5 +1,5 @@
 export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.hangzhounet.teztnets.xyz';
-export const explorers = [
+export const explorers = process.env.DISABLE_EXPLORERS === 'true' ? undefined : [
   {
     kind : 'TzKT' as 'TzKT',
     url : process.env.TZKT_ADDR || 'https://api.hangzhou2net.tzkt.io',
@@ -10,18 +10,7 @@ export const explorers = [
   },
 ];
 
-//TODO: move this to configuration
-// Note that this account must also be an admin of the `finp2p_proxy` contract
-export let masterAdmin = {
-  pkh : 'tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz',
-  pk : 'edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq',
-  sk : 'edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS',
-};
-
-//TODO: move this to configuration
-// Note that these accounts must be admin of the `finp2p_proxy` contract
-export let accounts = [
-  masterAdmin,
+let extraAccounts = [
   {
     pkh: 'tz1aABc8BL4EoFPKb9JqCQicP5He8NRMex73',
     pk: 'edpku9b4PwaVMNFciuwcgcUHPVBH9eJvfBuc4kPJKkVyHBMcRvHVSF',
@@ -174,10 +163,34 @@ export let accounts = [
   },
 ];
 
+//TODO: move this to configuration
+// Note that this account must also be an admin of the `finp2p_proxy` contract
+module Hangzhounet {
+  export const account = {
+    pkh : 'tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz',
+    pk : 'edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq',
+    sk : 'edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS',
+  };
+  export const accounts = [account].concat(extraAccounts);
+}
+
+module Flextesa {
+  export const account = {
+    pk: 'edpkvGfYw3LyB1UcCahKQk4rF2tvbMUk8GFiTuMjL75uGXrpvKXhjn',
+    pkh: 'tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb',
+    sk: 'edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq',
+  };
+  export const accounts = [account].concat(extraAccounts);
+}
+
+//TODO: move this to configuration
+// Note that these accounts must be admin of the `finp2p_proxy` contract
+export let accounts = (process.env.USE_FLEXTESA == 'true') ? Flextesa.accounts : Hangzhounet.accounts;
+
 // Initialize FinP2P library
 //TODO: move this to configuration
 export const contracts = {
-  finp2pAuthAddress : 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
-  finp2pFA2Address : 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
-  finp2pProxyAddress : 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
+  finp2pAuthAddress : process.env.FINP2P_AUTH_ADDRESS || 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
+  finp2pFA2Address : process.env.FINP2P_FA2_ADDRESS || 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
+  finp2pProxyAddress : process.env.FINP2P_PROXY_ADDRESS || 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
 };

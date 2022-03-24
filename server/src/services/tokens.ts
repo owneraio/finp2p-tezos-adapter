@@ -11,11 +11,11 @@ function pubkeyToTezosSecp256k1(pubKey : string) : string {
   return ('0x01' /* secp256k1 */ + pubKey);
 }
 
-function getFieldFromSignature(signature: Components.Schemas.SignatureTemplate, hgIndex: number, name: string) : Components.Schemas.Field {
-  if (signature.template.hashGroups[hgIndex] == null || signature.template.hashGroups[hgIndex].fields == null) {
+function getFieldFromSignature(template: Components.Schemas.SignatureTemplate, hgIndex: number, name: string) : Components.Schemas.Field {
+  if (template.hashGroups[hgIndex] == null || template.hashGroups[hgIndex].fields == null) {
     throw Error(`hashGroups ${hgIndex} not found in signature template`);
   }
-  let f = signature.template.hashGroups[hgIndex].fields?.find(element => element.name == name);
+  let f = template.hashGroups[hgIndex].fields?.find(element => element.name == name);
   if (f == undefined) {
     throw Error(`field ${name} not found in signature template`);
   }
@@ -40,7 +40,7 @@ function getEscrowDestination(destination: Components.Schemas.Destination | unde
   let dstAccount : FINP2PProxy.HoldDst  | undefined;
   if (destination){
     if ( destination.type == 'escrow' ){
-      dstAccount = { kind: 'Other', dst: utf8.encode(destination.finId) } as FINP2PProxy.OtherHoldDst;
+      dstAccount = { kind: 'Other', dst: utf8.encode(destination.escrowAccountId) } as FINP2PProxy.OtherHoldDst;
     } else if ( destination.type == 'cryptoWallet' ){
       dstAccount = { kind: 'Tezos', pkh: destination.address } as FINP2PProxy.TezosHoldDst;
     } else if ( destination.type == 'finId' ){
@@ -67,6 +67,7 @@ export class TokenService {
       finp2pProxyAddress : contracts.finp2pProxyAddress,
       debug: false,
     };
+    logger.debug('starting client', { config });
     this.tezosClient = new FINP2PProxy.FinP2PTezos(config);
     accounts.map(a =>
       this.tezosClient.registerSigner(new InMemorySigner(a.sk)),
@@ -106,12 +107,13 @@ export class TokenService {
       shg: new Uint8Array(),
     } as FINP2PProxy.IssueTokensParam);
     await this.tezosClient.waitInclusion(op);
+    request.destination.type = 'finId';
     return {
       isCompleted: true,
       response: {
         id: op.hash,
         asset: request.asset,
-        destination: { finId: request.destination.finId, type: 'finId' } as Components.Schemas.FinIdAccount,
+        destination: request.destination,
         quantity: request.quantity,
       } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
@@ -160,6 +162,7 @@ export class TokenService {
     };
     const op = await this.tezosClient.transferTokens(params);
     await this.tezosClient.waitInclusion(op);
+    //TODO: what if destination is not finId?
     return {
       isCompleted: true,
       response: {
@@ -174,6 +177,7 @@ export class TokenService {
 
   public async getReceipt(id: Paths.GetReceipt.Parameters.TransactionId) : Promise<Paths.GetReceipt.Responses.$200> {
     const r = await this.tezosClient.getReceipt({ hash : id });
+    //TODO: what if destination is not finId?
     return {
       isCompleted: true,
       response: {
@@ -182,8 +186,7 @@ export class TokenService {
         source:
             (r.srcAccount === undefined) ? undefined : { finId: r.srcAccount.toString('hex') } as Components.Schemas.Source,
         destination:
-            (r.dstAccount === undefined) ? undefined : { type: 'finId', finId: r.dstAccount.toString('hex') } as Components.Schemas.FinIdAccount,
-        quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
+            (r.dstAccount === undefined) ? undefined : { type: 'finId', finId: r.dstAccount.toString('hex') } as Components.Schemas.FinIdAccount,        quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
       } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
   }
@@ -216,10 +219,10 @@ export class TokenService {
 
     let dstAccount = getEscrowDestination(request.destination);
 
-    let ahgSourceField = getFieldFromSignature(request.signature, 0, 'srcAccount');
-    let ahgDestinationField = getFieldFromSignature(request.signature, 0, 'dstAccount');
-    let ahgAssetIdField = getFieldFromSignature(request.signature, 0, 'assetId');
-    let ahgAmountField = getFieldFromSignature(request.signature, 0, 'amount');
+    let ahgSourceField = getFieldFromSignature(request.signature.template, 0, 'srcAccount');
+    let ahgDestinationField = getFieldFromSignature(request.signature.template, 0, 'dstAccount');
+    let ahgAssetIdField = getFieldFromSignature(request.signature.template, 0, 'assetId');
+    let ahgAmountField = getFieldFromSignature(request.signature.template, 0, 'amount');
 
     const nonceBytes = Buffer.from(request.nonce, 'hex');
     const noncePre = nonceBytes.slice(0, 24);
@@ -254,6 +257,12 @@ export class TokenService {
     await this.tezosClient.waitInclusion(op);
     return {
       isCompleted: true,
+      response: {
+        id: op.hash,
+        asset: request.asset,
+        source: request.source,
+        quantity: request.quantity,
+      } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -272,6 +281,7 @@ export class TokenService {
 
     const op = await this.tezosClient.executeHold(params);
     await this.tezosClient.waitInclusion(op);
+    //TODO: what if destination is not finId?
     return {
       isCompleted: true,
       response: {
@@ -302,8 +312,7 @@ export class TokenService {
         id: op.hash,
         asset: request.asset,
         source: request.source,
-        destination: { type: 'finId', finId: request.source.finId } as Components.Schemas.FinIdAccount,
-        quantity: request.quantity,
+        destination: { type: 'finId', finId: request.source.finId } as Components.Schemas.FinIdAccount,        quantity: request.quantity,
       } as Components.Schemas.Receipt,
     } as Components.Schemas.ReceiptOperation;
   }
