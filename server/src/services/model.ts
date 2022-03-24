@@ -1,25 +1,19 @@
 declare namespace Components {
   namespace Schemas {
     export type Asset = CryptocurrencyAsset | FiatAsset | Finp2pAsset;
-    /**
-         * Asset receipt details
-         */
-    export interface AssetReceiptDetails {
-      type: string;
-    }
     export interface Balance {
       asset: Asset;
       balance: string;
     }
     export interface CryptoWalletAccount {
-      type: string;
+      type: 'cryptoWallet';
       /**
              * address of the cryptocurrency wallet
              */
       address: string;
     }
     export interface CryptocurrencyAsset {
-      type: string;
+      type: 'cryptocurrency';
       /**
              * unique identifier symbol of the cryptocurrency
              */
@@ -64,7 +58,7 @@ declare namespace Components {
     export interface EmptyOperationErrorInformation {
     }
     export interface EscrowAccount {
-      type: string;
+      type: 'escrow';
       /**
              * FinID of the user
              */
@@ -75,14 +69,14 @@ declare namespace Components {
       escrowAccountId: string;
     }
     export interface FiatAccount {
-      type: string;
+      type: 'fiatAccount';
       /**
              * IBAN or other code to represent a fiat account
              */
       code: string;
     }
     export interface FiatAsset {
-      type: string;
+      type: 'fiat';
       /**
              * unique identifier code of the fiat currency - based on ISO-4217
              */
@@ -106,11 +100,11 @@ declare namespace Components {
       value: string;
     }
     export interface FinIdAccount {
-      type: string;
+      type: 'finId';
       finId: string;
     }
     export interface Finp2pAsset {
-      type: string;
+      type: 'finp2p';
       /**
              * unique resource ID of the FinP2P asset
              */
@@ -168,14 +162,6 @@ declare namespace Components {
              */
       index: number; // uint32
     }
-    /**
-         * Payment receipt details
-         */
-    export interface PaymentReceiptDetails {
-      type: string;
-      source?: /* describes destination for remote operations operations */ Destination;
-      destination?: /* describes destination for remote operations operations */ Destination;
-    }
     export type PayoutAsset = CryptocurrencyAsset | FiatAsset;
     export interface Receipt {
       /**
@@ -191,21 +177,10 @@ declare namespace Components {
              * transaction timestamp
              */
       timestamp: number; // int64
-      /**
-             * FinId of the source user
-             */
-      source: string;
-      /**
-             * FinId of the destination user
-             */
-      destination: string;
+      source?: Source;
+      destination?: /* describes destination for remote operations operations */ Destination;
       transactionDetails?: /* Additional input and output details for UTXO supporting DLTs */ TransactionDetails;
-      details: /* Receipt details */ ReceiptDetails;
     }
-    /**
-         * Receipt details
-         */
-    export type ReceiptDetails = /* Receipt details */ /* Asset receipt details */ AssetReceiptDetails | /* Payment receipt details */ PaymentReceiptDetails;
     export interface ReceiptOperation {
       /**
              * unique correlation id which identify the operation
@@ -372,7 +347,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * nonce
              */
       nonce: string;
-      destination: Components.Schemas.Source;
+      destination: Components.Schemas.FinIdAccount;
       /**
              * quantity
              */
@@ -420,7 +395,7 @@ declare namespace Paths { // eslint-disable-line @typescript-eslint/no-unused-va
              * nonce
              */
       nonce: string;
-      source: Components.Schemas.Source;
+      source: Components.Schemas.FinIdAccount;
       /**
              * quantity
              */
