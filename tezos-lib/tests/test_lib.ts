@@ -820,13 +820,13 @@ export async function execute_hold(i : {
   return await FinP2PTezos.executeHold(param, i.options)
 }
 
-export async function mk_release_hold(i : {
+export async function mk_rollback_hold(i : {
   hold_id : string,
   asset_id? : string,
   amount? : number | bigint,
   src? : Buffer,
 }) {
-  let param: Finp2pProxy.ReleaseHoldParam = {
+  let param: Finp2pProxy.RollbackHoldParam = {
     hold_id : utf8.encode(i.hold_id),
     asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
     amount : (i.amount === undefined)? undefined : BigInt(i.amount),
@@ -836,16 +836,16 @@ export async function mk_release_hold(i : {
   return param
 }
 
-export async function release_hold(i : {
+export async function rollback_hold(i : {
   hold_id : string,
   asset_id? : string,
   amount? : number | bigint,
   src? : Buffer,
   options? : Finp2pProxy.CallOptions,
 }) {
-  let param = await mk_release_hold(i)
-  log("Release hold parameters:", param)
-  return await FinP2PTezos.releaseHold(param, i.options)
+  let param = await mk_rollback_hold(i)
+  log("Rollback hold parameters:", param)
+  return await FinP2PTezos.rollbackHold(param, i.options)
 }
 
 export async function get_balance_big_int(i : {

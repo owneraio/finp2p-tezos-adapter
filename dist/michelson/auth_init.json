@@ -297,7 +297,7 @@
                                                                     "address" } ],
                                                                     "annots":
                                                                     [ "%src" ] } ] } ] } ],
-                                                    "annots": [ "%release" ] } ] } ],
+                                                    "annots": [ "%rollback" ] } ] } ],
                                         "annots": [ "%manage_action" ] },
                                       { "prim": "unit",
                                         "annots": [ "%admin_action" ] } ] } ],

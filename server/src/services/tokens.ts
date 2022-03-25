@@ -298,13 +298,13 @@ export class TokenService {
     logger.debug('rollback', { request });
     let assetId = getEscrowAsset(request.asset);
 
-    let params: FINP2PProxy.ReleaseHoldParam = {
+    let params: FINP2PProxy.RollbackHoldParam = {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
       src_account : pubkeyToTezosSecp256k1(request.source.finId),
     };
-    const op = await this.tezosClient.releaseHold(params);
+    const op = await this.tezosClient.rollbackHold(params);
     await this.tezosClient.waitInclusion(op);
     return {
       isCompleted: true,

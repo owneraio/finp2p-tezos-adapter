@@ -247,7 +247,7 @@
                                                       [ { "prim": "key" } ],
                                                     "annots":
                                                       [ "%src_account" ] } ] } ] } ],
-                                  "annots": [ "%release_hold" ] },
+                                  "annots": [ "%rollback_hold" ] },
                                 { "prim": "pair",
                                   "args":
                                     [ { "prim": "pair",
@@ -486,7 +486,7 @@
                                                             [ { "prim": "key" } ],
                                                           "annots":
                                                             [ "%src_account" ] } ] } ] } ],
-                                        "annots": [ "%release_hold" ] },
+                                        "annots": [ "%rollback_hold" ] },
                                       { "prim": "pair",
                                         "args":
                                           [ { "prim": "pair",
@@ -6354,7 +6354,7 @@
                                                                     "address" } ],
                                                                     "annots":
                                                                     [ "%src" ] } ] } ] } ] } ],
-                                            "annots": [ "%release" ] },
+                                            "annots": [ "%rollback" ] },
                                           { "prim": "IF_NONE",
                                             "args":
                                               [ [ { "prim": "DIG",

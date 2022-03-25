@@ -30,7 +30,7 @@
                           (pair %nonce (bytes %nonce) (timestamp %timestamp))
                           (pair (bytes %asset_id)
                                 (pair (key %src_account) (pair (nat %amount) (signature %signature)))))))
-               (or (pair %release_hold
+               (or (pair %rollback_hold
                       (bytes %hold_id)
                       (pair (option %asset_id bytes) (pair (option %amount nat) (option %src_account key))))
                    (pair %transfer_tokens
@@ -57,7 +57,7 @@
                               (pair %nonce (bytes %nonce) (timestamp %timestamp))
                               (pair (bytes %asset_id)
                                     (pair (key %src_account) (pair (nat %amount) (signature %signature)))))))
-                   (or (pair %release_hold
+                   (or (pair %rollback_hold
                           (bytes %hold_id)
                           (pair (option %asset_id bytes) (pair (option %amount nat) (option %src_account key))))
                        (pair %transfer_tokens
@@ -1769,7 +1769,7 @@
                          DUP ;
                          DUG 2 ;
                          CAR ;
-                         CONTRACT %release
+                         CONTRACT %rollback
                            (pair (nat %hold_id)
                                  (pair (option %amount nat) (pair (option %token_id nat) (option %src address)))) ;
                          IF_NONE { DIG 6 ; FAILWITH } { DIG 7 ; DROP } ;

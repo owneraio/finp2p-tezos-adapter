@@ -378,13 +378,13 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
       Tezos.transaction [execute_transfer] 0tez transfer_ep in
   (op, s)
 
-let release_hold (p : release_hold_param) (s : storage) : (operation * storage) =
+let rollback_hold (p : rollback_hold_param) (s : storage) : (operation * storage) =
   let { hold_id; asset_id; amount = amount_; src_account } = p in
   let (s, hold_info) = unhold_aux hold_id asset_id amount_ s in
   let op =
     match hold_info with
     | FA2_hold { fa2_hold_id; held_token; fa2_fallback_dst = _ } ->
-      let release_ep = get_release_entrypoint held_token.address in
+      let rollback_ep = get_rollback_entrypoint held_token.address in
       let rl_src =
         match src_account with
         | None -> None
@@ -395,7 +395,7 @@ let release_hold (p : release_hold_param) (s : storage) : (operation * storage) 
           amount = amount_;
           token_id = (Some held_token.id);
           src = rl_src 
-        } 0tez release_ep
+        } 0tez rollback_ep
     | Escrow
         { held_token = es_held_token; amount = es_amount;
           src_account = es_src_account; dst = _; fallback_dst = _ }
@@ -409,14 +409,14 @@ let release_hold (p : release_hold_param) (s : storage) : (operation * storage) 
       let tr_dst = address_of_key es_src_account es_held_token s in
       let tr_amount = match amount_ with | None -> es_amount | Some a -> a in
       let tr_token_id = es_held_token.id in
-      let release_transfer =
+      let rollback_transfer =
         {
           from_ = tr_src ;
           txs =
             [{ to_ = tr_dst ; token_id = tr_token_id ; amount = tr_amount  }]
         } in
       let transfer_ep = get_transfer_entrypoint es_held_token.address in
-      Tezos.transaction [release_transfer] 0tez transfer_ep in
+      Tezos.transaction [rollback_transfer] 0tez transfer_ep in
   (op, s)
 
 let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) : (operation * storage) =
@@ -426,7 +426,7 @@ let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) : (operation * sto
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
   | Execute_hold p -> execute_hold p s
-  | Release_hold p -> release_hold p s
+  | Rollback_hold p -> rollback_hold p s
 
 let finp2p_batch_asset (l : finp2p_proxy_asset_param list) (s : storage) : (operation list * storage) =
   let (r_ops, s) =

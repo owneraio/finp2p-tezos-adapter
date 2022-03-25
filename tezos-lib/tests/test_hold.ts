@@ -1,13 +1,13 @@
 import 'mocha'
 import { strict as assert } from 'assert';
-import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, release_hold, execute_hold } from './test_lib'
+import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, execute_hold } from './test_lib'
 
 import { accounts, asset_id1, asset_id4 } from './test_variables';
 
 
 export function run() {
 
-  describe('Hold / Execute / Release',  () => {
+  describe('Hold / Execute / Rollback',  () => {
 
     it("Hold more than balance", async () => {
       let b0 = await get_balance({
@@ -230,10 +230,10 @@ export function run() {
       assert.equal(bs0, 18n)
     })
 
-    it("Release missing hold", async () => {
+    it("Rollback missing hold", async () => {
       await assert.rejects(
         async () => {
-          await release_hold(
+          await rollback_hold(
             { hold_id: "HOLD-ID-0000" }
           )
         },

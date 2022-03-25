@@ -220,7 +220,7 @@
                                               "args":
                                                 [ { "prim": "address" } ],
                                               "annots": [ "%src" ] } ] } ] } ],
-                            "annots": [ "%release" ] } ] } ],
+                            "annots": [ "%rollback" ] } ] } ],
                 "annots": [ "%manager" ] } ] } ] },
   { "prim": "storage",
     "args":
@@ -2427,7 +2427,7 @@
                                                                     "annots":
                                                                     [ "%src" ] } ] } ] } ],
                                                             "annots":
-                                                              [ "%release" ] } ] } ],
+                                                              [ "%rollback" ] } ] } ],
                                                 "annots":
                                                   [ "%manage_action" ] },
                                               { "prim": "unit",

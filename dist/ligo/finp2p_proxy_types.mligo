@@ -94,7 +94,7 @@ type execute_hold_param = [@layout:comb]  {
     src_account: key option ;
     dst: hold_dst option }
 
-type release_hold_param = [@layout:comb]  {
+type rollback_hold_param = [@layout:comb]  {
     hold_id: finp2p_hold_id ;
     asset_id: asset_id option ;
     amount: token_amount option ;
@@ -106,7 +106,7 @@ type finp2p_proxy_asset_param =
   | Issue_tokens of issue_tokens_param 
   | Redeem_tokens of redeem_tokens_param 
   | Execute_hold of execute_hold_param 
-  | Release_hold of release_hold_param 
+  | Rollback_hold of rollback_hold_param 
 
 type update_fa2_token_param = (asset_id * fa2_token)
 

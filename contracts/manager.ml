@@ -87,8 +87,8 @@ let burn (p : burn_param) (s : storage) : storage =
   in
   {s with ledger; total_supply}
 
-let release (r : release_param) (s : storage) : storage * (token_amount * hold)
-    =
+let rollback (r : rollback_param) (s : storage) :
+    storage * (token_amount * hold) =
   let {
     rl_hold_id = hold_id;
     rl_amount = amount_;
@@ -113,9 +113,11 @@ let release (r : release_param) (s : storage) : storage * (token_amount * hold)
     | None -> ()
     | Some src -> if src <> h.ho_src then failwith "UNEXPECTED_HOLD_SOURCE"
   in
-  let release_amount = match amount_ with None -> h.ho_amount | Some a -> a in
+  let rollback_amount =
+    match amount_ with None -> h.ho_amount | Some a -> a
+  in
   let new_hold =
-    match sub_amount h.ho_amount release_amount with
+    match sub_amount h.ho_amount rollback_amount with
     | None -> (failwith fa2_insufficient_hold : hold option)
     | Some a -> if a = Amount 0n then None else Some {h with ho_amount = a}
   in
@@ -126,14 +128,14 @@ let release (r : release_param) (s : storage) : storage * (token_amount * hold)
     | Some total -> total
   in
   let new_total_on_hold =
-    match sub_amount total_on_hold release_amount with
+    match sub_amount total_on_hold rollback_amount with
     | None -> None
     | Some total -> if total = Amount 0n then None else Some total
   in
   let holds_totals =
     Big_map.update (h.ho_src, h.ho_token_id) new_total_on_hold s.holds_totals
   in
-  ({s with holds; holds_totals}, (release_amount, h))
+  ({s with holds; holds_totals}, (rollback_amount, h))
 
 let execute (e : execute_param) (s : storage) : storage =
   let {
@@ -146,7 +148,7 @@ let execute (e : execute_param) (s : storage) : storage =
     e
   in
   let (s, (tr_amount, hold)) =
-    release
+    rollback
       {
         rl_hold_id = hold_id_;
         rl_amount = amount_;
@@ -176,8 +178,8 @@ let manager ((param, s) : manager_params * storage) : operation list * storage =
     match param with
     | Mint p -> mint p s
     | Burn p -> burn p s
-    | Release p ->
-        let (s, _) = release p s in
+    | Rollback p ->
+        let (s, _) = rollback p s in
         s
     | Execute p -> execute p s
   in

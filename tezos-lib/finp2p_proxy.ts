@@ -158,7 +158,7 @@ export interface ExecuteHoldParam {
   dst? : HoldDst;
 }
 
-export interface ReleaseHoldParam {
+export interface RollbackHoldParam {
   hold_id : Finp2pHoldId;
   asset_id? : AssetId;
   amount? : TokenAmount;
@@ -174,7 +174,7 @@ type BatchEntryPoint =
   | 'redeem_tokens'
   | 'hold_tokens'
   | 'execute_hold'
-  | 'release_hold'
+  | 'rollback_hold'
   | 'hold_tokens'
   | 'cleanup'
   | 'update_admins'
@@ -190,7 +190,7 @@ type ProxyBatchParam =
   | RedeemTokensParam
   | HoldTokensParam
   | ExecuteHoldParam
-  | ReleaseHoldParam
+  | RollbackHoldParam
   | CleanupParam
   | Address[]
   | Address[]
@@ -497,7 +497,7 @@ export namespace Michelson {
     };
   }
 
-  export function releaseHoldParam(rh: ReleaseHoldParam): MichelsonV1Expression {
+  export function rollbackHoldParam(rh: RollbackHoldParam): MichelsonV1Expression {
     let assetId = mkOpt(rh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
     let amount = mkOpt(rh.amount, (s => { return { int : s.toString() }; }));
     let srcAccount = mkOpt(rh.src_account, (s => { return maybeBytes(s); }));
@@ -997,16 +997,16 @@ export class FinP2PTezos {
   }
 
   /**
-   * @description Call the entry-point `release_hold` of the FinP2P proxy
-   * @param rh: the parameters of the release
+   * @description Call the entry-point `rollback_hold` of the FinP2P proxy
+   * @param rh: the parameters of the rollback
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async releaseHold(
-    rh: ReleaseHoldParam,
+  async rollbackHold(
+    rh: RollbackHoldParam,
     options : CallOptions = this.defaultCallOptions)
     : Promise<OperationResult> {
-    return this.cleanupAndCallProxy('release_hold', rh, options);
+    return this.cleanupAndCallProxy('rollback_hold', rh, options);
   }
 
   /**
@@ -1282,13 +1282,13 @@ export class FinP2PTezos {
             parameter : { entrypoint: bp.kind,
               value: Michelson.executeHoldParam(<ExecuteHoldParam>bp.param) },
           };
-        case 'release_hold':
+        case 'rollback_hold':
           return {
             source,
             amount : 0,
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
-              value: Michelson.releaseHoldParam(<ReleaseHoldParam>bp.param) },
+              value: Michelson.rollbackHoldParam(<RollbackHoldParam>bp.param) },
           };
         case 'cleanup':
           let vCl = <CleanupParam>bp.param;

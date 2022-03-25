@@ -77,7 +77,7 @@ mechanism.
 We extend the FA2 contract with three additional entry points:
 
 - `hold` to put tokens on hold,
-- `release` to release tokens on hold back to their owner,
+- `rollback` to return tokens on hold back to their owner,
 - `execute` to execute a on hold.
 
 Additional views are also provided to query the balance and total number of
@@ -115,8 +115,9 @@ the FA2 contract (namely `transfer`, `add/remove_operator`, `balance_of`).
 #### Spec
 
 The `hold` entry point checks that the `hold_id`, when provided, is strictly
-greater than `max_hold_id`. This prevents reusing released hold ids. If the
-hold_id is not provided, a fresh hold id is computed as `max_hold_id + 1`.
+greater than `max_hold_id`. This prevents reusing released (or rolled back) hold
+ids. If the hold_id is not provided, a fresh hold id is computed as
+`max_hold_id + 1`.
 
 Note that when a user provides his or her own hold id, the transaction is
 subject to _front running_ attacks. It is possible for an attacker to make all
@@ -128,17 +129,17 @@ id is computed dynamically.
 The hold information is then stored in the `holds` table. And finally, the total
 held for the user is incremented with the hold amount in the table `holds_totals`.
 
-### `release`
+### `rollback`
 
 ```ocaml
-type release_param = { 
+type rollback_param = { 
   hold_id : hold_id; 
   amount : token_amount option;
   token_id : token_id option;
   src : address option;
 }
 
-let release (r : release_param) (s : storage) : storage =
+let rollback (r : rollback_param) (s : storage) : storage =
 ```
 
 The authorization policy for this entry point restricts calls to be made only by
@@ -146,15 +147,15 @@ the proxy.
 
 #### Spec
 
-Calling `release` will remove the hold (if no amount is provided or if the
+Calling `rollback` will remove the hold (if no amount is provided or if the
 amount is the one of the hold) or decrement the hold, effectively returning the
 held tokens to the original user.
 
 When provided, `token_id` and `src` must match the one of the hold.
 
 If the `amount` is smaller than the amount of the hold (it cannot be greater),
-then the hold remains active, but is decremented by the released amount. In this
-case we talk about a _partial release_ of the tokens.
+then the hold remains active, but is decremented by the rollbackd amount. In this
+case we talk about a _partial rollback_ of the tokens.
 
 
 ### `execute`
@@ -272,7 +273,7 @@ section](#proxy-hold), but we give a high level overview of the general idea.
 
 A hold operation put tokens in escrow by transferring them to the Proxy contract
 (_i.e._ the tokens are owned by the proxy contract in the token's FA2 ledger). A
-release makes the proxy transfer the token back to the original owner, while a
+rollback makes the proxy transfer the token back to the original owner, while a
 hold execution makes the proxy transfer the tokens to their intended destination.
 
 ### Working with External Addresses
@@ -303,7 +304,7 @@ entry points:
 
 - `hold_tokens` (put tokens on hold)
 - `execute_hold` (transfer tokens on hold)
-- `release_hold` (return tokens to owner)
+- `rollback_hold` (return tokens to owner)
 
 Only the `hold_tokens` entry point requires a signature from a FinP2P user. The
 other entry points are called a FinP2P admin account, which in this case acts as
@@ -424,7 +425,7 @@ next subsection.
 Note that we assume that `dstAccountType` and `dstAccount` are optional, meaning
 that they can be absent from the SHG, in the case where the hold has no set
 destination (the buyer signs the fact that the hold has no preset
-destination). Release operations for such holds must specify a destination. 
+destination). Rollback operations for such holds must specify a destination. 
 
 #### Verifying hold signatures
 
@@ -476,8 +477,9 @@ The destination of the hold is computed as follows:
     contained in `dstAccount`. This is a Tezos account address on chain. For the
     purpose of the signature the key hash is the _raw bytes_ (size 20) of the
     public key hash with a prefix of size one for the curve (`01` for
-    secp256k1). **TODO:** decide a format. (If the `dstAccount` contains
-    something that is not a Tezos address, the hold will fail).
+    secp256k1). (If the `dstAccount` contains
+    something that is not a Tezos address, the hold will fail. Also note that
+    this format can be changed at will before the system is put into production).
 - If the `dstAccountType` of the SHG is "escrow" then the funds are held in a
   special FinP2P escrow account, and the destination for the hold is the seller,
   _i.e._ `srcAccount` in the _AHG_.
@@ -530,7 +532,6 @@ values are the expected ones.
 
 The `amount` can be inferior to the amount that was put on hold. In this case,
 the execution is _partial_, and there is still a hold for the difference.
-**TODO**: Do we want to release the rest or not?
 
 The `execute_hold` works differently if the hold is native to the FA2 or if it
 resides in an external **Escrow** contract.
@@ -547,25 +548,25 @@ resides in an external **Escrow** contract.
 from the proxy contract to the corresponding destination. 
 
 
-### `release_hold`
+### `rollback_hold`
 
 ```ocaml
-type release_hold_param = {
+type rollback_hold_param = {
   hold_id : finp2p_hold_id; (* = boxed bytes *)
   asset_id : asset_id option;  (* = boxed bytes *)
   amount : token_amount option;
   src_account : public_key option;
 }
 
-let release_hold (p : release_hold_param) (s : storage) : operation * storage = ...
+let rollback_hold (p : rollback_hold_param) (s : storage) : operation * storage = ...
 ```
 
 This Tezos operation must be signed/injected by an administrator.
 
 
-#### Spec for Release Hold
+#### Spec for Rollback Hold
 
-Releasing a hold happens when the other side of the bargain has not been
+Rolling back a hold happens when the other side of the bargain has not been
 fulfilled or if the FinP2P transaction is canceled. This event is initiated by
 the notary (_i.e._ an admin of the proxy contract). In this case, the funds are
 not transferred to their intended destination but are instead returned to the
@@ -576,18 +577,17 @@ Only the FinP2P `hold_id` is compulsory. The other information, _i.e._
 values are the expected ones.
 
 The `amount` can be inferior to the amount that was put on hold. In this case,
-the release is _partial_, and there is still a hold for the difference.
-**TODO**: Do we want to forbid partial release or not?
+the rollback is _partial_, and there is still a hold for the difference.
 
-The `release_hold` works differently if the hold is native to the FA2 or if it
+The `rollback_hold` works differently if the hold is native to the FA2 or if it
 resides in an external **Escrow** contract.
 
-##### Release Native Hold on FA2 
+##### Rollback Native Hold on FA2 
 
 1. Remove `hold_id` association from storage.
-2. Call the `release` entry point with corresponding amount.
+2. Call the `rollback` entry point with corresponding amount.
 
-##### Release Hold by Escrow
+##### Rollback Hold by Escrow
 
 1. Remove `hold_id` association from storage.
 2. Call the `transfer` entry point of the FA2 to transfer the tokens in escrow

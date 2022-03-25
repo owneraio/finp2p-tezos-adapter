@@ -32,7 +32,7 @@
                                                     (or (pair %mint
                                                            (nat %token_id)
                                                            (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                                        (pair %release
+                                                        (pair %rollback
                                                            (nat %hold_id)
                                                            (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                                                  (unit %admin_action))))))
@@ -68,7 +68,7 @@
                                  (or (pair %mint
                                         (nat %token_id)
                                         (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                     (pair %release
+                                     (pair %rollback
                                         (nat %hold_id)
                                         (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                               (unit %admin_action))))))) ;
@@ -104,7 +104,7 @@
                                                (or (pair %mint
                                                       (nat %token_id)
                                                       (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                                   (pair %release
+                                                   (pair %rollback
                                                       (nat %hold_id)
                                                       (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                                             (unit %admin_action))))))

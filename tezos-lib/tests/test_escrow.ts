@@ -3,7 +3,7 @@ import { strict as assert } from 'assert';
 import { contractAddressOfOpHash  } from '../taquito_wrapper';
 import { BigNumber } from 'bignumber.js';
 import * as Finp2pProxy from '../finp2p_proxy'
-import { FinP2PTezos, Net, log, get_balance, transfer_tokens, accountPkh, accountSk, hold_tokens, get_balance_info, get_spendable_balance, release_hold, execute_hold, deployTestFA2 } from './test_lib'
+import { FinP2PTezos, Net, log, get_balance, transfer_tokens, accountPkh, accountSk, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, execute_hold, deployTestFA2 } from './test_lib'
 import { InMemorySigner } from '@taquito/signer';
 import { MichelsonMap } from '@taquito/michelson-encoder';
 
@@ -331,10 +331,10 @@ export function run() {
       assert.equal(bs0, 18n)
     })
 
-    it("Release missing hold", async () => {
+    it("Rollback missing hold", async () => {
       await assert.rejects(
         async () => {
-          await release_hold(
+          await rollback_hold(
             { hold_id: "EXT-HOLD-ID-0000" }
           )
         },
