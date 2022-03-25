@@ -90,7 +90,7 @@ type rollback_param = {
 }
 [@@comb] [@@param Rollback]
 
-type execute_param = {
+type release_param = {
   e_hold_id : hold_id;
   e_amount : token_amount option;
   e_token_id : token_id option;
@@ -103,7 +103,7 @@ type manager_params =
   | Mint of mint_param
   | Burn of burn_param
   | Rollback of rollback_param
-  | Execute of execute_param
+  | Release of release_param
 [@@entry Manager]
 
 (* Admin *)

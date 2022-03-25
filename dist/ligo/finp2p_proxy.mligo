@@ -323,13 +323,13 @@ let address_of_hold_dst (dst : hold_dst option) (fallback_dst : key) (token : fa
   | Some (Supported (Tezos pkh)) -> Some (implicit_address pkh)
   | Some (Supported (FinId k)) -> Some (address_of_key k token s)
 
-let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) =
+let release_hold (p : release_hold_param) (s : storage) : (operation * storage) =
   let { hold_id; asset_id; amount = amount_; src_account; dst } = p in
   let (s, hold_info) = unhold_aux hold_id asset_id amount_ s in
   let op =
     match hold_info with
     | FA2_hold { fa2_hold_id; held_token; fa2_fallback_dst } ->
-      let execute_ep = get_execute_entrypoint held_token.address in
+      let release_ep = get_release_entrypoint held_token.address in
       let e_src =
         match src_account with
         | None -> None
@@ -342,7 +342,7 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
           token_id = (Some held_token.id);
           src = e_src ;
           dst = e_dst 
-        } 0tez execute_ep
+        } 0tez release_ep
     | Escrow
         { held_token = es_held_token; amount = es_amount;
           src_account = es_src_account; dst = es_dst;
@@ -353,12 +353,12 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
       let es_dst_address = address_of_dst es_dst es_held_token s in
       let tr_dst =
         match (dst_address, es_dst_address) with
-        | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
+        | (None, None) -> (failwith "NO_DESTINATION_RELEASE_HOLD" : address)
         | (Some dst, None) -> dst
         | (None, Some dst) -> dst
         | (Some dst, Some escrow_dst) ->
           if dst <> escrow_dst
-          then (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
+          then (failwith "UNEXPECTED_RELEASE_HOLD_DESTINATION" : address)
           else dst in
       let () =
         match src_account with
@@ -368,14 +368,14 @@ let execute_hold (p : execute_hold_param) (s : storage) : (operation * storage) 
       let tr_src = Tezos.self_address in
       let tr_amount = match amount_ with | None -> es_amount | Some a -> a in
       let tr_token_id = es_held_token.id in
-      let execute_transfer =
+      let release_transfer =
         {
           from_ = tr_src ;
           txs =
             [{ to_ = tr_dst ; token_id = tr_token_id ; amount = tr_amount  }]
         } in
       let transfer_ep = get_transfer_entrypoint es_held_token.address in
-      Tezos.transaction [execute_transfer] 0tez transfer_ep in
+      Tezos.transaction [release_transfer] 0tez transfer_ep in
   (op, s)
 
 let rollback_hold (p : rollback_hold_param) (s : storage) : (operation * storage) =
@@ -425,7 +425,7 @@ let finp2p_asset (p : finp2p_proxy_asset_param) (s : storage) : (operation * sto
   | Create_asset p -> create_asset p s
   | Issue_tokens p -> issue_tokens p s
   | Redeem_tokens p -> redeem_tokens p s
-  | Execute_hold p -> execute_hold p s
+  | Release_hold p -> release_hold p s
   | Rollback_hold p -> rollback_hold p s
 
 let finp2p_batch_asset (l : finp2p_proxy_asset_param list) (s : storage) : (operation list * storage) =

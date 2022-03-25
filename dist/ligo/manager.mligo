@@ -116,7 +116,7 @@ let rollback (r : rollback_param) (s : storage) : (storage * (token_amount * hol
   ({ s with holds = holds ; holds_totals = holds_totals  },
    (rollback_amount, h))
 
-let execute (e : execute_param) (s : storage) : storage =
+let release (e : release_param) (s : storage) : storage =
   let { hold_id = hold_id_; amount = amount_; token_id = token_id_; src = src_;
         dst }
     = e in
@@ -126,12 +126,12 @@ let execute (e : execute_param) (s : storage) : storage =
       } s in
   let tr_dst =
     match (dst, hold.dst) with
-    | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
+    | (None, None) -> (failwith "NO_DESTINATION_RELEASE_HOLD" : address)
     | (Some dst, None) -> dst
     | (None, Some dst) -> dst
     | (Some dst, Some hold_dst) ->
       if dst <> hold_dst
-      then (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
+      then (failwith "UNEXPECTED_RELEASE_HOLD_DESTINATION" : address)
       else dst in
   let tr_src = hold.src in
   let tr_token_id = hold.token_id in
@@ -148,7 +148,7 @@ let manager ((param, s) : (manager_params * storage)) : (operation list * storag
     | Mint p -> mint p s
     | Burn p -> burn p s
     | Rollback p -> let (s, _) = rollback p s in s
-    | Execute p -> execute p s in
+    | Release p -> release p s in
   (([] : operation list), s)
 
 #endif

@@ -137,7 +137,7 @@ let rollback (r : rollback_param) (s : storage) :
   in
   ({s with holds; holds_totals}, (rollback_amount, h))
 
-let execute (e : execute_param) (s : storage) : storage =
+let release (e : release_param) (s : storage) : storage =
   let {
     e_hold_id = hold_id_;
     e_amount = amount_;
@@ -159,12 +159,12 @@ let execute (e : execute_param) (s : storage) : storage =
   in
   let tr_dst =
     match (dst, hold.ho_dst) with
-    | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
+    | (None, None) -> (failwith "NO_DESTINATION_RELEASE_HOLD" : address)
     | (Some dst, None) -> dst
     | (None, Some dst) -> dst
     | (Some dst, Some hold_dst) ->
         if dst <> hold_dst then
-          (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
+          (failwith "UNEXPECTED_RELEASE_HOLD_DESTINATION" : address)
         else dst
   in
   let tr_src = hold.ho_src in
@@ -181,6 +181,6 @@ let manager ((param, s) : manager_params * storage) : operation list * storage =
     | Rollback p ->
         let (s, _) = rollback p s in
         s
-    | Execute p -> execute p s
+    | Release p -> release p s
   in
   (([] : operation list), s)

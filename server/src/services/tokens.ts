@@ -271,7 +271,7 @@ export class TokenService {
     let assetId = getEscrowAsset(request.asset);
     let dstAccount = getEscrowDestination(request.destination);
 
-    let params: FINP2PProxy.ExecuteHoldParam = {
+    let params: FINP2PProxy.ReleaseHoldParam = {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
@@ -279,7 +279,7 @@ export class TokenService {
       dst: dstAccount,
     };
 
-    const op = await this.tezosClient.executeHold(params);
+    const op = await this.tezosClient.releaseHold(params);
     await this.tezosClient.waitInclusion(op);
     //TODO: what if destination is not finId?
     return {

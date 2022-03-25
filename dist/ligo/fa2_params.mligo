@@ -71,7 +71,7 @@ type rollback_param = [@layout:comb]  {
     token_id: token_id option ;
     src: address option }
 
-type execute_param = [@layout:comb]  {
+type release_param = [@layout:comb]  {
     hold_id: hold_id ;
     amount: token_amount option ;
     token_id: token_id option ;
@@ -82,7 +82,7 @@ type manager_params =
   | Mint of mint_param 
   | Burn of burn_param 
   | Rollback of rollback_param 
-  | Execute of execute_param 
+  | Release of release_param 
 
 type update_token_metadata_param = [@layout:comb]  {
     token_id: token_id ;

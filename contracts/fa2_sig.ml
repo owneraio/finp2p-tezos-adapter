@@ -44,13 +44,13 @@ let[@inline] get_rollback_entrypoint (addr : address) :
   | None -> (failwith invalid_fa2_contract : (rollback_param, _) contract)
   | Some c -> c
 
-let[@inline] get_execute_entrypoint (addr : address) :
-    (execute_param, _) contract =
+let[@inline] get_release_entrypoint (addr : address) :
+    (release_param, _) contract =
   match
-    (Tezos.get_entrypoint_opt None "%execute" addr
-      : (execute_param, _) contract option)
+    (Tezos.get_entrypoint_opt None "%release" addr
+      : (release_param, _) contract option)
   with
-  | None -> (failwith invalid_fa2_contract : (execute_param, _) contract)
+  | None -> (failwith invalid_fa2_contract : (release_param, _) contract)
   | Some c -> c
 
 (** Fails if the contract does not have at least the correct transfer

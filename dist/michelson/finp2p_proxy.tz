@@ -15,21 +15,21 @@
                (or (or (pair %create_asset
                           (bytes %asset_id)
                           (pair %new_token_info (pair (address %address) (option %id nat)) (map string bytes)))
-                       (pair %execute_hold
+                       (pair %issue_tokens
+                          (pair %nonce (bytes %nonce) (timestamp %timestamp))
+                          (pair (bytes %asset_id)
+                                (pair (key %dst_account)
+                                      (pair (nat %amount) (pair (bytes %shg) (option %signature signature)))))))
+                   (or (pair %redeem_tokens
+                          (pair %nonce (bytes %nonce) (timestamp %timestamp))
+                          (pair (bytes %asset_id)
+                                (pair (key %src_account) (pair (nat %amount) (signature %signature)))))
+                       (pair %release_hold
                           (bytes %hold_id)
                           (pair (option %asset_id bytes)
                                 (pair (option %amount nat)
                                       (pair (option %src_account key)
-                                            (option %dst (or (or %supported (key %finId) (key_hash %tezos)) (bytes %other))))))))
-                   (or (pair %issue_tokens
-                          (pair %nonce (bytes %nonce) (timestamp %timestamp))
-                          (pair (bytes %asset_id)
-                                (pair (key %dst_account)
-                                      (pair (nat %amount) (pair (bytes %shg) (option %signature signature))))))
-                       (pair %redeem_tokens
-                          (pair %nonce (bytes %nonce) (timestamp %timestamp))
-                          (pair (bytes %asset_id)
-                                (pair (key %src_account) (pair (nat %amount) (signature %signature)))))))
+                                            (option %dst (or (or %supported (key %finId) (key_hash %tezos)) (bytes %other)))))))))
                (or (pair %rollback_hold
                       (bytes %hold_id)
                       (pair (option %asset_id bytes) (pair (option %amount nat) (option %src_account key))))
@@ -42,21 +42,21 @@
                (or (or (or (pair %create_asset
                               (bytes %asset_id)
                               (pair %new_token_info (pair (address %address) (option %id nat)) (map string bytes)))
-                           (pair %execute_hold
+                           (pair %issue_tokens
+                              (pair %nonce (bytes %nonce) (timestamp %timestamp))
+                              (pair (bytes %asset_id)
+                                    (pair (key %dst_account)
+                                          (pair (nat %amount) (pair (bytes %shg) (option %signature signature)))))))
+                       (or (pair %redeem_tokens
+                              (pair %nonce (bytes %nonce) (timestamp %timestamp))
+                              (pair (bytes %asset_id)
+                                    (pair (key %src_account) (pair (nat %amount) (signature %signature)))))
+                           (pair %release_hold
                               (bytes %hold_id)
                               (pair (option %asset_id bytes)
                                     (pair (option %amount nat)
                                           (pair (option %src_account key)
-                                                (option %dst (or (or %supported (key %finId) (key_hash %tezos)) (bytes %other))))))))
-                       (or (pair %issue_tokens
-                              (pair %nonce (bytes %nonce) (timestamp %timestamp))
-                              (pair (bytes %asset_id)
-                                    (pair (key %dst_account)
-                                          (pair (nat %amount) (pair (bytes %shg) (option %signature signature))))))
-                           (pair %redeem_tokens
-                              (pair %nonce (bytes %nonce) (timestamp %timestamp))
-                              (pair (bytes %asset_id)
-                                    (pair (key %src_account) (pair (nat %amount) (signature %signature)))))))
+                                                (option %dst (or (or %supported (key %finId) (key_hash %tezos)) (bytes %other)))))))))
                    (or (pair %rollback_hold
                           (bytes %hold_id)
                           (pair (option %asset_id bytes) (pair (option %amount nat) (option %src_account key))))
@@ -1217,12 +1217,12 @@
                                                      (pair (lambda nat string)
                                                            (pair (lambda (list bytes) bytes) (pair string (pair string (pair string string)))))))))))
                  (pair (or (or (or (pair bytes (pair (pair address (option nat)) (map string bytes)))
+                                   (pair (pair bytes timestamp)
+                                         (pair bytes (pair key (pair nat (pair bytes (option signature)))))))
+                               (or (pair (pair bytes timestamp) (pair bytes (pair key (pair nat signature))))
                                    (pair bytes
                                          (pair (option bytes)
-                                               (pair (option nat) (pair (option key) (option (or (or key key_hash) bytes)))))))
-                               (or (pair (pair bytes timestamp)
-                                         (pair bytes (pair key (pair nat (pair bytes (option signature))))))
-                                   (pair (pair bytes timestamp) (pair bytes (pair key (pair nat signature))))))
+                                               (pair (option nat) (pair (option key) (option (or (or key key_hash) bytes))))))))
                            (or (pair bytes (pair (option bytes) (pair (option nat) (option key))))
                                (pair (pair bytes timestamp)
                                      (pair bytes (pair key (pair key (pair nat (pair bytes signature))))))))
@@ -1255,20 +1255,20 @@
              UNPAIR ;
              IF_LEFT
                { IF_LEFT
-                   { DIG 4 ;
-                     DIG 5 ;
-                     DIG 6 ;
-                     DIG 7 ;
-                     DIG 8 ;
-                     DIG 9 ;
-                     DIG 10 ;
-                     DIG 12 ;
-                     DIG 13 ;
-                     DROP 9 ;
+                   { DIG 2 ;
+                     DROP ;
                      IF_LEFT
                        { DIG 2 ;
                          DIG 3 ;
-                         DROP 2 ;
+                         DIG 4 ;
+                         DIG 5 ;
+                         DIG 6 ;
+                         DIG 7 ;
+                         DIG 8 ;
+                         DIG 9 ;
+                         DIG 11 ;
+                         DIG 12 ;
+                         DROP 10 ;
                          DUP ;
                          CDR ;
                          UNPAIR ;
@@ -1343,126 +1343,6 @@
                          UPDATE 11 ;
                          SWAP ;
                          PAIR }
-                       { UNPAIR 5 ;
-                         DIG 5 ;
-                         DUP 4 ;
-                         DIG 3 ;
-                         DIG 3 ;
-                         PAIR 4 ;
-                         DIG 4 ;
-                         SWAP ;
-                         EXEC ;
-                         UNPAIR ;
-                         SWAP ;
-                         IF_LEFT
-                           { UNPAIR 5 ;
-                             DIG 8 ;
-                             IF_NONE
-                               { DIG 4 ; DROP ; NONE address }
-                               { IF_LEFT
-                                   { DIG 5 ;
-                                     DROP ;
-                                     IF_LEFT
-                                       { DUP 6 ; DUP 3 ; DIG 2 ; PAIR 3 ; DUP 9 ; SWAP ; EXEC ; SOME }
-                                       { IMPLICIT_ACCOUNT ; ADDRESS ; SOME } }
-                                   { DROP ;
-                                     DUP 6 ;
-                                     SWAP ;
-                                     DUP ;
-                                     DUG 2 ;
-                                     DIG 6 ;
-                                     PAIR 3 ;
-                                     DUP 9 ;
-                                     SWAP ;
-                                     EXEC ;
-                                     SOME } } ;
-                             DIG 4 ;
-                             IF_NONE
-                               { DIG 7 ; DROP ; NONE address }
-                               { IF_LEFT
-                                   { DUP 6 ; DUP 4 ; DIG 2 ; PAIR 3 ; DIG 8 ; SWAP ; EXEC ; SOME }
-                                   { DIG 8 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } } ;
-                             SWAP ;
-                             IF_NONE
-                               { IF_NONE { PUSH string "NO_DESTINATION_EXECUTE_HOLD" ; FAILWITH } {} }
-                               { SWAP ;
-                                 IF_NONE
-                                   {}
-                                   { SWAP ;
-                                     DUP ;
-                                     DUG 2 ;
-                                     COMPARE ;
-                                     NEQ ;
-                                     IF { DROP ; PUSH string "UNEXPECTED_EXECUTE_HOLD_DESTINATION" ; FAILWITH }
-                                        {} } } ;
-                             DIG 6 ;
-                             IF_NONE
-                               { DIG 3 ; DROP ; UNIT }
-                               { DIG 4 ;
-                                 SWAP ;
-                                 COMPARE ;
-                                 NEQ ;
-                                 IF { PUSH string "UNEXPECTED_HOLD_SOURCE" ; FAILWITH } { UNIT } } ;
-                             DROP ;
-                             SELF_ADDRESS ;
-                             DUP 3 ;
-                             CAR ;
-                             CONTRACT %transfer
-                               (list (pair (address %from_)
-                                           (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))) ;
-                             IF_NONE { DIG 6 ; FAILWITH } { DIG 7 ; DROP } ;
-                             PUSH mutez 0 ;
-                             NIL (pair address (list (pair address (pair nat nat)))) ;
-                             NIL (pair address (pair nat nat)) ;
-                             DIG 9 ;
-                             IF_NONE { DIG 7 } { DIG 8 ; DROP } ;
-                             DIG 7 ;
-                             CDR ;
-                             DIG 7 ;
-                             PAIR 3 ;
-                             CONS ;
-                             DIG 4 ;
-                             PAIR ;
-                             CONS ;
-                             TRANSFER_TOKENS }
-                           { UNPAIR ;
-                             UNPAIR ;
-                             DUP 3 ;
-                             CAR ;
-                             CONTRACT %execute
-                               (pair (nat %hold_id)
-                                     (pair (option %amount nat)
-                                           (pair (option %token_id nat) (pair (option %src address) (option %dst address))))) ;
-                             IF_NONE { DIG 8 ; FAILWITH } { DIG 9 ; DROP } ;
-                             DIG 6 ;
-                             IF_NONE
-                               { NONE address }
-                               { DUP 6 ; DUP 6 ; DIG 2 ; PAIR 3 ; DUP 9 ; SWAP ; EXEC ; SOME } ;
-                             DIG 7 ;
-                             IF_NONE
-                               { DIG 2 ; DIG 7 ; DROP 2 ; NONE address }
-                               { IF_LEFT
-                                   { DIG 3 ;
-                                     DROP ;
-                                     IF_LEFT
-                                       { DUP 6 ; DUP 6 ; DIG 2 ; PAIR 3 ; DIG 7 ; SWAP ; EXEC ; SOME }
-                                       { DIG 7 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } }
-                                   { DROP ; DUP 6 ; DUP 6 ; DIG 4 ; PAIR 3 ; DIG 7 ; SWAP ; EXEC ; SOME } } ;
-                             DIG 2 ;
-                             PUSH mutez 0 ;
-                             DIG 2 ;
-                             DIG 3 ;
-                             DIG 5 ;
-                             CDR ;
-                             SOME ;
-                             DIG 7 ;
-                             DIG 6 ;
-                             PAIR 5 ;
-                             TRANSFER_TOKENS } ;
-                         PAIR } }
-                   { DIG 2 ;
-                     DROP ;
-                     IF_LEFT
                        { SWAP ;
                          DUP ;
                          DUG 2 ;
@@ -1594,8 +1474,11 @@
                          UPDATE ;
                          UPDATE 3 ;
                          SWAP ;
-                         PAIR }
-                       { DIG 4 ;
+                         PAIR } }
+                   { DIG 5 ;
+                     DROP ;
+                     IF_LEFT
+                       { DIG 2 ;
                          DROP ;
                          SWAP ;
                          DUP ;
@@ -1698,6 +1581,132 @@
                          PUSH mutez 0 ;
                          DIG 2 ;
                          TRANSFER_TOKENS ;
+                         PAIR }
+                       { DIG 4 ;
+                         DIG 5 ;
+                         DIG 6 ;
+                         DIG 7 ;
+                         DIG 8 ;
+                         DIG 9 ;
+                         DIG 11 ;
+                         DIG 12 ;
+                         DROP 8 ;
+                         UNPAIR 5 ;
+                         DIG 5 ;
+                         DUP 4 ;
+                         DIG 3 ;
+                         DIG 3 ;
+                         PAIR 4 ;
+                         DIG 4 ;
+                         SWAP ;
+                         EXEC ;
+                         UNPAIR ;
+                         SWAP ;
+                         IF_LEFT
+                           { UNPAIR 5 ;
+                             DIG 8 ;
+                             IF_NONE
+                               { DIG 4 ; DROP ; NONE address }
+                               { IF_LEFT
+                                   { DIG 5 ;
+                                     DROP ;
+                                     IF_LEFT
+                                       { DUP 6 ; DUP 3 ; DIG 2 ; PAIR 3 ; DUP 9 ; SWAP ; EXEC ; SOME }
+                                       { IMPLICIT_ACCOUNT ; ADDRESS ; SOME } }
+                                   { DROP ;
+                                     DUP 6 ;
+                                     SWAP ;
+                                     DUP ;
+                                     DUG 2 ;
+                                     DIG 6 ;
+                                     PAIR 3 ;
+                                     DUP 9 ;
+                                     SWAP ;
+                                     EXEC ;
+                                     SOME } } ;
+                             DIG 4 ;
+                             IF_NONE
+                               { DIG 7 ; DROP ; NONE address }
+                               { IF_LEFT
+                                   { DUP 6 ; DUP 4 ; DIG 2 ; PAIR 3 ; DIG 8 ; SWAP ; EXEC ; SOME }
+                                   { DIG 8 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } } ;
+                             SWAP ;
+                             IF_NONE
+                               { IF_NONE { PUSH string "NO_DESTINATION_RELEASE_HOLD" ; FAILWITH } {} }
+                               { SWAP ;
+                                 IF_NONE
+                                   {}
+                                   { SWAP ;
+                                     DUP ;
+                                     DUG 2 ;
+                                     COMPARE ;
+                                     NEQ ;
+                                     IF { DROP ; PUSH string "UNEXPECTED_RELEASE_HOLD_DESTINATION" ; FAILWITH }
+                                        {} } } ;
+                             DIG 6 ;
+                             IF_NONE
+                               { DIG 3 ; DROP ; UNIT }
+                               { DIG 4 ;
+                                 SWAP ;
+                                 COMPARE ;
+                                 NEQ ;
+                                 IF { PUSH string "UNEXPECTED_HOLD_SOURCE" ; FAILWITH } { UNIT } } ;
+                             DROP ;
+                             SELF_ADDRESS ;
+                             DUP 3 ;
+                             CAR ;
+                             CONTRACT %transfer
+                               (list (pair (address %from_)
+                                           (list %txs (pair (address %to_) (pair (nat %token_id) (nat %amount)))))) ;
+                             IF_NONE { DIG 6 ; FAILWITH } { DIG 7 ; DROP } ;
+                             PUSH mutez 0 ;
+                             NIL (pair address (list (pair address (pair nat nat)))) ;
+                             NIL (pair address (pair nat nat)) ;
+                             DIG 9 ;
+                             IF_NONE { DIG 7 } { DIG 8 ; DROP } ;
+                             DIG 7 ;
+                             CDR ;
+                             DIG 7 ;
+                             PAIR 3 ;
+                             CONS ;
+                             DIG 4 ;
+                             PAIR ;
+                             CONS ;
+                             TRANSFER_TOKENS }
+                           { UNPAIR ;
+                             UNPAIR ;
+                             DUP 3 ;
+                             CAR ;
+                             CONTRACT %release
+                               (pair (nat %hold_id)
+                                     (pair (option %amount nat)
+                                           (pair (option %token_id nat) (pair (option %src address) (option %dst address))))) ;
+                             IF_NONE { DIG 8 ; FAILWITH } { DIG 9 ; DROP } ;
+                             DIG 6 ;
+                             IF_NONE
+                               { NONE address }
+                               { DUP 6 ; DUP 6 ; DIG 2 ; PAIR 3 ; DUP 9 ; SWAP ; EXEC ; SOME } ;
+                             DIG 7 ;
+                             IF_NONE
+                               { DIG 2 ; DIG 7 ; DROP 2 ; NONE address }
+                               { IF_LEFT
+                                   { DIG 3 ;
+                                     DROP ;
+                                     IF_LEFT
+                                       { DUP 6 ; DUP 6 ; DIG 2 ; PAIR 3 ; DIG 7 ; SWAP ; EXEC ; SOME }
+                                       { DIG 7 ; DROP ; IMPLICIT_ACCOUNT ; ADDRESS ; SOME } }
+                                   { DROP ; DUP 6 ; DUP 6 ; DIG 4 ; PAIR 3 ; DIG 7 ; SWAP ; EXEC ; SOME } } ;
+                             DIG 2 ;
+                             PUSH mutez 0 ;
+                             DIG 2 ;
+                             DIG 3 ;
+                             DIG 5 ;
+                             CDR ;
+                             SOME ;
+                             DIG 7 ;
+                             DIG 6 ;
+                             PAIR 5 ;
+                             TRANSFER_TOKENS } ;
                          PAIR } } }
                { IF_LEFT
                    { DIG 4 ;

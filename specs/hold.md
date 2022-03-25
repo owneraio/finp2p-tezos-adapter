@@ -78,7 +78,7 @@ We extend the FA2 contract with three additional entry points:
 
 - `hold` to put tokens on hold,
 - `rollback` to return tokens on hold back to their owner,
-- `execute` to execute a on hold.
+- `release` to release a on hold.
 
 Additional views are also provided to query the balance and total number of
 tokens on hold for a specific user and token.
@@ -158,10 +158,10 @@ then the hold remains active, but is decremented by the rollbackd amount. In thi
 case we talk about a _partial rollback_ of the tokens.
 
 
-### `execute`
+### `release`
 
 ```ocaml
-type execute_param = { 
+type release_param = { 
   hold_id : hold_id; 
   amount : token_amount option;
   token_id : token_id option;
@@ -169,7 +169,7 @@ type execute_param = {
   dst : address option;
 }
 
-let execute (e : execute_param) (s : storage) : storage =
+let release (e : release_param) (s : storage) : storage =
 ```
 
 The authorization policy for this entry point restricts calls to be made only by
@@ -177,8 +177,8 @@ the proxy.
 
 #### Spec
 
-Calling `execute` will remove the hold (if no amount is provided or if the
-amount is the one of the hold) or decrement the hold, and transfer the executed
+Calling `release` will remove the hold (if no amount is provided or if the
+amount is the one of the hold) or decrement the hold, and transfer the released
 amount to the intended destination.
 
 It is important to remove the hold before transferring the tokens to be able to
@@ -191,8 +191,8 @@ can also be provided if there is a destination in the hold, but it must be
 identical.)
 
 If the `amount` is smaller than the amount of the hold (it cannot be greater),
-then the hold remains active, but is decremented by the executed amount. In this
-case we talk about a _partial hold execution_.
+then the hold remains active, but is decremented by the released amount. In this
+case we talk about a _partial hold release_.
 
 
 ### Modifications to the Other Entry Points
@@ -274,7 +274,7 @@ section](#proxy-hold), but we give a high level overview of the general idea.
 A hold operation put tokens in escrow by transferring them to the Proxy contract
 (_i.e._ the tokens are owned by the proxy contract in the token's FA2 ledger). A
 rollback makes the proxy transfer the token back to the original owner, while a
-hold execution makes the proxy transfer the tokens to their intended destination.
+hold release makes the proxy transfer the tokens to their intended destination.
 
 ### Working with External Addresses
 
@@ -303,7 +303,7 @@ To support these new features the Proxy contract is augmented with three new
 entry points:
 
 - `hold_tokens` (put tokens on hold)
-- `execute_hold` (transfer tokens on hold)
+- `release_hold` (transfer tokens on hold)
 - `rollback_hold` (return tokens to owner)
 
 Only the `hold_tokens` entry point requires a signature from a FinP2P user. The
@@ -500,10 +500,10 @@ This is directly reflected in the type `hold_dst` of the `hold_tokens` parameter
    escrow](#escrow-of-external-tokens).
 
 
-### `execute_hold`
+### `release_hold`
 
 ```ocaml
-type execute_hold_param = {
+type release_hold_param = {
   hold_id : finp2p_hold_id; (* = boxed bytes *)
   asset_id : asset_id option;  (* = boxed bytes *)
   amount : token_amount option;
@@ -511,37 +511,37 @@ type execute_hold_param = {
   dst_account : public_key option;
 }
 
-let execute_hold (p : execute_hold_param) (s : storage) : operation * storage = ...
+let release_hold (p : release_hold_param) (s : storage) : operation * storage = ...
 ```
 
 This Tezos operation must be signed/injected by an administrator.
 
-#### Spec for Execute Hold
+#### Spec for Release Hold
 
-Executing a hold here means that the FinP2P admin has confirmed the
+Releasing a hold here means that the FinP2P admin has confirmed the
 corresponding sell and so the tokens on hold must be paid to the intended
 recipient.
 
 The destination for a hold is optional when it is created. If it was not set at
 creation time then the admin must provide a destination (`dst_account`) when
-calling `execute_hold`.
+calling `release_hold`.
 
 Only the FinP2P `hold_id` is compulsory. The other information, _i.e._
 `asset_id` and `src_account` are used to perform extra checks to ensure that the
 values are the expected ones.
 
 The `amount` can be inferior to the amount that was put on hold. In this case,
-the execution is _partial_, and there is still a hold for the difference.
+the release is _partial_, and there is still a hold for the difference.
 
-The `execute_hold` works differently if the hold is native to the FA2 or if it
+The `release_hold` works differently if the hold is native to the FA2 or if it
 resides in an external **Escrow** contract.
 
-##### Execute Native Hold on FA2 
+##### Release Native Hold on FA2 
 
 1. Remove `hold_id` association from storage.
-2. Call the `execute` entry point with corresponding amount and destination.
+2. Call the `release` entry point with corresponding amount and destination.
 
-##### Execute Hold by Escrow
+##### Release Hold by Escrow
 
 1. Remove `hold_id` association from storage.
 2. Call the `transfer` entry point of the FA2 to transfer the tokens in escrow

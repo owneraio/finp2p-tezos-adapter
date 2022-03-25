@@ -150,7 +150,7 @@ export interface HoldTokensParam {
   signature? : Signature;
 }
 
-export interface ExecuteHoldParam {
+export interface ReleaseHoldParam {
   hold_id : Finp2pHoldId;
   asset_id? : AssetId;
   amount? : TokenAmount;
@@ -173,7 +173,7 @@ type BatchEntryPoint =
   | 'issue_tokens'
   | 'redeem_tokens'
   | 'hold_tokens'
-  | 'execute_hold'
+  | 'release_hold'
   | 'rollback_hold'
   | 'hold_tokens'
   | 'cleanup'
@@ -189,7 +189,7 @@ type ProxyBatchParam =
   | IssueTokensParam
   | RedeemTokensParam
   | HoldTokensParam
-  | ExecuteHoldParam
+  | ReleaseHoldParam
   | RollbackHoldParam
   | CleanupParam
   | Address[]
@@ -480,7 +480,7 @@ export namespace Michelson {
     };
   }
 
-  export function executeHoldParam(eh: ExecuteHoldParam): MichelsonV1Expression {
+  export function releaseHoldParam(eh: ReleaseHoldParam): MichelsonV1Expression {
     let assetId = mkOpt(eh.asset_id, (s => { return { bytes : bytesToHex(s) }; }));
     let amount = mkOpt(eh.amount, (s => { return { int : s.toString() }; }));
     let srcAccount = mkOpt(eh.src_account, (s => { return maybeBytes(s); }));
@@ -984,16 +984,16 @@ export class FinP2PTezos {
   }
 
   /**
-   * @description Call the entry-point `execute_hold` of the FinP2P proxy
-   * @param eh: the parameters of the execution
+   * @description Call the entry-point `release_hold` of the FinP2P proxy
+   * @param eh: the parameters of the release
    * @param options : options for the call, including contract address and cleanup
    * @returns operation injection result
    */
-  async executeHold(
-    eh: ExecuteHoldParam,
+  async releaseHold(
+    eh: ReleaseHoldParam,
     options : CallOptions = this.defaultCallOptions)
     : Promise<OperationResult> {
-    return this.cleanupAndCallProxy('execute_hold', eh, options);
+    return this.cleanupAndCallProxy('release_hold', eh, options);
   }
 
   /**
@@ -1274,13 +1274,13 @@ export class FinP2PTezos {
             parameter : { entrypoint: bp.kind,
               value: Michelson.holdTokensParam(<HoldTokensParam>bp.param) },
           };
-        case 'execute_hold':
+        case 'release_hold':
           return {
             source,
             amount : 0,
             to : finp2p.getProxyAddress(bp.kt1),
             parameter : { entrypoint: bp.kind,
-              value: Michelson.executeHoldParam(<ExecuteHoldParam>bp.param) },
+              value: Michelson.releaseHoldParam(<ReleaseHoldParam>bp.param) },
           };
         case 'rollback_hold':
           return {
