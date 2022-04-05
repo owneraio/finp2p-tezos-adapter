@@ -98,9 +98,9 @@ the following addresses:
 
 Contract | Address
 ---|---
-FinP2P Proxy | [KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W](https://better-call.dev/hangzhou2net/KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W)
-FinP2P FA2 | [KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA](https://better-call.dev/hangzhou2net/KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA)
-Authorization contract | [KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw](https://better-call.dev/hangzhou2net/KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw)
+FinP2P Proxy | [KT1N1EPC4necEWSUirbdixtWxsMznZq1dPwd](https://better-call.dev/hangzhou2net/KT1N1EPC4necEWSUirbdixtWxsMznZq1dPwd)
+FinP2P FA2 | [KT1DeiBKdr8zh7i3xSHvXWuB5pHEGREv6pzB](https://better-call.dev/hangzhou2net/KT1DeiBKdr8zh7i3xSHvXWuB5pHEGREv6pzB)
+Authorization contract | [KT19G7ypAK14Q2zGY1udrLzevd2yhoAzbgq3](https://better-call.dev/hangzhou2net/KT19G7ypAK14Q2zGY1udrLzevd2yhoAzbgq3)
 
 The provided links to the BetterCallDev explorer allows to see the different
 operations and the tokens on the FA2 contract.

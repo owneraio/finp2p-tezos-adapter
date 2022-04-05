@@ -19,7 +19,7 @@ export function run() {
     // This is in case we want to redeploy and change the config
     log('================')
     log(`finp2pAuthAddress : '${FinP2PTezos.config.finp2pAuthAddress}',`)
-    log(`finp2pFa2Address : '${FinP2PTezos.config.finp2pFA2Address}',`)
+    log(`finp2pFA2Address : '${FinP2PTezos.config.finp2pFA2Address}',`)
     log(`finp2pProxyAddress : '${FinP2PTezos.config.finp2pProxyAddress}',`)
     log('================')
 

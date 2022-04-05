@@ -226,9 +226,9 @@ module Hangzhounet {
       { kind : 'tzstats', url : 'https://api.hangzhou.tzstats.com' },
     ],
     admins : accounts.map(a => a.pkh),
-    finp2pAuthAddress : 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
-    finp2pFA2Address : 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
-    finp2pProxyAddress : 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
+    finp2pAuthAddress : 'KT19G7ypAK14Q2zGY1udrLzevd2yhoAzbgq3',
+    finp2pFA2Address : 'KT1DeiBKdr8zh7i3xSHvXWuB5pHEGREv6pzB',
+    finp2pProxyAddress : 'KT1N1EPC4necEWSUirbdixtWxsMznZq1dPwd',
     debug
   }
 
