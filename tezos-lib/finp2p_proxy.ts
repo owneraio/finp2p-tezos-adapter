@@ -704,6 +704,33 @@ export class FinP2PTezos {
     return result;
   }
 
+  /**
+   * @description Re-export `waitInclusion` for ease of use and check that it
+   * is successful. * By default, waits for the number of confirmations in the
+   * `config`.
+   * @see TaquitoWrapper.waitInclusion for details
+   */
+  async isIncluded(op : OperationResult, confirmations = this.config.confirmations) {
+    const result = await this.taquito.isIncluded(op, confirmations);
+    const [blockOp,,] = result;
+    blockOp.contents.map(o => {
+      if (!hasOwnProperty(o, 'metadata')
+          || o.metadata === undefined
+          || !hasOwnProperty(o.metadata, 'operation_result')
+          || o.metadata.operation_result === undefined ) {
+        // Not a manager operation, or the metadata is not available in the node (unlikely)
+        // Consider operation as successful.
+        return;
+      }
+      if (o.metadata.operation_result.status === 'applied') {
+        return;
+      }
+      throw new Error(
+        `Operation is included as ${o.metadata.operation_result.status}, ` +
+          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
+    });
+  }
+
   async init(p : { operationTTL : OperationTTL,
     fa2Metadata : Object }) {
     var accredit = false;
@@ -917,7 +944,7 @@ export class FinP2PTezos {
     }
     return this.batch(batchParams, sender);
   }
-  
+
   /**
    * @description Call the entry-point `transfer_tokens` of the FinP2P proxy
    * @param tt: the parameters of the transfer
@@ -1907,12 +1934,17 @@ export class FinP2PTezos {
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
     const kind = op0.parameters.entrypoint as string;
+    const hrxKind = (kind == 'hold_tokens' || kind ==  'execute_hold' || kind == 'release_hold');
+    const assetId = hrxKind ? v.shg.asset_id  : v.asset_id;
+    const amount = hrxKind ? v.shg.amount  : v.amount;
+    const srcAccount = hrxKind ? v.ahg.dst_account  : v.src_account;
+    const dstAccount = hrxKind ? undefined  : v.dst_account;
     let receipt = {
       kind,
-      assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
-      amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-      srcAccount : getPkBytes(v.src_account),
-      dstAccount : getPkBytes(v.dst_account),
+      assetId : utf8dec.decode(Buffer.from(assetId, 'hex')),
+      amount : (v.amount === undefined) ? undefined : BigInt(amount as string),
+      srcAccount : getPkBytes(srcAccount),
+      dstAccount : getPkBytes(dstAccount),
       status: op0.metadata.operation_result.status,
       block: block.hash,
       level: block.header.level,

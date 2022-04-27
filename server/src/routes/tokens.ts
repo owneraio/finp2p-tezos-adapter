@@ -78,11 +78,12 @@ export const register = (app: express.Application) => {
     }),
   );
 
-  // /* POST operation status. */
-  // app.post(
-  //     `/operations/status/:correlationId`,
-  //     asyncMiddleware(async (req, res) => {
-  //
-  //     }),
-  // );
+  /* POST operation status. */
+  app.get(
+    '/api/operations/status/:cid',
+    asyncMiddleware(async (req, res) => {
+      const status = await TokenService.GetService().operationStatus({ cid: req.params.cid });
+      res.json(status);
+    }),
+  );
 };

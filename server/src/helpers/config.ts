@@ -1,4 +1,4 @@
-export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.hangzhounet.teztnets.xyz';
+export const nodeAddr = process.env.NODE_ADDR || 'https://hangzhounet.api.tez.ie';
 export const explorers = process.env.DISABLE_EXPLORERS === 'true' ? undefined : [
   {
     kind : 'TzKT' as 'TzKT',
