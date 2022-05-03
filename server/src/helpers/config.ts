@@ -190,7 +190,7 @@ export let accounts = (process.env.USE_FLEXTESA == 'true') ? Flextesa.accounts :
 // Initialize FinP2P library
 //TODO: move this to configuration
 export const contracts = {
-  finp2pAuthAddress : process.env.FINP2P_AUTH_ADDRESS || 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
+  finp2pAuthAddress : process.env.FINP2P_AUTH_ADDRESS || 'KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw',
   finp2pFA2Address : process.env.FINP2P_FA2_ADDRESS || 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
   finp2pProxyAddress : process.env.FINP2P_PROXY_ADDRESS || 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
 };

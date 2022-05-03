@@ -70,4 +70,4 @@ stop-sandbox-network:
 	@npx --prefix tezos-lib ts-node tezos-lib/tests/sandbox.ts stop
 
 redeploy-contracts:
-	@npx --prefix tezos-lib ts-node tezos-lib/tests/redeploy_contracts.ts configs/testnet-config.json
+	@scripts/redeploy.sh
