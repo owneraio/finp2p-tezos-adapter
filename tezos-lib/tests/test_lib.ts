@@ -251,23 +251,23 @@ module Flextesa {
 
   export const accounts = [account].concat(extra_accounts)
 
-  let flextesa_image = 'oxheadalpha/flextesa:20211221'
+  let flextesa_image = 'oxheadalpha/flextesa:latest'
   let flexteas_script : string
   switch (process.env.FINP2P_SANDBOX_NETWORK) {
-    case 'hangzhou':
-    case 'hangzbox':
-      flexteas_script = 'hangzbox'
-      break
     case 'ithaca':
     case 'ithacabox':
       flexteas_script = 'ithacabox'
+      break
+    case 'jakarta':
+    case 'jakartabox':
+      flexteas_script = 'jakartabox'
       break
     case 'alpha':
     case 'alphabox':
       flexteas_script = 'alphabox'
       break
     case undefined:
-      flexteas_script = 'hangzbox';
+      flexteas_script = 'ithacabox';
       break
     default:
       flexteas_script = process.env.FINP2P_SANDBOX_NETWORK
