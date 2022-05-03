@@ -1,0 +1,25 @@
+{
+  "url": "https://rpc.ithacanet.teztnets.xyz",
+  "blockTime": 15,
+  "account": {
+    "pkh": "tz1RwdbEstzX1hyes44tRE1i37YcoNMriEaB",
+    "pk": "edpkumnf9MeqsHEcdYuH3JATfmi6sqMm2re2gRDyC2cejZYkr3SHxP",
+    "sk": "edsk2zTy1q1FQoLwMWxtUkmRfqijJu7sYSxaXj89P8X5fq55nPPFf7"
+  },
+  "admins": [
+    "tz1RwdbEstzX1hyes44tRE1i37YcoNMriEaB"
+  ],
+  "explorers": [
+    {
+      "kind": "TzKT",
+      "url": "https://api.ithacanet.tzkt.io"
+    },
+    {
+      "kind": "tzstats",
+      "url": "https://api.ithaca.tzstats.com"
+    }
+  ],
+  "finp2pAuthAddress": "KT1B8ZhxLP6w6B2R5DtUs1KJbp6Gi9qn5Tyw",
+  "finp2pFA2Address": "KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA",
+  "finp2pProxyAddress": "KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W"
+}
