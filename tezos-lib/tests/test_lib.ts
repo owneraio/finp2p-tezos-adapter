@@ -15,6 +15,8 @@ import { OperationResult  } from '../taquito_wrapper';
 
 import * as testFa2Code from '../../dist/michelson/for_tests/test_fa2.json';
 
+import * as testnetConfig from '../../configs/testnet-config.json';
+
 const utf8 = new TextEncoder()
 
 let debug = false
@@ -195,16 +197,17 @@ const extra_accounts = [
   }
 ]
 
-module Hangzhounet {
+module Testnet {
+
+  export const config =
+    testnetConfig as
+      Finp2pProxy.Config &
+      {account : {pk : string; pkh : string; sk : string}}
 
   // This is the account that we will use to sign transactions on Tezos Note that
   // this account must also be an admin of the `finp2p_proxy` contract
   // Testnet faucet accounts can be obtained here: https://teztnets.xyz
-  export const account = {
-    pkh : "tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz",
-    pk : "edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq",
-    sk : "edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS"
-  }
+  export const account = config.account
 
   export const other_account = {
     pkh : "tz1Uxpw1ojH9r2k48vfNiB7CTrPbniJgmeGG",
@@ -219,18 +222,9 @@ module Hangzhounet {
 
   export var block_time = 30
 
-  export const config: Finp2pProxy.Config = {
-    url : "https://rpc.hangzhounet.teztnets.xyz",
-    explorers : [
-      { kind : 'TzKT', url : 'https://api.hangzhou2net.tzkt.io' },
-      { kind : 'tzstats', url : 'https://api.hangzhou.tzstats.com' },
-    ],
-    admins : accounts.map(a => a.pkh),
-    finp2pAuthAddress : 'KT19FphHNf55Y5LkEQwXtBw9w2zJsiHNduj2',
-    finp2pFA2Address : 'KT1L2TH91yZ5hGquq28vud2N1eipQKRwiUqA',
-    finp2pProxyAddress : 'KT1QfEsETrSaKvJTmrqFdLYAgRgq6Hw4hM8W',
-    debug
-  }
+  config.admins = accounts.map(a => a.pkh)
+  config.debug = debug
+  config.explorers.map ((e : any) => e.kind = (e.kind as 'TzKT' | 'tzstats'));
 
   export const poll = undefined
 
@@ -257,23 +251,23 @@ module Flextesa {
 
   export const accounts = [account].concat(extra_accounts)
 
-  let flextesa_image = 'oxheadalpha/flextesa:20211221'
+  let flextesa_image = 'oxheadalpha/flextesa:latest'
   let flexteas_script : string
   switch (process.env.FINP2P_SANDBOX_NETWORK) {
-    case 'hangzhou':
-    case 'hangzbox':
-      flexteas_script = 'hangzbox'
-      break
     case 'ithaca':
     case 'ithacabox':
       flexteas_script = 'ithacabox'
+      break
+    case 'jakarta':
+    case 'jakartabox':
+      flexteas_script = 'jakartabox'
       break
     case 'alpha':
     case 'alphabox':
       flexteas_script = 'alphabox'
       break
     case undefined:
-      flexteas_script = 'hangzbox';
+      flexteas_script = 'ithacabox';
       break
     default:
       flexteas_script = process.env.FINP2P_SANDBOX_NETWORK
@@ -335,8 +329,8 @@ module Flextesa {
 export var Net : typeof Flextesa
 
 switch (process.env.FINP2P_TEST_NETWORK) {
-  case 'hangzhounet':
-    Net = Hangzhounet
+  case 'testnet':
+    Net = Testnet
     break
   default:
     Net = Flextesa

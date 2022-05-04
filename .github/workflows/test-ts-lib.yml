@@ -32,13 +32,14 @@ jobs:
 
     - name: Install dev dependencies
       run: make ts-dev-deps server-dev-deps
-      
-    - name: Test on Hangzhou
-      run: make test
-      env:
-        FINP2P_SANDBOX_NETWORK: hangzhou
 
     - name: Test on Ithaca
       run: make test
       env:
         FINP2P_SANDBOX_NETWORK: ithaca
+
+    ## Uncomment when jakarta lands in flextesa
+    # - name: Test on Jakarta
+    #   run: make test
+    #   env:
+    #     FINP2P_SANDBOX_NETWORK: jakarta
