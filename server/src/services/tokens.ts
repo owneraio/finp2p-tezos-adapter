@@ -283,28 +283,38 @@ export class TokenService {
       cid: op.hash,
     } as Components.Schemas.ReceiptOperation;
   }
-//TODO: handle cleanup transactions that arrive as part of the batch
+
+  //TODO: handle cleanup transactions that arrive as part of the batch
   public async operationStatus(request: Paths.GetOperation.PathParameters) : Promise<Paths.GetOperation.Responses.$200> {
     try {
-      logger.debug('operation status', { request });
-      await this.tezosClient.isIncluded({ hash : request.cid });
-      logger.debug('operation status isIncluded');
-      let r = await this.tezosClient.getReceipt({ hash : request.cid }, { throwOnFail: false, throwOnUnconfirmed: true });
-      logger.debug('operation status', { r });
-
-      let source = (r.srcAccount === undefined) ?
-        undefined :
-        {
-          finId: r.srcAccount.toString('hex'),
-          account: { type: 'finId' } as Components.Schemas.FinIdAccount,
-        } as Components.Schemas.Source;
-      let destination = (r.dstAccount === undefined) ?
-        undefined :
-        {
-          finId: r.dstAccount.toString('hex'),
-          account: { type: 'finId' } as Components.Schemas.FinIdAccount,
-        } as Components.Schemas.Destination;
-      return { type: 'receipt', operation: {
+      await this.tezosClient.isIncluded({ hash: request.cid });
+    } catch (e) {
+      let message;
+      if (e instanceof Error) message = e.message;
+      else message = String(e);
+      logger.debug('operation status error', { message });
+      return {
+        type: 'receipt', operation: {
+          isCompleted: false,
+          cid: request.cid,
+        } as Components.Schemas.ReceiptOperation,
+      } as Components.Schemas.OperationStatus;
+    }
+    let r = await this.tezosClient.getReceipt({ hash: request.cid }, { throwOnFail: true, throwOnUnconfirmed: true });
+    let source = (r.srcAccount === undefined) ?
+      undefined :
+      {
+        finId: r.srcAccount.toString('hex'),
+        account: { type: 'finId' } as Components.Schemas.FinIdAccount,
+      } as Components.Schemas.Source;
+    let destination = (r.dstAccount === undefined) ?
+      undefined :
+      {
+        finId: r.dstAccount.toString('hex'),
+        account: { type: 'finId' } as Components.Schemas.FinIdAccount,
+      } as Components.Schemas.Destination;
+    return {
+      type: 'receipt', operation: {
         isCompleted: true,
         response: {
           id: request.cid,
@@ -314,18 +324,7 @@ export class TokenService {
           quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
         } as Components.Schemas.Receipt,
       } as Components.Schemas.ReceiptOperation,
-      } as Components.Schemas.OperationStatus;
-    } catch (e) {
-      let message;
-      if (e instanceof Error) message = e.message;
-      else message = String(e);
-      logger.debug('operation status error', { message });
-      return { type: 'receipt', operation: {
-        isCompleted: false,
-        cid: request.cid,
-      } as Components.Schemas.ReceiptOperation,
-      } as Components.Schemas.OperationStatus;
-    }
+    } as Components.Schemas.OperationStatus;
   }
 }
 
