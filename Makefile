@@ -68,3 +68,6 @@ start-sandbox-network:
 
 stop-sandbox-network:
 	@npx --prefix tezos-lib ts-node tezos-lib/tests/sandbox.ts stop
+
+redeploy-contracts:
+	@scripts/redeploy.sh
