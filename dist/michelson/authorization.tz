@@ -25,14 +25,14 @@
                                                            (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))))
                                              (or (or %manage_action
                                                     (or (pair %burn (nat %token_id) (list %owners (pair address nat)))
-                                                        (pair %execute
+                                                        (pair %mint
+                                                           (nat %token_id)
+                                                           (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                                    (or (pair %release
                                                            (nat %hold_id)
                                                            (pair (option %amount nat)
-                                                                 (pair (option %token_id nat) (pair (option %src address) (option %dst address))))))
-                                                    (or (pair %mint
-                                                           (nat %token_id)
-                                                           (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                                        (pair %release
+                                                                 (pair (option %token_id nat) (pair (option %src address) (option %dst address)))))
+                                                        (pair %rollback
                                                            (nat %hold_id)
                                                            (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                                                  (unit %admin_action))))))
@@ -61,14 +61,14 @@
                                         (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))))
                           (or (or %manage_action
                                  (or (pair %burn (nat %token_id) (list %owners (pair address nat)))
-                                     (pair %execute
+                                     (pair %mint
+                                        (nat %token_id)
+                                        (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                 (or (pair %release
                                         (nat %hold_id)
                                         (pair (option %amount nat)
-                                              (pair (option %token_id nat) (pair (option %src address) (option %dst address))))))
-                                 (or (pair %mint
-                                        (nat %token_id)
-                                        (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                     (pair %release
+                                              (pair (option %token_id nat) (pair (option %src address) (option %dst address)))))
+                                     (pair %rollback
                                         (nat %hold_id)
                                         (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                               (unit %admin_action))))))) ;
@@ -97,14 +97,14 @@
                                                       (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))))
                                         (or (or %manage_action
                                                (or (pair %burn (nat %token_id) (list %owners (pair address nat)))
-                                                   (pair %execute
+                                                   (pair %mint
+                                                      (nat %token_id)
+                                                      (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                               (or (pair %release
                                                       (nat %hold_id)
                                                       (pair (option %amount nat)
-                                                            (pair (option %token_id nat) (pair (option %src address) (option %dst address))))))
-                                               (or (pair %mint
-                                                      (nat %token_id)
-                                                      (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                                   (pair %release
+                                                            (pair (option %token_id nat) (pair (option %src address) (option %dst address)))))
+                                                   (pair %rollback
                                                       (nat %hold_id)
                                                       (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                                             (unit %admin_action))))))

@@ -1,13 +1,13 @@
 import 'mocha'
 import { strict as assert } from 'assert';
-import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, release_hold, execute_hold } from './test_lib'
+import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, release_hold } from './test_lib'
 
 import { accounts, asset_id1, asset_id4 } from './test_variables';
 
 
 export function run() {
 
-  describe('Hold / Execute / Release',  () => {
+  describe('Hold / Release / Rollback',  () => {
 
     it("Hold more than balance", async () => {
       let b0 = await get_balance({
@@ -230,20 +230,20 @@ export function run() {
       assert.equal(bs0, 18n)
     })
 
-    it("Release missing hold", async () => {
+    it("Rollback missing hold", async () => {
       await assert.rejects(
         async () => {
-          await release_hold(
+          await rollback_hold(
             { hold_id: "HOLD-ID-0000" }
           )
         },
         { message : "FINP2P_UNKNOWN_HOLD_ID"})
     })
 
-    it("Execute hold amount too large", async () => {
+    it("Release hold amount too large", async () => {
       await assert.rejects(
         async () => {
-          await execute_hold(
+          await release_hold(
             { hold_id: "HOLD-ID-0001",
               amount: 51
             }
@@ -252,11 +252,11 @@ export function run() {
         { message : "FA2_INSUFFICIENT_HOLD"})
     })
 
-    it("Execute hold mismatch asset", async () => {
+    it("Release hold mismatch asset", async () => {
 
       await assert.rejects(
         async () => {
-          await execute_hold(
+          await release_hold(
             { hold_id: "HOLD-ID-0001",
               asset_id: asset_id4
             }
@@ -265,10 +265,10 @@ export function run() {
         { message : "UNEXPECTED_HOLD_ASSET_ID"})
     })
 
-    it("Execute hold mismatch source", async () => {
+    it("Release hold mismatch source", async () => {
       await assert.rejects(
         async () => {
-          await execute_hold(
+          await release_hold(
             { hold_id: "HOLD-ID-0001",
               src: accounts[1].pubKey
             }
@@ -277,19 +277,19 @@ export function run() {
         { message : "UNEXPECTED_HOLD_SOURCE"})
     })
 
-    it("Execute hold mismatch destination", async () => {
+    it("Release hold mismatch destination", async () => {
       await assert.rejects(
         async () => {
-          await execute_hold(
+          await release_hold(
             { hold_id: "HOLD-ID-0001",
               dst : { kind: 'finId', dst: accounts[0].pubKey },
             }
           )
         },
-        { message : "UNEXPECTED_EXECUTE_HOLD_DESTINATION"})
+        { message : "UNEXPECTED_RELEASE_HOLD_DESTINATION"})
     })
 
-    it("Execute hold", async () => {
+    it("Release hold", async () => {
       let bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : asset_id1 })
@@ -298,7 +298,7 @@ export function run() {
         owner : accounts[1].pubKey,
         asset_id : asset_id1 })
       assert.equal(b1, 250n)
-      let op = await execute_hold({ hold_id: "HOLD-ID-0001"})
+      let op = await release_hold({ hold_id: "HOLD-ID-0001"})
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
       bi0 = await get_balance_info({
