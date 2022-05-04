@@ -32,7 +32,7 @@ export function run() {
   })
 
   it('Top up admin accounts to 10tz', async () => {
-    let op = await FinP2PTezos.topUpXTZ(FinP2PTezos.config.admins, 10, Net.account.pkh)
+    let op = await FinP2PTezos.topUpXTZ(FinP2PTezos.config.admins.concat([Net.other_account.pkh]), 10, Net.account.pkh)
     if (op !== undefined) {
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
