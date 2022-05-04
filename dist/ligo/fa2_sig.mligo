@@ -41,20 +41,20 @@ let get_hold_entrypoint (addr : address) : hold_param contract =
 
 
 [@inline]
+let get_rollback_entrypoint (addr : address) : rollback_param contract =
+  match (Tezos.get_entrypoint_opt "%rollback" addr : rollback_param contract
+             option)
+  with
+  | None -> (failwith invalid_fa2_contract : rollback_param contract)
+  | Some c -> c
+
+
+[@inline]
 let get_release_entrypoint (addr : address) : release_param contract =
   match (Tezos.get_entrypoint_opt "%release" addr : release_param contract
              option)
   with
   | None -> (failwith invalid_fa2_contract : release_param contract)
-  | Some c -> c
-
-
-[@inline]
-let get_execute_entrypoint (addr : address) : execute_param contract =
-  match (Tezos.get_entrypoint_opt "%execute" addr : execute_param contract
-             option)
-  with
-  | None -> (failwith invalid_fa2_contract : execute_param contract)
   | Some c -> c
 
 

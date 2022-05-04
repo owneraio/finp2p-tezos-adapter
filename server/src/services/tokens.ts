@@ -251,7 +251,7 @@ export class TokenService {
     let assetId = getEscrowAsset(request.asset);
     let dstAccount = getEscrowDestination(request.destination);
 
-    let params: FINP2PProxy.ExecuteHoldParam = {
+    let params: FINP2PProxy.ReleaseHoldParam = {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
@@ -259,7 +259,7 @@ export class TokenService {
       dst: dstAccount,
     };
 
-    const op = await this.tezosClient.executeHold(params);
+    const op = await this.tezosClient.releaseHold(params);
     //TODO: what if destination is not finId?
     return {
       isCompleted: false,
@@ -271,13 +271,13 @@ export class TokenService {
     logger.debug('rollback', { request });
     let assetId = getEscrowAsset(request.asset);
 
-    let params: FINP2PProxy.ReleaseHoldParam = {
+    let params: FINP2PProxy.RollbackHoldParam = {
       hold_id : utf8.encode(request.operationId),
       asset_id : utf8.encode(assetId),
       amount : BigInt(request.quantity),
       src_account : pubkeyToTezosSecp256k1(request.source.finId),
     };
-    const op = await this.tezosClient.releaseHold(params);
+    const op = await this.tezosClient.rollbackHold(params);
     return {
       isCompleted: false,
       cid: op.hash,

@@ -20,14 +20,14 @@
                           (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id))))))))
         (or %manager
            (or (pair %burn (nat %token_id) (list %owners (pair address nat)))
-               (pair %execute
+               (pair %mint
+                  (nat %token_id)
+                  (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+           (or (pair %release
                   (nat %hold_id)
                   (pair (option %amount nat)
-                        (pair (option %token_id nat) (pair (option %src address) (option %dst address))))))
-           (or (pair %mint
-                  (nat %token_id)
-                  (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-               (pair %release
+                        (pair (option %token_id nat) (pair (option %src address) (option %dst address)))))
+               (pair %rollback
                   (nat %hold_id)
                   (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))) ;
   storage
@@ -513,11 +513,11 @@
              DIG 2 ;
              SWAP ;
              IF_LEFT
-               { IF_LEFT
-                   { DIG 3 ;
-                     DIG 4 ;
-                     DROP 2 ;
-                     DUP ;
+               { DIG 3 ;
+                 DIG 4 ;
+                 DROP 2 ;
+                 IF_LEFT
+                   { DUP ;
                      CAR ;
                      DUP 3 ;
                      GET 9 ;
@@ -604,59 +604,6 @@
                      UPDATE 5 ;
                      SWAP ;
                      UPDATE 11 }
-                   { DIG 5 ;
-                     DIG 6 ;
-                     DROP 2 ;
-                     UNPAIR 5 ;
-                     DIG 5 ;
-                     DUG 4 ;
-                     PAIR 4 ;
-                     PAIR ;
-                     DIG 3 ;
-                     SWAP ;
-                     EXEC ;
-                     UNPAIR ;
-                     SWAP ;
-                     UNPAIR ;
-                     SWAP ;
-                     DUP ;
-                     DUG 2 ;
-                     GET 6 ;
-                     DIG 4 ;
-                     IF_NONE
-                       { IF_NONE { PUSH string "NO_DESTINATION_EXECUTE_HOLD" ; FAILWITH } {} }
-                       { SWAP ;
-                         IF_NONE
-                           {}
-                           { SWAP ;
-                             DUP ;
-                             DUG 2 ;
-                             COMPARE ;
-                             NEQ ;
-                             IF { DROP ; PUSH string "UNEXPECTED_EXECUTE_HOLD_DESTINATION" ; FAILWITH }
-                                {} } } ;
-                     DUP 4 ;
-                     NIL (pair address (list (pair address (pair nat nat)))) ;
-                     NIL (pair address (pair nat nat)) ;
-                     DIG 4 ;
-                     DUP 6 ;
-                     CAR ;
-                     DIG 5 ;
-                     PAIR 3 ;
-                     CONS ;
-                     DIG 3 ;
-                     GET 5 ;
-                     PAIR ;
-                     CONS ;
-                     PAIR ;
-                     DIG 3 ;
-                     SWAP ;
-                     EXEC ;
-                     UPDATE 5 } }
-               { DIG 4 ;
-                 DIG 5 ;
-                 DROP 2 ;
-                 IF_LEFT
                    { DIG 3 ;
                      DROP ;
                      DUP ;
@@ -741,7 +688,57 @@
                      COMPARE ;
                      GT ;
                      IF { DIG 2 ; DROP ; SWAP } { SWAP ; DROP ; SWAP ; GET 13 } ;
-                     UPDATE 13 }
+                     UPDATE 13 } }
+               { DIG 5 ;
+                 DIG 6 ;
+                 DROP 2 ;
+                 IF_LEFT
+                   { UNPAIR 5 ;
+                     DIG 5 ;
+                     DUG 4 ;
+                     PAIR 4 ;
+                     PAIR ;
+                     DIG 3 ;
+                     SWAP ;
+                     EXEC ;
+                     UNPAIR ;
+                     SWAP ;
+                     UNPAIR ;
+                     SWAP ;
+                     DUP ;
+                     DUG 2 ;
+                     GET 6 ;
+                     DIG 4 ;
+                     IF_NONE
+                       { IF_NONE { PUSH string "NO_DESTINATION_RELEASE_HOLD" ; FAILWITH } {} }
+                       { SWAP ;
+                         IF_NONE
+                           {}
+                           { SWAP ;
+                             DUP ;
+                             DUG 2 ;
+                             COMPARE ;
+                             NEQ ;
+                             IF { DROP ; PUSH string "UNEXPECTED_RELEASE_HOLD_DESTINATION" ; FAILWITH }
+                                {} } } ;
+                     DUP 4 ;
+                     NIL (pair address (list (pair address (pair nat nat)))) ;
+                     NIL (pair address (pair nat nat)) ;
+                     DIG 4 ;
+                     DUP 6 ;
+                     CAR ;
+                     DIG 5 ;
+                     PAIR 3 ;
+                     CONS ;
+                     DIG 3 ;
+                     GET 5 ;
+                     PAIR ;
+                     CONS ;
+                     PAIR ;
+                     DIG 3 ;
+                     SWAP ;
+                     EXEC ;
+                     UPDATE 5 }
                    { DIG 4 ; DROP ; PAIR ; DIG 2 ; SWAP ; EXEC ; CAR } } ;
              NIL operation ;
              PAIR } ;
@@ -775,14 +772,14 @@
                                               (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))))
                                 (or (or %manage_action
                                        (or (pair %burn (nat %token_id) (list %owners (pair address nat)))
-                                           (pair %execute
+                                           (pair %mint
+                                              (nat %token_id)
+                                              (pair (option %token_info (map string bytes)) (list %owners (pair address nat)))))
+                                       (or (pair %release
                                               (nat %hold_id)
                                               (pair (option %amount nat)
-                                                    (pair (option %token_id nat) (pair (option %src address) (option %dst address))))))
-                                       (or (pair %mint
-                                              (nat %token_id)
-                                              (pair (option %token_info (map string bytes)) (list %owners (pair address nat))))
-                                           (pair %release
+                                                    (pair (option %token_id nat) (pair (option %src address) (option %dst address)))))
+                                           (pair %rollback
                                               (nat %hold_id)
                                               (pair (option %amount nat) (pair (option %token_id nat) (option %src address))))))
                                     (unit %admin_action)))))) ;
@@ -829,8 +826,8 @@
                  UNIT ;
                  RIGHT
                    (or (or (pair nat (list (pair address nat)))
-                           (pair nat (pair (option nat) (pair (option nat) (pair (option address) (option address))))))
-                       (or (pair nat (pair (option (map string bytes)) (list (pair address nat))))
+                           (pair nat (pair (option (map string bytes)) (list (pair address nat)))))
+                       (or (pair nat (pair (option nat) (pair (option nat) (pair (option address) (option address)))))
                            (pair nat (pair (option nat) (pair (option nat) (option address)))))) ;
                  RIGHT
                    (or (or (pair (list (pair address nat)) (contract (list (pair (pair address nat) nat))))
@@ -838,8 +835,8 @@
                        (or (list (pair address (list (pair address (pair nat nat)))))
                            (list (or (pair address (pair address nat)) (pair address (pair address nat)))))) }
                { LEFT (or (or (or (pair nat (list (pair address nat)))
-                                  (pair nat (pair (option nat) (pair (option nat) (pair (option address) (option address))))))
-                              (or (pair nat (pair (option (map string bytes)) (list (pair address nat))))
+                                  (pair nat (pair (option (map string bytes)) (list (pair address nat)))))
+                              (or (pair nat (pair (option nat) (pair (option nat) (pair (option address) (option address)))))
                                   (pair nat (pair (option nat) (pair (option nat) (option address))))))
                           unit) } }
            { LEFT unit ;

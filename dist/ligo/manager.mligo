@@ -82,7 +82,7 @@ let burn (p : burn_param) (s : storage) : storage =
       Big_map.update id supply s.total_supply in
   { s with ledger = ledger ; total_supply = total_supply  }
 
-let release (r : release_param) (s : storage) : (storage * (token_amount * hold)) =
+let rollback (r : rollback_param) (s : storage) : (storage * (token_amount * hold)) =
   let { hold_id; amount = amount_; token_id; src } = r in
   let h =
     match Big_map.find_opt hold_id s.holds with
@@ -97,9 +97,9 @@ let release (r : release_param) (s : storage) : (storage * (token_amount * hold)
     match src with
     | None -> ()
     | Some src -> if src <> h.src then failwith "UNEXPECTED_HOLD_SOURCE" in
-  let release_amount = match amount_ with | None -> h.amount | Some a -> a in
+  let rollback_amount = match amount_ with | None -> h.amount | Some a -> a in
   let new_hold =
-    match sub_amount h.amount release_amount with
+    match sub_amount h.amount rollback_amount with
     | None -> (failwith fa2_insufficient_hold : hold option)
     | Some a -> if a = (Amount 0n) then None else Some { h with amount = a } in
   let holds = Big_map.update hold_id new_hold s.holds in
@@ -108,30 +108,30 @@ let release (r : release_param) (s : storage) : (storage * (token_amount * hold)
     | None -> Amount 0n
     | Some total -> total in
   let new_total_on_hold =
-    match sub_amount total_on_hold release_amount with
+    match sub_amount total_on_hold rollback_amount with
     | None -> None
     | Some total -> if total = (Amount 0n) then None else Some total in
   let holds_totals =
     Big_map.update (h.src, h.token_id) new_total_on_hold s.holds_totals in
   ({ s with holds = holds ; holds_totals = holds_totals  },
-   (release_amount, h))
+   (rollback_amount, h))
 
-let execute (e : execute_param) (s : storage) : storage =
+let release (e : release_param) (s : storage) : storage =
   let { hold_id = hold_id_; amount = amount_; token_id = token_id_; src = src_;
         dst }
     = e in
   let (s, (tr_amount, hold)) =
-    release
+    rollback
       { hold_id = hold_id_; amount = amount_; token_id = token_id_; src = src_
       } s in
   let tr_dst =
     match (dst, hold.dst) with
-    | (None, None) -> (failwith "NO_DESTINATION_EXECUTE_HOLD" : address)
+    | (None, None) -> (failwith "NO_DESTINATION_RELEASE_HOLD" : address)
     | (Some dst, None) -> dst
     | (None, Some dst) -> dst
     | (Some dst, Some hold_dst) ->
       if dst <> hold_dst
-      then (failwith "UNEXPECTED_EXECUTE_HOLD_DESTINATION" : address)
+      then (failwith "UNEXPECTED_RELEASE_HOLD_DESTINATION" : address)
       else dst in
   let tr_src = hold.src in
   let tr_token_id = hold.token_id in
@@ -147,8 +147,8 @@ let manager ((param, s) : (manager_params * storage)) : (operation list * storag
     match param with
     | Mint p -> mint p s
     | Burn p -> burn p s
-    | Release p -> let (s, _) = release p s in s
-    | Execute p -> execute p s in
+    | Rollback p -> let (s, _) = rollback p s in s
+    | Release p -> release p s in
   (([] : operation list), s)
 
 #endif

@@ -82,28 +82,28 @@ type burn_param = {
 }
 [@@comb] [@@param Burn_tokens]
 
-type release_param = {
+type rollback_param = {
   rl_hold_id : hold_id;
   rl_amount : token_amount option;
   rl_token_id : token_id option;
   rl_src : address option;
 }
-[@@comb] [@@param Release]
+[@@comb] [@@param Rollback]
 
-type execute_param = {
+type release_param = {
   e_hold_id : hold_id;
   e_amount : token_amount option;
   e_token_id : token_id option;
   e_src : address option;
   e_dst : address option;
 }
-[@@comb] [@@param Release]
+[@@comb] [@@param Rollback]
 
 type manager_params =
   | Mint of mint_param
   | Burn of burn_param
+  | Rollback of rollback_param
   | Release of release_param
-  | Execute of execute_param
 [@@entry Manager]
 
 (* Admin *)
