@@ -1910,7 +1910,7 @@ export class FinP2PTezos {
     const assetId = (kind == 'hold_tokens') ? v.shg.asset_id : v.asset_id;
     const amount = (kind == 'hold_tokens') ? v.shg.amount : v.amount;
     const srcAccount = (kind == 'hold_tokens') ? v.ahg.dst_account : v.src_account;
-    const dstAccount = (kind == 'execute_hold') ? v.dst.finId : v.dst_account;
+    const dstAccount = (kind == 'release_hold') ? v.dst.finId : v.dst_account;
     let receipt = {
       kind,
       assetId : utf8dec.decode(Buffer.from(assetId, 'hex')),
