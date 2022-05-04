@@ -704,13 +704,6 @@ export class FinP2PTezos {
     return result;
   }
 
-  /**
-   * @description Re-export `waitInclusion` for ease of use and check that it
-   * is successful. * By default, waits for the number of confirmations in the
-   * `config`.
-   * @see TaquitoWrapper.waitInclusion for details
-   */
-
   async init(p : { operationTTL : OperationTTL,
     fa2Metadata : Object }) {
     var accredit = false;
