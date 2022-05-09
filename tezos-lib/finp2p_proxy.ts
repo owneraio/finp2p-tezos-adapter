@@ -8,7 +8,12 @@ import {
 } from '@taquito/taquito';
 import { BlockHeaderResponse, MichelsonV1Expression } from '@taquito/rpc';
 import { encodeKey, validateContractAddress } from '@taquito/utils';
-import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
+import {
+  TaquitoWrapper,
+  BatchResult,
+  OperationResult,
+  contractAddressOfOpHash,
+} from './taquito_wrapper';
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix, getPkhfromPk } from '@taquito/utils';
@@ -682,7 +687,7 @@ export class FinP2PTezos {
    * `config`.
    * @see TaquitoWrapper.waitInclusion for details
   */
-  async waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
+  async waitInclusion(op : BatchResult, confirmations = this.config.confirmations) {
     const result = await this.taquito.waitInclusion(op, confirmations);
     const [blockOp,,] = result;
     blockOp.contents.map(o => {
@@ -915,7 +920,10 @@ export class FinP2PTezos {
         batchParams = [cleanupParam, callParam];
       }
     }
-    return this.batch(batchParams, sender);
+    const { hash } = await this.batch(batchParams, sender);
+    // Last operation is the one we care about
+    const index = batchParams.length - 1;
+    return { hash, index };
   }
 
   /**
@@ -1188,7 +1196,7 @@ export class FinP2PTezos {
    * @param sender : address of sender/source for this transaction
    * @returns operation injection result
    */
-  async topUpXTZ(accounts : Address[], topUpAmount: number, sender? : Address) : Promise<OperationResult | undefined> {
+  async topUpXTZ(accounts : Address[], topUpAmount: number, sender? : Address) : Promise<BatchResult | undefined> {
     const balances = await Promise.all(accounts.map(async account => {
       return {
         account,
@@ -1222,7 +1230,7 @@ export class FinP2PTezos {
   async batch(
     p: BatchParam[],
     source? : Address,
-  ) : Promise<OperationResult> {
+  ) : Promise<BatchResult> {
     let finp2p = this;
     if (source === undefined) {
       // Pick next source in the admins list in a round robin manner
@@ -1601,11 +1609,11 @@ export class FinP2PTezos {
       if (pk === undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
-    const op0 = ops[0];
+    const op0 = ops[op.index];
     try {
       const v = op0.parameter.value;
       return {
-        kind : ops[0].parameter.entrypoint as string,
+        kind : op0.parameter.entrypoint as string,
         assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
         amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
         srcAccount : getPkBytes(v.src_account),
@@ -1637,7 +1645,7 @@ export class FinP2PTezos {
       if (pk === undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
-    const op0 = ops[0];
+    const op0 = ops[op.index];
     try {
       const kind = op0.parameters.entrypoint as string;
       const v = op0.parameters.value[kind];
@@ -1799,7 +1807,7 @@ export class FinP2PTezos {
     return receipt;
   }
 
-  async getTzktInclusionBlock(op : OperationResult,
+  async getTzktInclusionBlock(op : BatchResult,
     explorer : { kind : 'TzKT', url : string }) :
     Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
@@ -1809,12 +1817,12 @@ export class FinP2PTezos {
       },
     );
     if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
-      throw new ReceiptError(op, [], 'Operation is not known by TzKT');
+      throw new Error('Operation is not known by TzKT');
     }
     return ops[0].block;
   }
 
-  async getTzstatsInclusionBlock(op : OperationResult,
+  async getTzstatsInclusionBlock(op : BatchResult,
     explorer : { kind : 'tzstats', url : string }) :
     Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
@@ -1824,12 +1832,12 @@ export class FinP2PTezos {
       },
     );
     if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
-      throw new ReceiptError(op, [], 'Operation is not known by tzstats');
+      throw new Error('Operation is not known by tzstats');
     }
     return ops[0].block;
   }
 
-  async getExplorerInclusionBlock(op : OperationResult, explorer : Explorer) :
+  async getExplorerInclusionBlock(op : BatchResult, explorer : Explorer) :
   Promise<string> {
     switch (explorer.kind) {
       case 'TzKT':
@@ -1885,7 +1893,7 @@ export class FinP2PTezos {
     if (opContent === undefined) {
       throw new ReceiptError(op, [], 'Node could not find operation');
     }
-    let op0 = opContent.contents[0];
+    let op0 = opContent.contents[op.index];
     if (op0.kind !== OpKind.TRANSACTION) {
       throw Error('Operation is not a transaction');
     }
@@ -1937,7 +1945,7 @@ export class FinP2PTezos {
 
   }
 
-  async isIncluded(op : OperationResult, confirmations = this.config.confirmations) {
+  async isIncluded(op : BatchResult, confirmations = this.config.confirmations) {
     const result = await this.taquito.isIncluded(op, confirmations);
     const [blockOp,,] = result;
     blockOp.contents.map(o => {

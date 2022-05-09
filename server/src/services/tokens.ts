@@ -3,6 +3,7 @@ import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
 import { logger } from '../helpers/logger';
 import { accounts, contracts, nodeAddr, explorers } from '../helpers/config';
+import { OperationResult } from '@owneraio/tezos-lib/tezos-lib/taquito_wrapper';
 
 let service:TokenService;
 let utf8 = new TextEncoder();
@@ -20,6 +21,19 @@ function getFieldFromSignature(template: Components.Schemas.SignatureTemplate, h
     throw Error(`field ${name} not found in signature template`);
   }
   return f;
+}
+
+function operationResultToCid(op : OperationResult) : string {
+  return `${op.hash}-${op.index}`;
+}
+
+function cidToOperationResult(cid : string) : OperationResult {
+  const fields = cid.split('-', 2);
+  if (fields.length > 1) {
+    return { hash: fields[0], index: parseInt(fields[1]) };
+  } else {
+    return { hash: fields[0], index: 0 };
+  }
 }
 
 function getEscrowAsset(asset: Components.Schemas.Asset) : string {
@@ -108,7 +122,7 @@ export class TokenService {
     } as FINP2PProxy.IssueTokensParam);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -157,12 +171,13 @@ export class TokenService {
     //TODO: what if destination is not finId?
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
   public async getReceipt(id: Paths.GetReceipt.Parameters.TransactionId) : Promise<Paths.GetReceipt.Responses.$200> {
-    const r = await this.tezosClient.getReceipt({ hash : id });
+    const op = cidToOperationResult(id);
+    const r = await this.tezosClient.getReceipt(op);
     //TODO: what if destination is not finId?
     return {
       isCompleted: true,
@@ -242,7 +257,7 @@ export class TokenService {
     const op = await this.tezosClient.holdTokens(params);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -263,7 +278,7 @@ export class TokenService {
     //TODO: what if destination is not finId?
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -280,14 +295,14 @@ export class TokenService {
     const op = await this.tezosClient.rollbackHold(params);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
-  //TODO: handle cleanup transactions that arrive as part of the batch
   public async operationStatus(request: Paths.GetOperation.PathParameters) : Promise<Paths.GetOperation.Responses.$200> {
+    const op = cidToOperationResult(request.cid);
     try {
-      await this.tezosClient.isIncluded({ hash: request.cid });
+      await this.tezosClient.isIncluded(op);
     } catch (e) {
       let message;
       if (e instanceof Error) message = e.message;
@@ -300,7 +315,7 @@ export class TokenService {
         } as Components.Schemas.ReceiptOperation,
       } as Components.Schemas.OperationStatus;
     }
-    let r = await this.tezosClient.getReceipt({ hash: request.cid }, { throwOnFail: true, throwOnUnconfirmed: true });
+    let r = await this.tezosClient.getReceipt(op, { throwOnFail: true, throwOnUnconfirmed: true });
     let source = (r.srcAccount === undefined) ?
       undefined :
       {

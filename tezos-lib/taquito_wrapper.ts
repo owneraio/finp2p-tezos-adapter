@@ -17,8 +17,11 @@ import * as Blake2b from '@stablelib/blake2b';
  * With these functions, we have a better control on the operations hashs being injected.
 */
 
-export interface OperationResult {
+export interface BatchResult {
   hash: string;
+}
+export interface OperationResult extends BatchResult {
+  index: number;
 }
 
 /** @description Returns the contract address of an origination from the
@@ -39,11 +42,11 @@ export function contractAddressOfOpHash(hash : string, index = 0) : string {
 
 export class InjectionError extends Error {
 
-  op : OperationResult;
+  op : BatchResult;
 
   error : any;
 
-  constructor(op : OperationResult, error : any, ...params: any[]) {
+  constructor(op : BatchResult, error : any, ...params: any[]) {
     // Pass remaining arguments (including vendor specific ones) to parent constructor
     super(...params);
 
@@ -169,7 +172,7 @@ export class TaquitoWrapper extends TezosToolkit {
     });
   }
 
-  private findInBlock(block : BlockResponse, op : OperationResult) : OperationEntry | undefined {
+  private findInBlock(block : BlockResponse, op : BatchResult) : OperationEntry | undefined {
     const r = block.operations.find((l) => {
       return l.find((blockOp) => {
         return (blockOp.hash === op.hash);
@@ -191,7 +194,7 @@ export class TaquitoWrapper extends TezosToolkit {
   }
 
   private async inPrevBlocks(
-    op : OperationResult,
+    op : BatchResult,
     nb = 5,
     blockHash? : string,
     head? : BlockResponse,
@@ -222,7 +225,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  waitInclusion(op : OperationResult, confirmations? : number, max = 10) :
+  waitInclusion(op : BatchResult, confirmations? : number, max = 10) :
   Promise<[OperationEntry, BlockResponse, number]> {
     var foundRes : [OperationEntry, BlockResponse];
     const taquito = this;
@@ -286,7 +289,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  isIncluded(op : OperationResult, confirmations? : number, max = 10) :
+  isIncluded(op : BatchResult, confirmations? : number, max = 10) :
   Promise<[OperationEntry, BlockResponse, number]> {
     const taquito = this;
     return new Promise(function (resolve, reject) {
@@ -354,7 +357,8 @@ export class TaquitoWrapper extends TezosToolkit {
         source,
         counter: counter + 1,
       }];
-      return await this.signAndInject('revelation', contents);
+      const { hash } = await this.signAndInject('revelation', contents);
+      return { hash, index: 0 };
     } catch (e : any) {
       if (e.message.match(/Previously revealed/)) {
         throw Error('WalletAlreadyRevealed');
@@ -369,7 +373,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @param transfersParams : the transactions parameters
    * @returns injection result
    */
-  async batchTransactions(transfersParams: Array<TransferParams>): Promise<OperationResult> {
+  async batchTransactions(transfersParams: Array<TransferParams>): Promise<BatchResult> {
     transfersParams.map(t =>
       this.debug('Calling', t.parameter?.entrypoint, 'with', t.parameter?.value));
     let estimates = this.estimate.batch(
@@ -415,7 +419,9 @@ export class TaquitoWrapper extends TezosToolkit {
    */
   async transferXTZ(destination: string, amount: number, source? : string): Promise<OperationResult> {
     this.debug(`Transfering ${amount} tz to ${destination}`);
-    return this.batchTransactions([{ to : destination, amount, source }]);
+    const { hash } =
+      await this.batchTransactions([{ to : destination, amount, source }]);
+    return { hash, index: 0 };
   }
 
   /**
@@ -425,7 +431,7 @@ export class TaquitoWrapper extends TezosToolkit {
    */
   async multiTransferXTZ(
     transfers : { to: string, amount: number, source? : string }[],
-  ): Promise<OperationResult> {
+  ): Promise<BatchResult> {
     return this.batchTransactions(transfers);
   }
 
@@ -444,12 +450,13 @@ export class TaquitoWrapper extends TezosToolkit {
     source? : string,
     amount = 0): Promise<OperationResult> {
     this.debug('Calling', entrypoint, 'with', value);
-    return this.batchTransactions([{
+    const { hash } = await this.batchTransactions([{
       amount,
       source,
       to: kt1,
       parameter: { entrypoint, value },
     }]);
+    return { hash, index: 0 };
   }
 
 
