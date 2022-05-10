@@ -45,6 +45,10 @@ export type Opaque = Bytes;
 let utf8 = new TextEncoder();
 let utf8dec = new TextDecoder();
 
+function BigIntNumber(b : BigNumber) : bigint {
+  return BigInt('0x' + b.toString(16));
+}
+
 function toStr(x : any) : string {
   if (typeof x === 'string') { return x; }
   return JSON.stringify(x);
@@ -1205,7 +1209,7 @@ export class FinP2PTezos {
     }));
     let params : TransferParams[] = [];
     balances.map(({ account, balance }) => {
-      let amountMutez = BigInt(topUpAmount) * BigInt(1e6) - BigInt(balance.toString());
+      let amountMutez = BigInt(topUpAmount) * BigInt(1e6) - BigIntNumber(balance);
       let amountMutezNumber = Number(amountMutez);
       if (BigInt(amountMutezNumber) != amountMutez) {
         throw Error(`Precision loss ${amountMutezNumber} != ${amountMutez}`);
@@ -1394,7 +1398,7 @@ export class FinP2PTezos {
     let balance =
       await this.callProxyView<BigNumber>(
         'get_asset_balance', publicKey, assetId, kt1);
-    return (BigInt((balance || new BigNumber(0)).toString()));
+    return (BigIntNumber(balance || new BigNumber(0)));
   }
 
   private async getExternalAssetBalance(
@@ -1430,7 +1434,7 @@ export class FinP2PTezos {
       // TODO: does not work. Taquito only supports big map keys string, int or
       // bool
       const balance = await ledger.get<BigNumber>([owner, fa2Token.id]);
-      return (BigInt((balance || new BigNumber(0)).toString()));
+      return (BigIntNumber(balance || new BigNumber(0)));
     }
     // Single asset contract
     //   big_map %ledger address nat
@@ -1439,7 +1443,7 @@ export class FinP2PTezos {
     async function getBalanceSingle() {
       if (owner === undefined) { return (null as never) ; }
       const balance = await ledger.get<BigNumber>(owner);
-      return (BigInt((balance || new BigNumber(0)).toString()));
+      return (BigIntNumber(balance || new BigNumber(0)));
     }
     // NFT asset contract
     //    big_map %ledger nat address
@@ -1494,7 +1498,7 @@ export class FinP2PTezos {
     let balance =
       await this.callProxyView<BigNumber>(
         'get_asset_hold', publicKey, assetId, kt1);
-    return (BigInt((balance || new BigNumber(0)).toString()));
+    return (BigIntNumber(balance || new BigNumber(0)));
   }
 
 
@@ -1510,8 +1514,8 @@ export class FinP2PTezos {
       return { balance : 0n, on_hold : 0n };
     } else {
       return {
-        balance : BigInt(info.balance.toString()),
-        on_hold : BigInt(info.on_hold.toString()),
+        balance : BigIntNumber(info.balance),
+        on_hold : BigIntNumber(info.on_hold),
       };
     }
   }
@@ -1615,7 +1619,7 @@ export class FinP2PTezos {
       return {
         kind : op0.parameter.entrypoint as string,
         assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
-        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+        amount : (v.amount === undefined) ? undefined : BigIntNumber(v.amount),
         srcAccount : getPkBytes(v.src_account),
         dstAccount : getPkBytes(v.dst_account),
         status: op0.status ? op0.status as OpStatus : undefined,
@@ -1652,7 +1656,7 @@ export class FinP2PTezos {
       return {
         kind,
         assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
-        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
+        amount : (v.amount === undefined) ? undefined : BigIntNumber(v.amount),
         srcAccount : getPkBytes(v.src_account),
         dstAccount : getPkBytes(v.dst_account),
         status: op0.status ? op0.status as OpStatus : undefined,
@@ -1929,18 +1933,35 @@ export class FinP2PTezos {
     let schema = new ParameterSchema(contract.entrypoints.entrypoints[op0.parameters.entrypoint]);
     let v = schema.Execute(op0.parameters.value);
     const getPkBytes = (pk : any) => {
-      if (pk === undefined) { return undefined; }
+      if (pk == undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
     const kind = op0.parameters.entrypoint as string;
-    const assetId = (kind == 'hold_tokens') ? v.shg.asset_id : v.asset_id;
-    const amount = (kind == 'hold_tokens') ? v.shg.amount : v.amount;
-    const srcAccount = (kind == 'hold_tokens') ? v.ahg.dst_account : v.src_account;
-    const dstAccount = (kind == 'release_hold') ? v.dst.finId : v.dst_account;
+    let assetId = v.asset_id;
+    let amount = v.amount;
+    let srcAccount = v.src_account;
+    let dstAccount = v.dst_account;
+    switch (kind) {
+      case 'release_hold':
+        dstAccount = v.dst?.finId;
+        break;
+      case 'hold_tokens':
+        assetId = v.shg?.asset_id;
+        amount = v.shg?.amount;
+        dstAccount = v.shg?.dst_account?.finId;
+        srcAccount = v.ahg?.dst_account;
+        break;
+    }
+    if (!assetId) {
+      throw new ReceiptError(
+        op, [],
+        `Cannot extract assetId from operation ${op0.parameters.entrypoint} with ${JSON.stringify(v)}`,
+      );
+    }
     let receipt = {
       kind,
       assetId : utf8dec.decode(Buffer.from(assetId, 'hex')),
-      amount : (amount === undefined) ? undefined : BigInt(amount as string),
+      amount : (amount == undefined) ? undefined : BigIntNumber(amount),
       srcAccount : getPkBytes(srcAccount),
       dstAccount : getPkBytes(dstAccount),
       status: op0.metadata.operation_result.status,
