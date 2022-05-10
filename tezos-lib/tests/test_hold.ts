@@ -1,6 +1,6 @@
 import 'mocha'
 import { strict as assert } from 'assert';
-import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, release_hold } from './test_lib'
+import { FinP2PTezos, log, get_balance, transfer_tokens, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, release_hold, get_receipt } from './test_lib'
 
 import { accounts, asset_id1, asset_id4 } from './test_variables';
 
@@ -45,6 +45,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : asset_id1 })
@@ -100,6 +101,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : asset_id1 })
@@ -143,6 +145,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let b0 = await get_balance({
         owner : accounts[0].pubKey,
         asset_id : asset_id1 })
@@ -176,6 +179,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : asset_id1 })
@@ -198,6 +202,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : asset_id1 })
@@ -220,6 +225,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op);
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : asset_id1 })
@@ -234,7 +240,9 @@ export function run() {
       await assert.rejects(
         async () => {
           await rollback_hold(
-            { hold_id: "HOLD-ID-0000" }
+            { hold_id: "HOLD-ID-0000",
+              asset_id : asset_id1,
+            }
           )
         },
         { message : "FINP2P_UNKNOWN_HOLD_ID"})
@@ -245,6 +253,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "HOLD-ID-0001",
+              asset_id : asset_id1,
               amount: 51
             }
           )
@@ -270,6 +279,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "HOLD-ID-0001",
+              asset_id : asset_id1,
               src: accounts[1].pubKey
             }
           )
@@ -282,6 +292,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "HOLD-ID-0001",
+              asset_id : asset_id1,
               dst : { kind: 'finId', dst: accounts[0].pubKey },
             }
           )
@@ -298,9 +309,14 @@ export function run() {
         owner : accounts[1].pubKey,
         asset_id : asset_id1 })
       assert.equal(b1, 250n)
-      let op = await release_hold({ hold_id: "HOLD-ID-0001"})
+      let op = await release_hold({
+        hold_id: "HOLD-ID-0001",
+        asset_id : asset_id1,
+        dst : { kind: 'finId', dst: accounts[1].pubKey },
+      })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op);
       bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : asset_id1 })

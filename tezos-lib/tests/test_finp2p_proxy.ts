@@ -77,6 +77,7 @@ export function run() {
           amount : 220 })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Concurent transactions: issue more tokens (10 + 10 + 10)', async () => {
@@ -96,6 +97,7 @@ export function run() {
       ])
       log("waiting inclusions")
       await Promise.all(ops.map(op => { return FinP2PTezos.waitInclusion(op)}))
+      await Promise.all(ops.map(op => { return get_receipt(op)}))
     })
 
     it('Balance of account[1] should be 250 in ' + asset_id1, async () => {
@@ -156,6 +158,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Issue 0 of token with 6 decimals', async () => {
@@ -165,6 +168,7 @@ export function run() {
           amount : 0 })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Issue 1.000000 of token with 6 decimals', async () => {
@@ -174,6 +178,7 @@ export function run() {
           amount : 1000000 })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Issue 1000000.000000 of token with 6 decimals', async () => {
@@ -183,6 +188,7 @@ export function run() {
           amount : 1000000000000 })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it(`Issue ${Number.MAX_SAFE_INTEGER}`, async () => {
@@ -192,6 +198,7 @@ export function run() {
           amount : Number.MAX_SAFE_INTEGER })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Check big balance of account[3]', async () => {
@@ -213,6 +220,8 @@ export function run() {
       log("waiting inclusions")
       await FinP2PTezos.waitInclusion(op1)
       await FinP2PTezos.waitInclusion(op2)
+      await get_receipt(op1)
+      await get_receipt(op2)
     })
 
     it(`Issue ${2n ** 64n - 1n}`, async () => {
@@ -222,6 +231,7 @@ export function run() {
           amount : 2n ** 64n - 1n })
       log("waiting inclusions")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Check very big balance of account[3]', async () => {
@@ -238,6 +248,7 @@ export function run() {
           amount : 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999n })
       log("waiting inclusions")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it(`Issue -1 tokens`, async () => {
@@ -262,6 +273,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Issue 2 tokens of ' + asset_id3_utf8, async () => {
@@ -271,6 +283,7 @@ export function run() {
           amount : 2 })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Balance of account[3] should be 2 in ' + asset_id3_utf8, async () => {
@@ -445,6 +458,7 @@ export function run() {
           amount : 49})
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
     })
 
     it('Balance of account[0] should be 100 in ' + asset_id1, async () => {

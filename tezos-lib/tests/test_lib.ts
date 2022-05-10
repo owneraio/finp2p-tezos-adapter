@@ -356,14 +356,8 @@ export function log (message?: any, ...optionalParams: any[]) {
   if (Net.config.debug) { console.log(message, ...optionalParams) }
 }
 
-// Only get receipts if network has explorers associated
-export function get_receipt (op : OperationResult) : Promise<any>{
-  if (Net.config.explorers.length > 0) {
-    return FinP2PTezos.getReceipt(op)
-  }
-  else {
-    return new Promise(resolve => {resolve({})})
-  }
+export function get_receipt (op : OperationResult) {
+  return FinP2PTezos.getReceipt(op);
 }
 
 // Use same shg for everything
@@ -767,7 +761,7 @@ export async function hold_tokens(i : {
 
 export async function mk_release_hold(i : {
   hold_id : string,
-  asset_id? : string,
+  asset_id : string,
   amount? : number | bigint,
   src? : Buffer,
   dst? : hold_dst,
@@ -792,7 +786,7 @@ export async function mk_release_hold(i : {
   }
   let param: Finp2pProxy.ReleaseHoldParam = {
     hold_id : utf8.encode(i.hold_id),
-    asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
+    asset_id : utf8.encode(i.asset_id),
     amount : (i.amount === undefined)? undefined : BigInt(i.amount),
     src_account : (i.src === undefined)? undefined : pubkey_to_tezos_secp256k1(i.src),
     dst,
@@ -803,7 +797,7 @@ export async function mk_release_hold(i : {
 
 export async function release_hold(i : {
   hold_id : string,
-  asset_id? : string,
+  asset_id : string,
   amount? : number | bigint,
   src? : Buffer,
   dst? : hold_dst,
@@ -816,13 +810,13 @@ export async function release_hold(i : {
 
 export async function mk_rollback_hold(i : {
   hold_id : string,
-  asset_id? : string,
+  asset_id : string,
   amount? : number | bigint,
   src? : Buffer,
 }) {
   let param: Finp2pProxy.RollbackHoldParam = {
     hold_id : utf8.encode(i.hold_id),
-    asset_id : (i.asset_id === undefined)? undefined : utf8.encode(i.asset_id),
+    asset_id : utf8.encode(i.asset_id),
     amount : (i.amount === undefined)? undefined : BigInt(i.amount),
     src_account : (i.src === undefined)? undefined : pubkey_to_tezos_secp256k1(i.src),
   }
@@ -832,7 +826,7 @@ export async function mk_rollback_hold(i : {
 
 export async function rollback_hold(i : {
   hold_id : string,
-  asset_id? : string,
+  asset_id : string,
   amount? : number | bigint,
   src? : Buffer,
   options? : Finp2pProxy.CallOptions,
