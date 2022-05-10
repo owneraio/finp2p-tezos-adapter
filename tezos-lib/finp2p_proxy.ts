@@ -258,7 +258,8 @@ type OpStatus =
   'applied' | 'failed' | 'backtracked' | 'skipped';
 
 export interface OpReceipt {
-  kind: string,
+  kind: 'Receipt',
+  entrypoint: string,
   assetId: string,
   amount?: bigint;
   srcAccount? : Buffer,
@@ -269,7 +270,13 @@ export interface OpReceipt {
   level?: number,
   confirmations?: number,
   confirmed: boolean,
-  nodeAgree?: boolean,
+}
+
+export interface OpPendingReceipt {
+  kind: 'PendingReceipt'
+  reason: string,
+  confirmations?: number,
+  confirmed: boolean,
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
@@ -1682,16 +1689,36 @@ export class FinP2PTezos {
   async getReceipt(op : OperationResult,
     { throwOnFail = true,
       throwOnUnconfirmed = false } = {}) :
-    Promise<OpReceipt> {
+    Promise<OpReceipt | OpPendingReceipt> {
     const blockPromise = this.getInclusionBlock(op);
     const headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
-    const [block, head] = await Promise.all([blockPromise, headPromise]);
+    let block;
+    let head;
+    try {
+      [block, head] = await Promise.all([blockPromise, headPromise]);
+    } catch (e) {
+      if (throwOnFail) { throw e;}
+      let reason;
+      if (e instanceof Error) reason = e.message;
+      else reason = String(e);
+      return {
+        kind : 'PendingReceipt',
+        reason,
+        confirmed: false,
+      };
+    }
     let confirmations = head.level - block.header.level;
     // check if the inclusion block is reachable back from head
     const blockHashAtInclLevel =
       await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}` });
     if (blockHashAtInclLevel != block.hash) {
-      throw new ReceiptError(op, [], 'Operation is not included in the main chain');
+      const reason = `Operation (in ${block.hash}) is not included in the main chain `;
+      if (throwOnFail) { throw new ReceiptError(op, [], reason); }
+      return {
+        kind : 'PendingReceipt',
+        reason,
+        confirmed: false,
+      };
     }
     const opContent =
       // manager operations in [3]
@@ -1722,12 +1749,12 @@ export class FinP2PTezos {
       if (pk == undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
-    const kind = op0.parameters.entrypoint as string;
+    const entrypoint = op0.parameters.entrypoint;
     let assetId = v.asset_id;
     let amount = v.amount;
     let srcAccount = v.src_account;
     let dstAccount = v.dst_account;
-    switch (kind) {
+    switch (entrypoint) {
       case 'release_hold':
         dstAccount = v.dst?.finId;
         break;
@@ -1744,8 +1771,9 @@ export class FinP2PTezos {
         `Cannot extract assetId from operation ${op0.parameters.entrypoint} with ${JSON.stringify(v)}`,
       );
     }
-    let receipt = {
-      kind,
+    let receipt : OpReceipt = {
+      kind : 'Receipt',
+      entrypoint,
       assetId : utf8dec.decode(Buffer.from(assetId, 'hex')),
       amount : (amount == undefined) ? undefined : BigIntNumber(amount),
       srcAccount : getPkBytes(srcAccount),
