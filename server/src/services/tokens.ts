@@ -301,8 +301,9 @@ export class TokenService {
 
   public async operationStatus(request: Paths.GetOperation.PathParameters) : Promise<Paths.GetOperation.Responses.$200> {
     const op = cidToOperationResult(request.cid);
+    let r;
     try {
-      await this.tezosClient.isIncluded(op);
+      r = await this.tezosClient.getReceipt(op, { throwOnFail: true, throwOnUnconfirmed: true });
     } catch (e) {
       let message;
       if (e instanceof Error) message = e.message;
@@ -315,7 +316,6 @@ export class TokenService {
         } as Components.Schemas.ReceiptOperation,
       } as Components.Schemas.OperationStatus;
     }
-    let r = await this.tezosClient.getReceipt(op, { throwOnFail: true, throwOnUnconfirmed: true });
     let source = (r.srcAccount === undefined) ?
       undefined :
       {

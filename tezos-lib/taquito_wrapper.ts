@@ -278,36 +278,16 @@ export class TaquitoWrapper extends TezosToolkit {
   }
 
   /**
-   * @description Wait for an operation to be included with the specified
-   * number of confirmations, i.e. included in a block with `confirmations`
-   * block on top.
-   * @param hash : the hash op the operation to wait for
-   * @param confirmations : the number of confirmations to wait for before
-   * returning (by default 0, i.e. returns as soon as the operation is
-   * included in a block)
-   * @param max : the maximum number of blocks to wait before bailing (default 10)
+   * @description Returns if an operation is included in the latest `max`
+   * number of blocks.
+   * @param op :  the operation (hash) to look for
+   * @param max : the number of blocks in which to look for (default 10)
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  isIncluded(op : BatchResult, confirmations? : number, max = 10) :
-  Promise<[OperationEntry, BlockResponse, number]> {
-    const taquito = this;
-    return new Promise(function (resolve, reject) {
-      // start looking in the previous blocks
-      taquito.inPrevBlocks(op, max).then(blockAndConf => {
-        if (blockAndConf !== undefined) {
-          const [blockOp, block, blockConfirmations] = blockAndConf;
-          if (confirmations === undefined
-              || confirmations <= blockConfirmations) {
-            return resolve([blockOp, block, blockConfirmations]);
-          } else {
-            return reject(new Error('Did not see enough confirmations'));
-          }
-        } else {
-          return reject(new Error('Did not see operation blockAndConf'));
-        }
-      });
-    });
+  isIncludedInLatestBlocks(op : BatchResult, max = 10) :
+  Promise<[OperationEntry, BlockResponse, number] | undefined> {
+    return this.inPrevBlocks(op, max);
   }
 
   /**

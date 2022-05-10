@@ -6,7 +6,7 @@ import {
   Signer,
   TransferParams,
 } from '@taquito/taquito';
-import { BlockHeaderResponse, MichelsonV1Expression } from '@taquito/rpc';
+import { BlockHeaderResponse, BlockResponse, MichelsonV1Expression } from '@taquito/rpc';
 import { encodeKey, validateContractAddress } from '@taquito/utils';
 import {
   TaquitoWrapper,
@@ -1851,13 +1851,37 @@ export class FinP2PTezos {
     }
   }
 
+  private async getExplorersInclusionBlock(op : BatchResult) :
+  Promise<BlockResponse> {
+    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
+      throw Error('Cannot get inclusion block, no explorers configured');
+    }
+    let blockHash = await PromiseAny(this.config.explorers.map((explorer) => {
+      return this.getExplorerInclusionBlock(op, explorer);
+    }));
+    return this.taquito.rpc.getBlock({ block: blockHash });
+  }
+
+  private async getInclusionBlock(op : BatchResult) : Promise<BlockResponse> {
+    const promiseLatestBocks =
+      this.taquito.isIncludedInLatestBlocks(op)
+        .then(res => {
+          if (res === undefined) {
+            throw Error('Did not find operation with node');
+          }
+          return res[1];
+        });
+    const promiseExplorers = this.getExplorersInclusionBlock(op);
+    return PromiseAny([promiseLatestBocks, promiseExplorers]);
+  }
+
   /**
-   * @description Get a receipt from a transaction hash and confirm with node.
-   * Same as `getReceiptExplorers` but only use the explorer to find out the
-   * inclusion block. The receipt is extracted from the node, with confidence.
+   * @description Get a receipt from an operation result (transaction hash and index)
+   * and confirm with node. The inclusion block is retrieved with explorers or the
+   * node. The receipt is extracted from the node, with confidence.
    * Note that you need a Tezos node in mode **archive** to retrieve old
    * receipts.
-   * @param op: the operation hash
+   * @param op: the operation result (hash and index)
    * @param throwOnFail: throws an exception if the operation is not included
    * as "applied" (true by default)
    * @param throwOnUnconfirmed: throws an exception if the operation is not
@@ -1869,20 +1893,14 @@ export class FinP2PTezos {
     { throwOnFail = true,
       throwOnUnconfirmed = false } = {}) :
     Promise<OpReceipt> {
-    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
-      throw Error('Cannot get receipt, no explorers configured');
-    }
-    let blockHash = await PromiseAny(this.config.explorers.map((explorer) => {
-      return this.getExplorerInclusionBlock(op, explorer);
-    }));
-    const blockPromise = this.taquito.rpc.getBlock({ block: blockHash });
+    const blockPromise = this.getInclusionBlock(op);
     const headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
     const [block, head] = await Promise.all([blockPromise, headPromise]);
     let confirmations = head.level - block.header.level;
     // check if the inclusion block is reachable back from head
     const blockHashAtInclLevel =
       await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}` });
-    if (blockHashAtInclLevel != blockHash) {
+    if (blockHashAtInclLevel != block.hash) {
       throw new ReceiptError(op, [], 'Operation is not included in the main chain');
     }
     const opContent =
@@ -1945,24 +1963,5 @@ export class FinP2PTezos {
 
   }
 
-  async isIncluded(op : BatchResult, confirmations = this.config.confirmations) {
-    const result = await this.taquito.isIncluded(op, confirmations);
-    const [blockOp,,] = result;
-    blockOp.contents.map(o => {
-      if (!hasOwnProperty(o, 'metadata')
-          || o.metadata === undefined
-          || !hasOwnProperty(o.metadata, 'operation_result')
-          || o.metadata.operation_result === undefined ) {
-        // Not a manager operation, or the metadata is not available in the node (unlikely)
-        // Consider operation as successful.
-        return;
-      }
-      if (o.metadata.operation_result.status === 'applied') {
-        return;
-      }
-      throw new Error(
-        `Operation is included as ${o.metadata.operation_result.status}, ` +
-          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
-    });
-  }
+
 }
