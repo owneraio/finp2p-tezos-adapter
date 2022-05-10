@@ -18,7 +18,7 @@ import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix, getPkhfromPk } from '@taquito/utils';
 import { ParameterSchema } from '@taquito/michelson-encoder';
-const PromiseAny = require('promise-any');
+const PromiseAny : <T>(_ : Promise<T>[]) => Promise<T> = require('promise-any');
 import { BigNumber } from 'bignumber.js';
 
 import * as finp2pProxyCode from '../dist/michelson/finp2p_proxy.json';
