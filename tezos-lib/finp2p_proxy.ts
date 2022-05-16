@@ -6,14 +6,19 @@ import {
   Signer,
   TransferParams,
 } from '@taquito/taquito';
-import { BlockHeaderResponse, MichelsonV1Expression } from '@taquito/rpc';
+import { BlockResponse, MichelsonV1Expression } from '@taquito/rpc';
 import { encodeKey, validateContractAddress } from '@taquito/utils';
-import { TaquitoWrapper, OperationResult, contractAddressOfOpHash } from './taquito_wrapper';
+import {
+  TaquitoWrapper,
+  BatchResult,
+  OperationResult,
+  contractAddressOfOpHash,
+} from './taquito_wrapper';
 import { ContractsLibrary } from '@taquito/contracts-library';
 import { HttpBackend } from '@taquito/http-utils';
 import { b58cdecode, prefix, getPkhfromPk } from '@taquito/utils';
 import { ParameterSchema } from '@taquito/michelson-encoder';
-const PromiseAny = require('promise-any');
+const PromiseAny : <T>(_ : Promise<T>[]) => Promise<T> = require('promise-any');
 import { BigNumber } from 'bignumber.js';
 
 import * as finp2pProxyCode from '../dist/michelson/finp2p_proxy.json';
@@ -39,6 +44,10 @@ export type Opaque = Bytes;
 
 let utf8 = new TextEncoder();
 let utf8dec = new TextDecoder();
+
+function BigIntNumber(b : BigNumber) : bigint {
+  return BigInt('0x' + b.toString(16));
+}
 
 function toStr(x : any) : string {
   if (typeof x === 'string') { return x; }
@@ -249,7 +258,8 @@ type OpStatus =
   'applied' | 'failed' | 'backtracked' | 'skipped';
 
 export interface OpReceipt {
-  kind: string,
+  kind: 'Receipt',
+  entrypoint: string,
   assetId: string,
   amount?: bigint;
   srcAccount? : Buffer,
@@ -260,7 +270,13 @@ export interface OpReceipt {
   level?: number,
   confirmations?: number,
   confirmed: boolean,
-  nodeAgree?: boolean,
+}
+
+export interface OpPendingReceipt {
+  kind: 'PendingReceipt'
+  reason: string,
+  confirmations?: number,
+  confirmed: boolean,
 }
 
 /** Auxiliary functions to encode entrypoints' parameters into Michelson */
@@ -682,7 +698,7 @@ export class FinP2PTezos {
    * `config`.
    * @see TaquitoWrapper.waitInclusion for details
   */
-  async waitInclusion(op : OperationResult, confirmations = this.config.confirmations) {
+  async waitInclusion(op : BatchResult, confirmations = this.config.confirmations) {
     const result = await this.taquito.waitInclusion(op, confirmations);
     const [blockOp,,] = result;
     blockOp.contents.map(o => {
@@ -915,7 +931,10 @@ export class FinP2PTezos {
         batchParams = [cleanupParam, callParam];
       }
     }
-    return this.batch(batchParams, sender);
+    const { hash } = await this.batch(batchParams, sender);
+    // Last operation is the one we care about
+    const index = batchParams.length - 1;
+    return { hash, index };
   }
 
   /**
@@ -1188,7 +1207,7 @@ export class FinP2PTezos {
    * @param sender : address of sender/source for this transaction
    * @returns operation injection result
    */
-  async topUpXTZ(accounts : Address[], topUpAmount: number, sender? : Address) : Promise<OperationResult | undefined> {
+  async topUpXTZ(accounts : Address[], topUpAmount: number, sender? : Address) : Promise<BatchResult | undefined> {
     const balances = await Promise.all(accounts.map(async account => {
       return {
         account,
@@ -1197,7 +1216,7 @@ export class FinP2PTezos {
     }));
     let params : TransferParams[] = [];
     balances.map(({ account, balance }) => {
-      let amountMutez = BigInt(topUpAmount) * BigInt(1e6) - BigInt(balance.toString());
+      let amountMutez = BigInt(topUpAmount) * BigInt(1e6) - BigIntNumber(balance);
       let amountMutezNumber = Number(amountMutez);
       if (BigInt(amountMutezNumber) != amountMutez) {
         throw Error(`Precision loss ${amountMutezNumber} != ${amountMutez}`);
@@ -1222,7 +1241,7 @@ export class FinP2PTezos {
   async batch(
     p: BatchParam[],
     source? : Address,
-  ) : Promise<OperationResult> {
+  ) : Promise<BatchResult> {
     let finp2p = this;
     if (source === undefined) {
       // Pick next source in the admins list in a round robin manner
@@ -1386,7 +1405,7 @@ export class FinP2PTezos {
     let balance =
       await this.callProxyView<BigNumber>(
         'get_asset_balance', publicKey, assetId, kt1);
-    return (BigInt((balance || new BigNumber(0)).toString()));
+    return (BigIntNumber(balance || new BigNumber(0)));
   }
 
   private async getExternalAssetBalance(
@@ -1422,7 +1441,7 @@ export class FinP2PTezos {
       // TODO: does not work. Taquito only supports big map keys string, int or
       // bool
       const balance = await ledger.get<BigNumber>([owner, fa2Token.id]);
-      return (BigInt((balance || new BigNumber(0)).toString()));
+      return (BigIntNumber(balance || new BigNumber(0)));
     }
     // Single asset contract
     //   big_map %ledger address nat
@@ -1431,7 +1450,7 @@ export class FinP2PTezos {
     async function getBalanceSingle() {
       if (owner === undefined) { return (null as never) ; }
       const balance = await ledger.get<BigNumber>(owner);
-      return (BigInt((balance || new BigNumber(0)).toString()));
+      return (BigIntNumber(balance || new BigNumber(0)));
     }
     // NFT asset contract
     //    big_map %ledger nat address
@@ -1486,7 +1505,7 @@ export class FinP2PTezos {
     let balance =
       await this.callProxyView<BigNumber>(
         'get_asset_hold', publicKey, assetId, kt1);
-    return (BigInt((balance || new BigNumber(0)).toString()));
+    return (BigIntNumber(balance || new BigNumber(0)));
   }
 
 
@@ -1502,8 +1521,8 @@ export class FinP2PTezos {
       return { balance : 0n, on_hold : 0n };
     } else {
       return {
-        balance : BigInt(info.balance.toString()),
-        on_hold : BigInt(info.on_hold.toString()),
+        balance : BigIntNumber(info.balance),
+        on_hold : BigIntNumber(info.on_hold),
       };
     }
   }
@@ -1585,221 +1604,7 @@ export class FinP2PTezos {
     return info.balance;
   }
 
-  async getTzktReceipt(op : OperationResult,
-    explorer : { kind : 'TzKT', url : string }) :
-    Promise<OpReceipt> {
-    const ops = await (new HttpBackend()).createRequest<any>(
-      {
-        url: explorer.url + '/v1/operations/' + op.hash,
-        method: 'GET',
-      },
-    );
-    if (ops === undefined || ops.length == 0) {
-      throw new ReceiptError(op, [], `TzKT receipt not available yet for ${op.hash}`);
-    }
-    const getPkBytes = (pk : any) => {
-      if (pk === undefined) { return undefined; }
-      return Buffer.from(b58cdecode(pk, prefix.sppk));
-    };
-    const op0 = ops[0];
-    try {
-      const v = op0.parameter.value;
-      return {
-        kind : ops[0].parameter.entrypoint as string,
-        assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
-        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-        srcAccount : getPkBytes(v.src_account),
-        dstAccount : getPkBytes(v.dst_account),
-        status: op0.status ? op0.status as OpStatus : undefined,
-        block: op0.block ? op0.block as string : undefined,
-        level: op0.level ? op0.level as number : undefined,
-        errors: op0.errors ? op0.errors : undefined,
-        confirmed: false, // placeholder
-      };
-    } catch (e) {
-      throw new ReceiptError(op, [], `Cannot parse TzKT receipt (${e}): ${op0}`);
-    }
-  }
-
-  async getTzstatsReceipt(op : OperationResult,
-    explorer : { kind : 'tzstats', url : string }) :
-    Promise<OpReceipt> {
-    const ops = await (new HttpBackend()).createRequest<any>(
-      {
-        url: explorer.url + '/explorer/op/' + op.hash,
-        method: 'GET',
-      },
-    );
-    if (ops === undefined || ops.length == 0) {
-      throw new ReceiptError(op, [], `tzstats receipt not available yet for ${op.hash}`);
-    }
-    const getPkBytes = (pk : any) => {
-      if (pk === undefined) { return undefined; }
-      return Buffer.from(b58cdecode(pk, prefix.sppk));
-    };
-    const op0 = ops[0];
-    try {
-      const kind = op0.parameters.entrypoint as string;
-      const v = op0.parameters.value[kind];
-      return {
-        kind,
-        assetId : utf8dec.decode(Buffer.from(v.asset_id, 'hex')),
-        amount : (v.amount === undefined) ? undefined : BigInt(v.amount as string),
-        srcAccount : getPkBytes(v.src_account),
-        dstAccount : getPkBytes(v.dst_account),
-        status: op0.status ? op0.status as OpStatus : undefined,
-        block: op0.block ? op0.block as string : undefined,
-        level: op0.height ? op0.height as number : undefined,
-        errors: op0.errors ? op0.errors : undefined,
-        // confirmations: op0.confirmations ? op0.confirmations : undefined,
-        confirmed: false, // placeholder
-      };
-    } catch (e) {
-      throw new ReceiptError(op, [], `Cannot parse tzstats receipt (${e}): ${op0}`);
-    }
-  }
-
-  async getExplorerReceipt(
-    op : OperationResult,
-    explorer : Explorer,
-    headPromise : Promise<BlockHeaderResponse>,
-  ) : Promise<OpReceipt> {
-    let receipt: OpReceipt;
-    switch (explorer.kind) {
-      case 'TzKT':
-        receipt = await this.getTzktReceipt(
-          op, explorer as { kind : 'TzKT', url : string },
-        );
-        break;
-      case 'tzstats':
-        receipt = await this.getTzstatsReceipt(
-          op, explorer as { kind : 'tzstats', url : string },
-        );
-        break;
-    }
-    if (receipt.level && receipt.confirmations === undefined) {
-      let head = await headPromise;
-      receipt.confirmations = head.level - receipt.level;
-    }
-    if (receipt.confirmations !== undefined) {
-      receipt.confirmed = (this.config.confirmations === undefined) ||
-        (receipt.confirmations >= this.config.confirmations);
-    }
-    return receipt;
-  }
-
-
-  receiptProjEq<T>(name : string,
-    proj : ((_ :OpReceipt) => T),
-    eq : ((p1 : T, p2 : T) => boolean),
-    r0 : OpReceipt,
-    r2 : OpReceipt,
-    r2_index : number,
-    op : OperationResult) {
-    if (!eq(proj(r0), proj(r2))) {
-      throw new ReceiptError(op, [r0, r2],
-        `receipts 0 and ${r2_index} disagree on ${name}`);
-    }
-  }
-
-  mergeReceipts(receipts : OpReceipt[], op : OperationResult, { throwOnDiff = true } = {} )
-    : OpReceipt {
-    let receipt = receipts[0];
-    let others = receipts.slice(1);
-    let receiptj = receipt as any;
-    let polyEq = (x : any, y : any) => { return (x == y); };
-    let bufEq = (x? : Buffer, y? : Buffer) => {
-      return ((x === undefined && y === undefined) ||
-        (x !== undefined && y !== undefined && x.equals(y)));
-    };
-    others.forEach((r, i) => {
-      if (throwOnDiff) {
-        this.receiptProjEq('kind', (opr => opr.kind), polyEq,
-          receipt, r, i + 1, op);
-        this.receiptProjEq('assetId', (opr => opr.assetId),
-          polyEq, receipt, r, i + 1, op);
-        this.receiptProjEq('amount', (opr => opr.amount),
-          polyEq, receipt, r, i + 1, op);
-        this.receiptProjEq('srcAccount', (opr => opr.srcAccount),
-          bufEq, receipt, r, i + 1, op);
-        this.receiptProjEq('dstAccount', (opr => opr.dstAccount),
-          bufEq, receipt, r, i + 1, op);
-        this.receiptProjEq('status', (opr => opr.status),
-          polyEq, receipt, r, i + 1, op);
-      }
-      let rj = r as any;
-      Object.keys(r).forEach(k => {
-        if (rj[k] != undefined && receiptj[k] == undefined) {
-          receiptj[k] = rj[k];
-        }
-      });
-    });
-    return receipt;
-  }
-
-
-  /**
-   * @description Get a receipt from a transaction hash (with block explorers)
-   * and confirm with node
-   * @param op: the operation hash
-   * @param throwOnFail: throws an exception if the operation is not included
-   * as "applied" (true by default)
-   * @param throwOnUnconfirmed: throws an exception if the operation is not
-   * does not have enough confirmations w.r.t the `config` (false by default)
-   * @param throwOnNodeError: throws an exception if the node does not have
-   * the block in its storage (can happen if the block is too old and the node
-   * is not in archive mode) or can't be reached (false by default)
-   * @param throwOnDiff: throws an exception if block explorers disagree on
-   * the value of the receipt (true by default)
-   * @returns a receipt
-   * @throws `ReceiptError`
-   */
-  async getReceiptExplorers(op : OperationResult,
-    { throwOnFail = true,
-      throwOnUnconfirmed = false,
-      checkWithNode = true,
-      throwOnNodeError = false,
-      throwOnDiff = true } = {}) :
-    Promise<OpReceipt> {
-    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
-      throw Error('Cannot get receipt, no explorers configured');
-    }
-    let headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
-    let receipts = await Promise.all(this.config.explorers.map((explorer) => {
-      return this.getExplorerReceipt(op, explorer, headPromise);
-    }));
-    let receipt = this.mergeReceipts(receipts, op, { throwOnDiff });
-    if (checkWithNode && receipt.block) {
-      try {
-        const block = await this.taquito.rpc.getBlock({ block: receipt.block });
-        const found =
-          block.operations.find((l) => {
-            return l.find((blockOp) => {
-              return (blockOp.hash === op.hash);
-            });
-          });
-        if (found) { receipt.nodeAgree = true; } else { receipt.nodeAgree = false; }
-      } catch (e) {
-        if (throwOnNodeError) {
-          throw new ReceiptError(op, receipts, 'Node could not find block');
-        }
-      }
-      if (receipt.nodeAgree === false) {
-        throw new ReceiptError(op, receipts, 'Node says operation is not in block');
-      }
-    }
-    if (throwOnFail && receipt.status !== 'applied') {
-      throw new ReceiptError(op, receipts,
-        `Operation is included with status ${receipt.status}`);
-    }
-    if (throwOnUnconfirmed && !receipt.confirmed) {
-      throw new ReceiptError(op, receipts,
-        `Operation is not yet confirmed (${receipt.confirmations}/${this.config.confirmations})`);
-    }
-    return receipt;
-  }
-
-  async getTzktInclusionBlock(op : OperationResult,
+  async getTzktInclusionBlock(op : BatchResult,
     explorer : { kind : 'TzKT', url : string }) :
     Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
@@ -1809,12 +1614,12 @@ export class FinP2PTezos {
       },
     );
     if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
-      throw new ReceiptError(op, [], 'Operation is not known by TzKT');
+      throw new Error('Operation is not known by TzKT');
     }
     return ops[0].block;
   }
 
-  async getTzstatsInclusionBlock(op : OperationResult,
+  async getTzstatsInclusionBlock(op : BatchResult,
     explorer : { kind : 'tzstats', url : string }) :
     Promise<string> {
     const ops = await (new HttpBackend()).createRequest<any>(
@@ -1824,12 +1629,12 @@ export class FinP2PTezos {
       },
     );
     if (ops === undefined || ops.length == 0 || ops[0].block === undefined) {
-      throw new ReceiptError(op, [], 'Operation is not known by tzstats');
+      throw new Error('Operation is not known by tzstats');
     }
     return ops[0].block;
   }
 
-  async getExplorerInclusionBlock(op : OperationResult, explorer : Explorer) :
+  async getExplorerInclusionBlock(op : BatchResult, explorer : Explorer) :
   Promise<string> {
     switch (explorer.kind) {
       case 'TzKT':
@@ -1843,13 +1648,37 @@ export class FinP2PTezos {
     }
   }
 
+  private async getExplorersInclusionBlock(op : BatchResult) :
+  Promise<BlockResponse> {
+    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
+      throw Error('Cannot get inclusion block, no explorers configured');
+    }
+    let blockHash = await PromiseAny(this.config.explorers.map((explorer) => {
+      return this.getExplorerInclusionBlock(op, explorer);
+    }));
+    return this.taquito.rpc.getBlock({ block: blockHash });
+  }
+
+  private async getInclusionBlock(op : BatchResult) : Promise<BlockResponse> {
+    const promiseLatestBocks =
+      this.taquito.isIncludedInLatestBlocks(op)
+        .then(res => {
+          if (res === undefined) {
+            throw Error('Did not find operation with node');
+          }
+          return res[1];
+        });
+    const promiseExplorers = this.getExplorersInclusionBlock(op);
+    return PromiseAny([promiseLatestBocks, promiseExplorers]);
+  }
+
   /**
-   * @description Get a receipt from a transaction hash and confirm with node.
-   * Same as `getReceiptExplorers` but only use the explorer to find out the
-   * inclusion block. The receipt is extracted from the node, with confidence.
+   * @description Get a receipt from an operation result (transaction hash and index)
+   * and confirm with node. The inclusion block is retrieved with explorers or the
+   * node. The receipt is extracted from the node, with confidence.
    * Note that you need a Tezos node in mode **archive** to retrieve old
    * receipts.
-   * @param op: the operation hash
+   * @param op: the operation result (hash and index)
    * @param throwOnFail: throws an exception if the operation is not included
    * as "applied" (true by default)
    * @param throwOnUnconfirmed: throws an exception if the operation is not
@@ -1860,22 +1689,36 @@ export class FinP2PTezos {
   async getReceipt(op : OperationResult,
     { throwOnFail = true,
       throwOnUnconfirmed = false } = {}) :
-    Promise<OpReceipt> {
-    if (this.config.explorers === undefined || this.config.explorers.length == 0) {
-      throw Error('Cannot get receipt, no explorers configured');
-    }
-    let blockHash = await PromiseAny(this.config.explorers.map((explorer) => {
-      return this.getExplorerInclusionBlock(op, explorer);
-    }));
-    const blockPromise = this.taquito.rpc.getBlock({ block: blockHash });
+    Promise<OpReceipt | OpPendingReceipt> {
+    const blockPromise = this.getInclusionBlock(op);
     const headPromise = this.taquito.rpc.getBlockHeader({ block: 'head' });
-    const [block, head] = await Promise.all([blockPromise, headPromise]);
+    let block;
+    let head;
+    try {
+      [block, head] = await Promise.all([blockPromise, headPromise]);
+    } catch (e) {
+      if (throwOnFail) { throw e;}
+      let reason;
+      if (e instanceof Error) reason = e.message;
+      else reason = String(e);
+      return {
+        kind : 'PendingReceipt',
+        reason,
+        confirmed: false,
+      };
+    }
     let confirmations = head.level - block.header.level;
     // check if the inclusion block is reachable back from head
     const blockHashAtInclLevel =
       await this.taquito.rpc.getBlockHash({ block: `${head.hash}~${confirmations}` });
-    if (blockHashAtInclLevel != blockHash) {
-      throw new ReceiptError(op, [], 'Operation is not included in the main chain');
+    if (blockHashAtInclLevel != block.hash) {
+      const reason = `Operation (in ${block.hash}) is not included in the main chain `;
+      if (throwOnFail) { throw new ReceiptError(op, [], reason); }
+      return {
+        kind : 'PendingReceipt',
+        reason,
+        confirmed: false,
+      };
     }
     const opContent =
       // manager operations in [3]
@@ -1885,7 +1728,7 @@ export class FinP2PTezos {
     if (opContent === undefined) {
       throw new ReceiptError(op, [], 'Node could not find operation');
     }
-    let op0 = opContent.contents[0];
+    let op0 = opContent.contents[op.index];
     if (op0.kind !== OpKind.TRANSACTION) {
       throw Error('Operation is not a transaction');
     }
@@ -1903,18 +1746,36 @@ export class FinP2PTezos {
     let schema = new ParameterSchema(contract.entrypoints.entrypoints[op0.parameters.entrypoint]);
     let v = schema.Execute(op0.parameters.value);
     const getPkBytes = (pk : any) => {
-      if (pk === undefined) { return undefined; }
+      if (pk == undefined) { return undefined; }
       return Buffer.from(b58cdecode(pk, prefix.sppk));
     };
-    const kind = op0.parameters.entrypoint as string;
-    const assetId = (kind == 'hold_tokens') ? v.shg.asset_id : v.asset_id;
-    const amount = (kind == 'hold_tokens') ? v.shg.amount : v.amount;
-    const srcAccount = (kind == 'hold_tokens') ? v.ahg.dst_account : v.src_account;
-    const dstAccount = (kind == 'release_hold') ? v.dst.finId : v.dst_account;
-    let receipt = {
-      kind,
+    const entrypoint = op0.parameters.entrypoint;
+    let assetId = v.asset_id;
+    let amount = v.amount;
+    let srcAccount = v.src_account;
+    let dstAccount = v.dst_account;
+    switch (entrypoint) {
+      case 'release_hold':
+        dstAccount = v.dst?.finId;
+        break;
+      case 'hold_tokens':
+        assetId = v.shg?.asset_id;
+        amount = v.shg?.amount;
+        dstAccount = v.shg?.dst_account?.finId;
+        srcAccount = v.ahg?.dst_account;
+        break;
+    }
+    if (!assetId) {
+      throw new ReceiptError(
+        op, [],
+        `Cannot extract assetId from operation ${op0.parameters.entrypoint} with ${JSON.stringify(v)}`,
+      );
+    }
+    let receipt : OpReceipt = {
+      kind : 'Receipt',
+      entrypoint,
       assetId : utf8dec.decode(Buffer.from(assetId, 'hex')),
-      amount : (amount === undefined) ? undefined : BigInt(amount as string),
+      amount : (amount == undefined) ? undefined : BigIntNumber(amount),
       srcAccount : getPkBytes(srcAccount),
       dstAccount : getPkBytes(dstAccount),
       status: op0.metadata.operation_result.status,
@@ -1937,24 +1798,5 @@ export class FinP2PTezos {
 
   }
 
-  async isIncluded(op : OperationResult, confirmations = this.config.confirmations) {
-    const result = await this.taquito.isIncluded(op, confirmations);
-    const [blockOp,,] = result;
-    blockOp.contents.map(o => {
-      if (!hasOwnProperty(o, 'metadata')
-          || o.metadata === undefined
-          || !hasOwnProperty(o.metadata, 'operation_result')
-          || o.metadata.operation_result === undefined ) {
-        // Not a manager operation, or the metadata is not available in the node (unlikely)
-        // Consider operation as successful.
-        return;
-      }
-      if (o.metadata.operation_result.status === 'applied') {
-        return;
-      }
-      throw new Error(
-        `Operation is included as ${o.metadata.operation_result.status}, ` +
-          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
-    });
-  }
+
 }

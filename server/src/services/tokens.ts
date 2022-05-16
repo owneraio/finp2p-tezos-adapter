@@ -3,6 +3,7 @@ import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
 import { logger } from '../helpers/logger';
 import { accounts, contracts, nodeAddr, explorers } from '../helpers/config';
+import { OperationResult } from '@owneraio/tezos-lib/tezos-lib/taquito_wrapper';
 
 let service:TokenService;
 let utf8 = new TextEncoder();
@@ -20,6 +21,19 @@ function getFieldFromSignature(template: Components.Schemas.SignatureTemplate, h
     throw Error(`field ${name} not found in signature template`);
   }
   return f;
+}
+
+function operationResultToCid(op : OperationResult) : string {
+  return `${op.hash}-${op.index}`;
+}
+
+function cidToOperationResult(cid : string) : OperationResult {
+  const fields = cid.split('-', 2);
+  if (fields.length > 1) {
+    return { hash: fields[0], index: parseInt(fields[1]) };
+  } else {
+    return { hash: fields[0], index: 0 };
+  }
 }
 
 function getEscrowAsset(asset: Components.Schemas.Asset) : string {
@@ -108,7 +122,7 @@ export class TokenService {
     } as FINP2PProxy.IssueTokensParam);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -157,24 +171,30 @@ export class TokenService {
     //TODO: what if destination is not finId?
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
   public async getReceipt(id: Paths.GetReceipt.Parameters.TransactionId) : Promise<Paths.GetReceipt.Responses.$200> {
-    const r = await this.tezosClient.getReceipt({ hash : id });
-    //TODO: what if destination is not finId?
-    return {
-      isCompleted: true,
-      response: {
-        id: id,
-        asset: { type: 'finp2p', resourceId: r.assetId } as Components.Schemas.Asset,
-        source:
+    const op = cidToOperationResult(id);
+    const r = await this.tezosClient.getReceipt(op);
+    switch (r.kind) {
+      case 'PendingReceipt':
+        throw new Error(`receipt unavailable: ${r.reason}`);
+      case 'Receipt':
+        //TODO: what if destination is not finId?
+        return {
+          isCompleted: r.confirmed,
+          response: {
+            id: id,
+            asset: { type: 'finp2p', resourceId: r.assetId } as Components.Schemas.Asset,
+            source:
             (r.srcAccount === undefined) ? undefined : { finId: r.srcAccount.toString('hex') } as Components.Schemas.Source,
-        destination:
+            destination:
             (r.dstAccount === undefined) ? undefined : { type: 'finId', finId: r.dstAccount.toString('hex') } as Components.Schemas.FinIdAccount,        quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
-      } as Components.Schemas.Receipt,
-    } as Components.Schemas.ReceiptOperation;
+          } as Components.Schemas.Receipt,
+        } as Components.Schemas.ReceiptOperation;
+    }
   }
 
   public async balance(request: Paths.GetAssetBalance.RequestBody): Promise<Paths.GetAssetBalance.Responses.$200> {
@@ -242,7 +262,7 @@ export class TokenService {
     const op = await this.tezosClient.holdTokens(params);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -263,7 +283,7 @@ export class TokenService {
     //TODO: what if destination is not finId?
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
@@ -280,51 +300,62 @@ export class TokenService {
     const op = await this.tezosClient.rollbackHold(params);
     return {
       isCompleted: false,
-      cid: op.hash,
+      cid: operationResultToCid(op),
     } as Components.Schemas.ReceiptOperation;
   }
 
-  //TODO: handle cleanup transactions that arrive as part of the batch
   public async operationStatus(request: Paths.GetOperation.PathParameters) : Promise<Paths.GetOperation.Responses.$200> {
-    try {
-      await this.tezosClient.isIncluded({ hash: request.cid });
-    } catch (e) {
-      let message;
-      if (e instanceof Error) message = e.message;
-      else message = String(e);
-      logger.debug('operation status error', { message });
-      return {
-        type: 'receipt', operation: {
-          isCompleted: false,
-          cid: request.cid,
-        } as Components.Schemas.ReceiptOperation,
-      } as Components.Schemas.OperationStatus;
+    const op = cidToOperationResult(request.cid);
+    let r =
+      await this.tezosClient.getReceipt(op, { throwOnFail: false, throwOnUnconfirmed: false });
+    switch (r.kind) {
+      case 'PendingReceipt':
+        logger.debug('operation status error', { message: r.reason });
+        return {
+          type: 'receipt', operation: {
+            isCompleted: false,
+            cid: request.cid,
+          } as Components.Schemas.ReceiptOperation,
+        } as Components.Schemas.OperationStatus;
+      case 'Receipt':
+        if (r.errors) {
+          logger.debug('operation status error', r.errors);
+          return {
+            type: 'receipt', operation: {
+              isCompleted: true,
+              error : {
+                code: 1, // TODO: appropriate code when operation is included as failed in a block
+                message: JSON.stringify(r.errors, undefined, 2),
+              },
+              cid: request.cid,
+            } as Components.Schemas.ReceiptOperation,
+          } as Components.Schemas.OperationStatus;
+        }
+        let source = (r.srcAccount === undefined) ?
+          undefined :
+          {
+            finId: r.srcAccount.toString('hex'),
+            account: { type: 'finId' } as Components.Schemas.FinIdAccount,
+          } as Components.Schemas.Source;
+        let destination = (r.dstAccount === undefined) ?
+          undefined :
+          {
+            finId: r.dstAccount.toString('hex'),
+            account: { type: 'finId' } as Components.Schemas.FinIdAccount,
+          } as Components.Schemas.Destination;
+        return {
+          type: 'receipt', operation: {
+            isCompleted: r.confirmed,
+            response: {
+              id: request.cid,
+              asset: { type: 'finp2p', resourceId: r.assetId } as Components.Schemas.Asset,
+              source,
+              destination,
+              quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
+            } as Components.Schemas.Receipt,
+          } as Components.Schemas.ReceiptOperation,
+        } as Components.Schemas.OperationStatus;
     }
-    let r = await this.tezosClient.getReceipt({ hash: request.cid }, { throwOnFail: true, throwOnUnconfirmed: true });
-    let source = (r.srcAccount === undefined) ?
-      undefined :
-      {
-        finId: r.srcAccount.toString('hex'),
-        account: { type: 'finId' } as Components.Schemas.FinIdAccount,
-      } as Components.Schemas.Source;
-    let destination = (r.dstAccount === undefined) ?
-      undefined :
-      {
-        finId: r.dstAccount.toString('hex'),
-        account: { type: 'finId' } as Components.Schemas.FinIdAccount,
-      } as Components.Schemas.Destination;
-    return {
-      type: 'receipt', operation: {
-        isCompleted: true,
-        response: {
-          id: request.cid,
-          asset: { type: 'finp2p', resourceId: r.assetId } as Components.Schemas.Asset,
-          source,
-          destination,
-          quantity: (r.amount === undefined) ? undefined : r.amount.toString(),
-        } as Components.Schemas.Receipt,
-      } as Components.Schemas.ReceiptOperation,
-    } as Components.Schemas.OperationStatus;
   }
 }
 
