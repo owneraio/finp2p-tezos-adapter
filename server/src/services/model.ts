@@ -43,7 +43,13 @@ declare namespace Components {
     /**
          * describes destination for remote operations operations
          */
-    export type Destination = /* describes destination for remote operations operations */ EscrowAccount | CryptoWalletAccount | FiatAccount | FinIdAccount;
+    export interface Destination {
+      /**
+             * FinID, public key of the user
+             */
+      finId: string;
+      account: FinIdAccount | EscrowAccount | CryptoWalletAccount | FiatAccount;
+    }
     export interface EmptyOperation {
       /**
              * unique correlation id which identify the operation
@@ -59,10 +65,6 @@ declare namespace Components {
     }
     export interface EscrowAccount {
       type: 'escrow';
-      /**
-             * FinID of the user
-             */
-      finId: string;
       /**
              * escrow account id
              */
@@ -179,6 +181,10 @@ declare namespace Components {
       timestamp: number; // int64
       source?: Source;
       destination?: /* describes destination for remote operations operations */ Destination;
+      /**
+             * the id of related / counterpary operation
+             */
+      settlementRef?: string;
       transactionDetails?: /* Additional input and output details for UTXO supporting DLTs */ TransactionDetails;
     }
     export interface ReceiptOperation {
@@ -195,7 +201,12 @@ declare namespace Components {
     }
     export interface ReceiptOperationErrorInformation {
       code: number; // uint32
-      status: string;
+      message: string;
+      regulationErrorDetails?: RegulationError[];
+    }
+    export interface RegulationError {
+      regulationType: string;
+      details: string;
     }
     /**
          * represent a signature template information
@@ -222,10 +233,7 @@ declare namespace Components {
              * FinID, public key of the user
              */
       finId: string;
-      /**
-             * an optional escrow account id
-             */
-      escrowAccountId?: string;
+      account: FinIdAccount | EscrowAccount;
     }
     /**
          * Additional input and output details for UTXO supporting DLTs

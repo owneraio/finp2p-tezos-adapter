@@ -3,7 +3,7 @@ import { strict as assert } from 'assert';
 import { contractAddressOfOpHash  } from '../taquito_wrapper';
 import { BigNumber } from 'bignumber.js';
 import * as Finp2pProxy from '../finp2p_proxy'
-import { FinP2PTezos, Net, log, get_balance, transfer_tokens, accountPkh, accountSk, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, release_hold, deployTestFA2 } from './test_lib'
+import { FinP2PTezos, Net, log, get_balance, transfer_tokens, accountPkh, accountSk, hold_tokens, get_balance_info, get_spendable_balance, rollback_hold, release_hold, deployTestFA2, get_receipt } from './test_lib'
 import { InMemorySigner } from '@taquito/signer';
 import { MichelsonMap } from '@taquito/michelson-encoder';
 
@@ -146,6 +146,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : ext_asset_id })
@@ -201,6 +202,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : ext_asset_id })
@@ -244,6 +246,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let b0 = await get_balance({
         owner : accounts[0].pubKey,
         asset_id : ext_asset_id })
@@ -277,6 +280,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : ext_asset_id })
@@ -299,6 +303,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : ext_asset_id })
@@ -321,6 +326,7 @@ export function run() {
         })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       let bi2 = await get_balance_info({
         owner : accounts[2].pubKey,
         asset_id : ext_asset_id })
@@ -335,7 +341,9 @@ export function run() {
       await assert.rejects(
         async () => {
           await rollback_hold(
-            { hold_id: "EXT-HOLD-ID-0000" }
+            { hold_id: "EXT-HOLD-ID-0000",
+              asset_id : ext_asset_id,
+            }
           )
         },
         { message : "FINP2P_UNKNOWN_HOLD_ID"})
@@ -346,6 +354,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "EXT-HOLD-ID-0001",
+              asset_id : ext_asset_id,
               amount: 51
             }
           )
@@ -370,6 +379,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "EXT-HOLD-ID-0001",
+              asset_id : ext_asset_id,
               src: accounts[1].pubKey
             }
           )
@@ -382,6 +392,7 @@ export function run() {
         async () => {
           await release_hold(
             { hold_id: "EXT-HOLD-ID-0001",
+              asset_id : ext_asset_id,
               dst : { kind: 'finId', dst: accounts[0].pubKey },
             }
           )
@@ -398,9 +409,14 @@ export function run() {
         owner : accounts[1].pubKey,
         asset_id : ext_asset_id })
       assert.equal(b1, 100n)
-      let op = await release_hold({ hold_id: "EXT-HOLD-ID-0001"})
+      let op = await release_hold({
+        hold_id: "EXT-HOLD-ID-0001",
+        asset_id : ext_asset_id,
+        dst : { kind: 'finId', dst: accounts[1].pubKey },
+      })
       log("waiting inclusion")
       await FinP2PTezos.waitInclusion(op)
+      await get_receipt(op)
       bi0 = await get_balance_info({
         owner : accounts[0].pubKey,
         asset_id : ext_asset_id })

@@ -1,12 +1,12 @@
-export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.hangzhounet.teztnets.xyz';
+export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.ithacanet.teztnets.xyz/';
 export const explorers = process.env.DISABLE_EXPLORERS === 'true' ? undefined : [
   {
     kind : 'TzKT' as 'TzKT',
-    url : process.env.TZKT_ADDR || 'https://api.hangzhou2net.tzkt.io',
+    url : process.env.TZKT_ADDR || 'https://api.ithacanet.tzkt.io',
   },
   {
     kind : 'tzstats' as 'tzstats',
-    url : process.env.TZSTATS_ADDR || 'https://api.hangzhou.tzstats.com',
+    url : process.env.TZSTATS_ADDR || 'https://api.ithaca.tzstats.com',
   },
 ];
 
@@ -165,13 +165,14 @@ let extraAccounts = [
 
 //TODO: move this to configuration
 // Note that this account must also be an admin of the `finp2p_proxy` contract
-module Hangzhounet {
+module Ithaca {
+
   export const account = {
-    pkh : 'tz1ST4PBJJT1WqwGfAGkcS5w2zyBCmDGdDMz',
-    pk : 'edpkuDn6QhAiGahpciQicYAgdjoXZTP1hqLRxs9ZN1bLSexJZ5tJVq',
-    sk : 'edskRmhHemySiAV8gmhiV2UExyynQKv6tMAVgxur59J1ZFGr5dbu3SH2XU9s7ZkQE6NYFFjzNPyhuSxfrfgd476wcJo2Z9GsZS',
+    pkh : 'tz1RwdbEstzX1hyes44tRE1i37YcoNMriEaB',
+    pk : 'edpkumnf9MeqsHEcdYuH3JATfmi6sqMm2re2gRDyC2cejZYkr3SHxP',
+    sk : 'edsk2zTy1q1FQoLwMWxtUkmRfqijJu7sYSxaXj89P8X5fq55nPPFf7',
   };
-  export const accounts = [account].concat(extraAccounts);
+  export const accounts = [account];//.concat(extraAccounts);
 }
 
 module Flextesa {
@@ -185,7 +186,7 @@ module Flextesa {
 
 //TODO: move this to configuration
 // Note that these accounts must be admin of the `finp2p_proxy` contract
-export let accounts = (process.env.USE_FLEXTESA == 'true') ? Flextesa.accounts : Hangzhounet.accounts;
+export let accounts = (process.env.USE_FLEXTESA == 'true') ? Flextesa.accounts : Ithaca.accounts;
 
 // Initialize FinP2P library
 //TODO: move this to configuration
