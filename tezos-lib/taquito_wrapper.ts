@@ -102,14 +102,12 @@ export class TaquitoWrapper extends TezosToolkit {
     if (this.activatedDebug) { console.log(message, ...optionalParams); }
   }
 
-  public registerSigner(signer : Signer, source? : string) {
+  public async registerSigner(signer : Signer, source? : string) {
     if (source !== undefined) {
       this.signers[source] = signer;
     } else {
-      // register asynchronously
-      signer.publicKeyHash().then(s => {
-        this.signers[s] = signer;
-      });
+      let s = await signer.publicKeyHash();
+      this.signers[s] = signer;
     }
   }
 

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v0.1.0, v0.3.2
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: Checkout private tools
+        uses: actions/checkout@v2
+        with:
+          repository: owneraio/ops
+          token: ${{ secrets.CROSS_REPO_TOKEN }}
+          ref: 'develop'
+          path: ops
+
+      - name: Publish Docker
+        uses: ./ops/.github/actions/docker-publisher
+        with:
+          github_token: ${{ secrets.CROSS_REPO_TOKEN }}
+          dockerfiles: build/Dockerfile
+          name: tezos_adapter
+          helm_chart_name: ledger_adapter
+          helm_config_name: tezos
+          dev_branch: master
