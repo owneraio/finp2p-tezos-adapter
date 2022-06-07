@@ -218,7 +218,7 @@ module Flextesa {
     await client.init({
       operationTTL : {
         ttl : BigInt(15 * blockTime), // 15 blocks
-        allowed_in_the_future : BigInt(2 * blockTime), // 2 block
+        allowed_in_the_future : BigInt(60), // 60 seconds
       },
       fa2Metadata : { name : 'FinP2P FA2 assets',
         description : 'FinP2P assets for ORG' },
