@@ -232,20 +232,25 @@ export class TaquitoWrapper extends TezosToolkit {
     const taquito = this;
     var count = 0;
     return new Promise(function (resolve, reject) {
-      // start looking in the previous blocks
-      taquito.inPrevBlocks(op).then(blockAndConf => {
-        if (blockAndConf !== undefined) {
-          const [blockOp, block, blockConfirmations] = blockAndConf;
-          foundRes = [blockOp, block];
-          if (confirmations === undefined
-            || confirmations <= blockConfirmations) {
-            return resolve([blockOp, block, blockConfirmations]);
-          }
-        }
-      });
+      let lookInPrev = false;
       // in parallel, wait for new heads
       taquito.streamHeadHashes(
         async (hash, xhr) => {
+          if (!lookInPrev) {
+            lookInPrev = true;
+            // start looking in the previous blocks
+            taquito.inPrevBlocks(op, max / 2, hash).then(blockAndConf => {
+              if (blockAndConf !== undefined) {
+                const [blockOp, block, blockConfirmations] = blockAndConf;
+                foundRes = [blockOp, block];
+                if (confirmations === undefined
+                    || confirmations <= blockConfirmations) {
+                  xhr.abort();
+                  return resolve([blockOp, block, blockConfirmations]);
+                }
+              }
+            });
+          }
           count++;
           // console.log(hash, count, foundLevel)
           if (count > max) {
