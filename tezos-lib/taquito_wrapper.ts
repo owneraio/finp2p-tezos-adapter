@@ -88,7 +88,9 @@ export class TaquitoWrapper extends TezosToolkit {
 
   signers : Record<string, Signer>;
 
-  constructor(rpc : string | RpcClientInterface, debug = false) {
+  maxWaitBlocks : number;
+
+  constructor(rpc : string | RpcClientInterface, debug = false,  max = 10) {
     super(rpc);
     // Forge operations locally (instead of using RPCs to the node)
     this.setForgerProvider(localForger);
@@ -96,20 +98,19 @@ export class TaquitoWrapper extends TezosToolkit {
     this.setProvider({ config : { streamerPollingIntervalMilliseconds : 3000 } });
     this.activatedDebug = debug;
     this.signers = {};
+    this.maxWaitBlocks = max;
   }
 
   public debug(message?: any, ...optionalParams: any[]) {
     if (this.activatedDebug) { console.log(message, ...optionalParams); }
   }
 
-  public registerSigner(signer : Signer, source? : string) {
+  public async registerSigner(signer : Signer, source? : string) {
     if (source !== undefined) {
       this.signers[source] = signer;
     } else {
-      // register asynchronously
-      signer.publicKeyHash().then(s => {
-        this.signers[s] = signer;
-      });
+      let s = await signer.publicKeyHash();
+      this.signers[s] = signer;
     }
   }
 
@@ -225,26 +226,31 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  waitInclusion(op : BatchResult, confirmations? : number, max = 10) :
+  waitInclusion(op : BatchResult, confirmations? : number, max = this.maxWaitBlocks) :
   Promise<[OperationEntry, BlockResponse, number]> {
     var foundRes : [OperationEntry, BlockResponse];
     const taquito = this;
     var count = 0;
     return new Promise(function (resolve, reject) {
-      // start looking in the previous blocks
-      taquito.inPrevBlocks(op).then(blockAndConf => {
-        if (blockAndConf !== undefined) {
-          const [blockOp, block, blockConfirmations] = blockAndConf;
-          foundRes = [blockOp, block];
-          if (confirmations === undefined
-            || confirmations <= blockConfirmations) {
-            return resolve([blockOp, block, blockConfirmations]);
-          }
-        }
-      });
+      let lookInPrev = false;
       // in parallel, wait for new heads
       taquito.streamHeadHashes(
         async (hash, xhr) => {
+          if (!lookInPrev) {
+            lookInPrev = true;
+            // start looking in the previous blocks
+            taquito.inPrevBlocks(op, max / 2, hash).then(blockAndConf => {
+              if (blockAndConf !== undefined) {
+                const [blockOp, block, blockConfirmations] = blockAndConf;
+                foundRes = [blockOp, block];
+                if (confirmations === undefined
+                    || confirmations <= blockConfirmations) {
+                  xhr.abort();
+                  return resolve([blockOp, block, blockConfirmations]);
+                }
+              }
+            });
+          }
           count++;
           // console.log(hash, count, foundLevel)
           if (count > max) {
@@ -285,7 +291,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  isIncludedInLatestBlocks(op : BatchResult, max = 10) :
+  isIncludedInLatestBlocks(op : BatchResult, max = this.maxWaitBlocks) :
   Promise<[OperationEntry, BlockResponse, number] | undefined> {
     return this.inPrevBlocks(op, max);
   }

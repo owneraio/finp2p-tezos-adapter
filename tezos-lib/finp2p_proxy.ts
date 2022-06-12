@@ -605,6 +605,7 @@ export interface Config {
   finp2pAuthAddress? : Address;
   debug? : boolean;
   confirmations? : number;
+  maxWaitBlocks? : number;
   explorers? : Explorer[];
   autoCleanup? : boolean;
   minCleanup? : number;
@@ -653,7 +654,7 @@ export class FinP2PTezos {
     this.checkConfig(config);
     this.config = config;
     this.contracts = new ContractsLibrary();
-    this.taquito = new TaquitoWrapper(config.url, config.debug);
+    this.taquito = new TaquitoWrapper(config.url, config.debug, config.maxWaitBlocks);
     this.taquito.addExtension(this.contracts);
     if (this.config.minCleanup !== undefined) {
       this.defaultCallOptions.minCleanup = this.config.minCleanup;
@@ -681,46 +682,16 @@ export class FinP2PTezos {
     }
   }
 
-  public registerSigner(signer : Signer, source? : string) {
-    this.taquito.registerSigner(signer, source);
-    let sourcePromise : Promise<string>;
-    if (source !== undefined) { sourcePromise = new Promise(resolve => {resolve(source);}); } else { sourcePromise = signer.publicKeyHash(); }
-    sourcePromise.then(s => {
-      if (s == this.default_sender) {
-        this.taquito.setSignerProvider(signer);
-      }
-    });
+  public async registerSigner(signer : Signer, source? : string) {
+    if (source == undefined)
+      source = await signer.publicKeyHash();
+    await this.taquito.registerSigner(signer, source);
+    if (source == this.default_sender) {
+      this.taquito.setSignerProvider(signer);
+    }
   }
 
-  /**
-   * @description Re-export `waitInclusion` for ease of use and check that it
-   * is successful. * By default, waits for the number of confirmations in the
-   * `config`.
-   * @see TaquitoWrapper.waitInclusion for details
-  */
-  async waitInclusion(op : BatchResult, confirmations = this.config.confirmations) {
-    const result = await this.taquito.waitInclusion(op, confirmations);
-    const [blockOp,,] = result;
-    blockOp.contents.map(o => {
-      if (!hasOwnProperty(o, 'metadata')
-        || o.metadata === undefined
-        || !hasOwnProperty(o.metadata, 'operation_result')
-        || o.metadata.operation_result === undefined ) {
-        // Not a manager operation, or the metadata is not available in the node (unlikely)
-        // Consider operation as successful.
-        return;
-      }
-      if (o.metadata.operation_result.status === 'applied') {
-        return;
-      }
-      throw new Error(
-        `Operation is included as ${o.metadata.operation_result.status}, ` +
-          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
-    });
-    return result;
-  }
-
-  async init(p : { operationTTL : OperationTTL,
+  public async init(p : { operationTTL : OperationTTL,
     fa2Metadata : Object }) {
     var accredit = false;
     if (this.config.finp2pAuthAddress === undefined) {
@@ -756,6 +727,35 @@ export class FinP2PTezos {
       await this.taquito.waitInclusion(op);
     }
   }
+
+  /**
+   * @description Re-export `waitInclusion` for ease of use and check that it
+   * is successful. * By default, waits for the number of confirmations in the
+   * `config`.
+   * @see TaquitoWrapper.waitInclusion for details
+  */
+  async waitInclusion(op : BatchResult, confirmations = this.config.confirmations) {
+    const result = await this.taquito.waitInclusion(op, confirmations);
+    const [blockOp,,] = result;
+    blockOp.contents.map(o => {
+      if (!hasOwnProperty(o, 'metadata')
+        || o.metadata === undefined
+        || !hasOwnProperty(o.metadata, 'operation_result')
+        || o.metadata.operation_result === undefined ) {
+        // Not a manager operation, or the metadata is not available in the node (unlikely)
+        // Consider operation as successful.
+        return;
+      }
+      if (o.metadata.operation_result.status === 'applied') {
+        return;
+      }
+      throw new Error(
+        `Operation is included as ${o.metadata.operation_result.status}, ` +
+          `with errors: ${JSON.stringify(o.metadata.operation_result.errors)}`);
+    });
+    return result;
+  }
+
 
   async deployFinp2pProxy(
     operation_ttl : OperationTTL,

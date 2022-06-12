@@ -2,7 +2,7 @@ import { InMemorySigner } from '@taquito/signer';
 import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
 import { TextEncoder } from 'util';
 import { logger } from '../helpers/logger';
-import { accounts, contracts, nodeAddr, explorers } from '../helpers/config';
+import { Net } from '../helpers/config';
 import { OperationResult } from '@owneraio/tezos-lib/tezos-lib/taquito_wrapper';
 
 let service:TokenService;
@@ -72,20 +72,27 @@ export class TokenService {
 
   private constructor() {
     // Initialize FinP2P library
-    let config: FINP2PProxy.Config = {
-      url : nodeAddr,
-      explorers,
-      admins : accounts.map(a => a.pkh),
-      finp2pAuthAddress : contracts.finp2pAuthAddress,
-      finp2pFA2Address : contracts.finp2pFA2Address,
-      finp2pProxyAddress : contracts.finp2pProxyAddress,
-      debug: false,
-    };
+    let config: FINP2PProxy.Config = Net.config;
     logger.debug('starting client', { config });
     this.tezosClient = new FINP2PProxy.FinP2PTezos(config);
-    accounts.map(a =>
-      this.tezosClient.registerSigner(new InMemorySigner(a.sk)),
-    );
+    setTimeout(async () => {
+      logger.debug('registerSigners');
+      await Promise.all(Net.accounts.map(a =>
+        this.tezosClient.registerSigner(new InMemorySigner(a.sk)),
+      ));
+      if (Net.poll !== undefined) {
+        logger.debug('setProvider');
+        this.tezosClient.taquito.setProvider(
+          { config :
+                  { streamerPollingIntervalMilliseconds : Net.poll } });
+      }
+      logger.debug('Net.init starting');
+      Net.init(this.tezosClient).then(() => {
+        logger.debug('Net.init done');
+      }).catch((e) => {
+        logger.error('failed to initialize network', e);
+      });
+    }, 0);
   }
 
   public static GetService(): TokenService {
@@ -359,3 +366,5 @@ export class TokenService {
   }
 }
 
+//Initialize the service
+TokenService.GetService();

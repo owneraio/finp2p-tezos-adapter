@@ -1,3 +1,5 @@
+import  * as FINP2PProxy from '@owneraio/tezos-lib/tezos-lib/finp2p_proxy';
+
 export const nodeAddr = process.env.NODE_ADDR || 'https://rpc.ithacanet.teztnets.xyz/';
 export const explorers = process.env.DISABLE_EXPLORERS === 'true' ? undefined : [
   {
@@ -9,6 +11,13 @@ export const explorers = process.env.DISABLE_EXPLORERS === 'true' ? undefined : 
     url : process.env.TZSTATS_ADDR || 'https://api.ithaca.tzstats.com',
   },
 ];
+
+//TODO: move this to configuration
+export const contracts = {
+  finp2pAuthAddress : process.env.FINP2P_AUTH_ADDRESS || 'KT1TKEHctmfiHE9JirwNofSpqUDATKVqBStE',
+  finp2pFA2Address : process.env.FINP2P_FA2_ADDRESS || 'KT1GP9DSiwR66qg1BoxAVhWS1ExSsNaL25uW',
+  finp2pProxyAddress : process.env.FINP2P_PROXY_ADDRESS || 'KT1KrsLPoT1rwwzvdGJHDzGr4vuA8GVJZ51e',
+};
 
 let extraAccounts = [
   {
@@ -165,33 +174,90 @@ let extraAccounts = [
 
 //TODO: move this to configuration
 // Note that this account must also be an admin of the `finp2p_proxy` contract
-module Ithaca {
-
+module Testnet {
+  export var blockTime = 15;
   export const account = {
     pkh : 'tz1RwdbEstzX1hyes44tRE1i37YcoNMriEaB',
     pk : 'edpkumnf9MeqsHEcdYuH3JATfmi6sqMm2re2gRDyC2cejZYkr3SHxP',
     sk : 'edsk2zTy1q1FQoLwMWxtUkmRfqijJu7sYSxaXj89P8X5fq55nPPFf7',
   };
-  export const accounts = [account];//.concat(extraAccounts);
+  export const accounts = [account].concat(extraAccounts);
+  export const config: FINP2PProxy.Config = {
+    url : nodeAddr,
+    explorers,
+    admins : accounts.map(a => a.pkh),
+    finp2pAuthAddress : contracts.finp2pAuthAddress,
+    finp2pFA2Address : contracts.finp2pFA2Address,
+    finp2pProxyAddress : contracts.finp2pProxyAddress,
+    debug: false,
+  };
+
+
+  export async function init() {}  // eslint-disable-line @typescript-eslint/no-empty-function
+
+  export const poll = undefined;
+
 }
 
 module Flextesa {
+  export var blockTime = 1;
   export const account = {
     pk: 'edpkvGfYw3LyB1UcCahKQk4rF2tvbMUk8GFiTuMjL75uGXrpvKXhjn',
     pkh: 'tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb',
     sk: 'edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq',
   };
   export const accounts = [account].concat(extraAccounts);
+
+  export const config: FINP2PProxy.Config = {
+    url : process.env.NODE_ADDR || 'http://tezos-sansbox-tezos-sandbox',
+    explorers : [],
+    admins : accounts.map(a => a.pkh),
+    debug: false,
+    maxWaitBlocks: 60,
+  };
+  export async function init(client: FINP2PProxy.FinP2PTezos) {
+    await client.init({
+      operationTTL : {
+        ttl : BigInt(15 * blockTime), // 15 blocks
+        allowed_in_the_future : BigInt(60), // 60 seconds
+      },
+      fa2Metadata : { name : 'FinP2P FA2 assets',
+        description : 'FinP2P assets for ORG' },
+    });
+
+    let op = await client.topUpXTZ(config.admins, 10, account.pkh);
+    // @ts-ignore
+    await client.waitInclusion(op);
+
+    let ops = await Promise.all(accounts.map(async a => {
+      try {
+        return await client.taquito.revealWallet(a.pk);
+      } catch (e) {
+        // console.error(e)
+        // @ts-ignore
+        if (e.message == 'WalletAlreadyRevealed') {
+          return undefined;
+        }
+        throw e;
+      }
+    }));
+
+    ops = ops.filter(a => a !== undefined);
+    await Promise.all(ops.map(o => { // @ts-ignore
+      return client.waitInclusion(o);
+    }));
+
+  }
+  export const poll : number | undefined = 500; // ms
+
 }
 
-//TODO: move this to configuration
-// Note that these accounts must be admin of the `finp2p_proxy` contract
-export let accounts = (process.env.USE_FLEXTESA == 'true') ? Flextesa.accounts : Ithaca.accounts;
+export var Net : typeof Flextesa;
+switch (process.env.FINP2P_NETWORK) {
+  case 'testnet':
+    Net = Testnet;
+    break;
+  default:
+    Net = Flextesa;
+}
 
-// Initialize FinP2P library
-//TODO: move this to configuration
-export const contracts = {
-  finp2pAuthAddress : process.env.FINP2P_AUTH_ADDRESS || 'KT1TKEHctmfiHE9JirwNofSpqUDATKVqBStE',
-  finp2pFA2Address : process.env.FINP2P_FA2_ADDRESS || 'KT1GP9DSiwR66qg1BoxAVhWS1ExSsNaL25uW',
-  finp2pProxyAddress : process.env.FINP2P_PROXY_ADDRESS || 'KT1KrsLPoT1rwwzvdGJHDzGr4vuA8GVJZ51e',
-};
