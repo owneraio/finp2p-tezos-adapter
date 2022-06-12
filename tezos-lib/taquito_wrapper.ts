@@ -88,7 +88,9 @@ export class TaquitoWrapper extends TezosToolkit {
 
   signers : Record<string, Signer>;
 
-  constructor(rpc : string | RpcClientInterface, debug = false) {
+  maxWaitBlocks : number;
+
+  constructor(rpc : string | RpcClientInterface, debug = false,  max = 10) {
     super(rpc);
     // Forge operations locally (instead of using RPCs to the node)
     this.setForgerProvider(localForger);
@@ -96,6 +98,7 @@ export class TaquitoWrapper extends TezosToolkit {
     this.setProvider({ config : { streamerPollingIntervalMilliseconds : 3000 } });
     this.activatedDebug = debug;
     this.signers = {};
+    this.maxWaitBlocks = max;
   }
 
   public debug(message?: any, ...optionalParams: any[]) {
@@ -223,7 +226,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  waitInclusion(op : BatchResult, confirmations? : number, max = 10) :
+  waitInclusion(op : BatchResult, confirmations? : number, max = this.maxWaitBlocks) :
   Promise<[OperationEntry, BlockResponse, number]> {
     var foundRes : [OperationEntry, BlockResponse];
     const taquito = this;
@@ -283,7 +286,7 @@ export class TaquitoWrapper extends TezosToolkit {
    * @returns information about inclusion: the operation, the inclusion block, the
    * number of confirmations, etc.
    */
-  isIncludedInLatestBlocks(op : BatchResult, max = 10) :
+  isIncludedInLatestBlocks(op : BatchResult, max = this.maxWaitBlocks) :
   Promise<[OperationEntry, BlockResponse, number] | undefined> {
     return this.inPrevBlocks(op, max);
   }

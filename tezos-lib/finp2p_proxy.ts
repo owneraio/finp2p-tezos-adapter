@@ -605,6 +605,7 @@ export interface Config {
   finp2pAuthAddress? : Address;
   debug? : boolean;
   confirmations? : number;
+  maxWaitBlocks? : number;
   explorers? : Explorer[];
   autoCleanup? : boolean;
   minCleanup? : number;
@@ -653,7 +654,7 @@ export class FinP2PTezos {
     this.checkConfig(config);
     this.config = config;
     this.contracts = new ContractsLibrary();
-    this.taquito = new TaquitoWrapper(config.url, config.debug);
+    this.taquito = new TaquitoWrapper(config.url, config.debug, config.maxWaitBlocks);
     this.taquito.addExtension(this.contracts);
     if (this.config.minCleanup !== undefined) {
       this.defaultCallOptions.minCleanup = this.config.minCleanup;

@@ -213,7 +213,7 @@ module Flextesa {
     explorers : [],
     admins : accounts.map(a => a.pkh),
     debug: false,
-    confirmations: 60,
+    maxWaitBlocks: 60,
   };
   export async function init(client: FINP2PProxy.FinP2PTezos) {
     await client.init({
